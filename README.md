@@ -1,4 +1,4 @@
-# Backend .NET 8 (MVP Marketplace)
+# Backend .NET 8 (Jobeasy)
 
 Novo backend portátil para **AWS Lambda + API Gateway HTTP API v2** e também executável como **container (ECS/Fargate)** sem mudanças de domínio.
 
@@ -47,9 +47,9 @@ Copie `.env.example` e configure:
 ## Executar local
 
 ```bash
-dotnet restore MarketplaceMvp.sln
-dotnet build MarketplaceMvp.sln
-dotnet test MarketplaceMvp.sln
+dotnet restore Jobeasy.sln
+dotnet build Jobeasy.sln
+dotnet test Jobeasy.sln
 dotnet run --project src/Api/Api.csproj
 ```
 
@@ -71,8 +71,8 @@ sam deploy --guided --template-file infra/sam/template.yaml
 ## Container (futuro ECS/Fargate)
 
 ```bash
-docker build -t marketplace-api-dotnet .
-docker run --rm -p 8080:8080 --env-file .env marketplace-api-dotnet
+docker build -t jobeasy-api-dotnet .
+docker run --rm -p 8080:8080 --env-file .env jobeasy-api-dotnet
 ```
 
 ## Webhook + idempotência
@@ -107,3 +107,20 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 - Login compatível com hash bcrypt existente.
 - JWT de Supabase: placeholder documentado em `.env.example` para ativação do middleware de validação (próxima iteração).
 
+
+
+## Troubleshooting (CI/CD AWS SAM)
+
+Se o `sam build` falhar com **"No .NET project found"**, verifique se o `CodeUri` no `infra/sam/template.yaml` aponta para o projeto da Lambda (`src/Api`) e não para a raiz do repositório.
+
+Se o `sam build` falhar com **"Missing required parameter: --framework"**, defina explicitamente `<TargetFramework>net8.0</TargetFramework>` no `src/Api/Api.csproj` e mantenha em `template.yaml` os metadados de build (`BuildMethod: dotnet8` + `BuildProperties.Framework: net8.0`).
+
+
+## Secrets do GitHub Actions (deploy AWS)
+
+Para o workflow de deploy funcionar, configure estes secrets no repositório:
+
+- `DB_CONNECTION`
+- `MP_ACCESS_TOKEN`
+
+> Se algum estiver vazio, o workflow interrompe antes do `sam deploy` com mensagem explícita de validação.
