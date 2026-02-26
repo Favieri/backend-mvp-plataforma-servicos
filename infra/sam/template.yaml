@@ -49,6 +49,10 @@ Resources:
             Method: ANY
       Policies:
         - AWSLambdaBasicExecutionRole
+    Metadata:
+      BuildMethod: dotnet8
+      BuildProperties:
+        Framework: net8.0
 
 Outputs:
   ApiUrl:
