@@ -4,7 +4,12 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - "backend-dotnet/**"
+      - "src/**"
+      - "tests/**"
+      - "infra/**"
+      - "Jobeasy.sln"
+      - "Directory.Build.props"
+      - "Dockerfile"
       - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
@@ -30,11 +35,10 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore/Build/Test
-        working-directory: backend-dotnet
         run: |
-          dotnet restore
-          dotnet build -c Release --no-restore
-          dotnet test -c Release --no-build
+          dotnet restore Jobeasy.sln
+          dotnet build Jobeasy.sln -c Release --no-restore
+          dotnet test Jobeasy.sln -c Release --no-build
 
       - name: Setup AWS SAM
         uses: aws-actions/setup-sam@v2
@@ -46,13 +50,12 @@ jobs:
           aws-region: sa-east-1
 
       - name: SAM Build
-        working-directory: backend-dotnet
-        run: sam build
+        run: sam build -t infra/sam/template.yaml
 
       - name: SAM Deploy
-        working-directory: backend-dotnet
         run: |
           sam deploy \
+            --template-file infra/sam/template.yaml \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \
@@ -61,4 +64,4 @@ jobs:
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               DbConnection="${{ secrets.DB_CONNECTION }}" \
-              MpAccessToken="${{ secrets.MP_ACCESS_TOKEN }}
+              MercadoPagoAccessToken="${{ secrets.MP_ACCESS_TOKEN }}"
