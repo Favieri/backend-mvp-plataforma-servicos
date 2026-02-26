@@ -107,3 +107,8 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 - Login compatível com hash bcrypt existente.
 - JWT de Supabase: placeholder documentado em `.env.example` para ativação do middleware de validação (próxima iteração).
 
+
+
+## Troubleshooting (CI/CD AWS SAM)
+
+Se o `sam build` falhar com **"No .NET project found"**, verifique se o `CodeUri` no `infra/sam/template.yaml` aponta para o projeto da Lambda (`src/Api`) e não para a raiz do repositório.
