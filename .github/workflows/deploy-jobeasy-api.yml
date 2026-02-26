@@ -1,0 +1,64 @@
+name: Deploy jobeasy-api (SAM)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "backend-dotnet/**"
+      - ".github/workflows/deploy-jobeasy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # necessário para OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: sa-east-1
+      STACK_NAME: jobeasy-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore/Build/Test
+        working-directory: backend-dotnet
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+          dotnet test -c Release --no-build
+
+      - name: Setup AWS SAM
+        uses: aws-actions/setup-sam@v2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
+          aws-region: sa-east-1
+
+      - name: SAM Build
+        working-directory: backend-dotnet
+        run: sam build
+
+      - name: SAM Deploy
+        working-directory: backend-dotnet
+        run: |
+          sam deploy \
+            --stack-name "${STACK_NAME}" \
+            --region "${AWS_REGION}" \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              DbConnection="${{ secrets.DB_CONNECTION }}" \
+              MpAccessToken="${{ secrets.MP_ACCESS_TOKEN }}

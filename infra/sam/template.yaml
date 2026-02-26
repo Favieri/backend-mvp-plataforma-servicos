@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Marketplace MVP API (.NET 8 Minimal API + Lambda HTTP API v2)
+
+Globals:
+  Function:
+    Runtime: dotnet8
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        ASPNETCORE_ENVIRONMENT: Production
+        DB_CONNECTION: !Ref DbConnection
+        DB_TIMEOUT_SECONDS: !Ref DbTimeoutSeconds
+        CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
+        MercadoPago__AccessToken: !Ref MercadoPagoAccessToken
+        MercadoPago__BaseUrl: https://api.mercadopago.com
+
+Parameters:
+  DbConnection:
+    Type: String
+  DbTimeoutSeconds:
+    Type: String
+    Default: '15'
+  CorsAllowedOrigins:
+    Type: String
+    Default: '*'
+  MercadoPagoAccessToken:
+    Type: String
+    NoEcho: true
+
+Resources:
+  MarketplaceHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: '$default'
+
+  MarketplaceApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: Api
+      Events:
+        ProxyEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MarketplaceHttpApi
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+Outputs:
+  ApiUrl:
+    Description: HTTP API endpoint URL
+    Value: !Sub 'https://${MarketplaceHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
