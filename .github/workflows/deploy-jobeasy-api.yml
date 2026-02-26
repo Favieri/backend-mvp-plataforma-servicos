@@ -61,13 +61,16 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${MP_ACCESS_TOKEN}" ]; then
-            echo "ERROR: configure MP_ACCESS_TOKEN (or MERCADOPAGO_ACCESS_TOKEN) in GitHub Secrets." >&2
-            exit 1
-          fi
-
       - name: SAM Deploy
         run: |
+          PARAM_OVERRIDES=("ParameterKey=DbConnection,ParameterValue=${DB_CONNECTION}")
+
+          if [ -n "${MP_ACCESS_TOKEN}" ]; then
+            PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
+          else
+            echo "INFO: MP_ACCESS_TOKEN/MERCADOPAGO_ACCESS_TOKEN não configurado; usando valor default do template." >&2
+          fi
+
           sam deploy \
             --template-file infra/sam/template.yaml \
             --stack-name "${STACK_NAME}" \
@@ -76,6 +79,4 @@ jobs:
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides \
-              ParameterKey=DbConnection,ParameterValue="${DB_CONNECTION}" \
-              ParameterKey=MercadoPagoAccessToken,ParameterValue="${MP_ACCESS_TOKEN}"
+            --parameter-overrides "${PARAM_OVERRIDES[@]}"

@@ -27,6 +27,7 @@ Parameters:
     Default: '*'
   MercadoPagoAccessToken:
     Type: String
+    Default: ''
     NoEcho: true
 
 Resources:
