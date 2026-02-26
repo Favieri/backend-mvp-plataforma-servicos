@@ -111,9 +111,9 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 
 ## Troubleshooting (CI/CD AWS SAM)
 
-Se o `sam build` falhar com **"No .NET project found"**, verifique se o `CodeUri` no `infra/sam/template.yaml` aponta para o projeto da Lambda (`src/Api`) e não para a raiz do repositório.
+Se o `sam build` falhar com **"No .NET project found"**, confirme que o `CodeUri` está na raiz do repositório e que o `Makefile` publica explicitamente o projeto `src/Api/Api.csproj`.
 
-Se o `sam build` falhar com **"Missing required parameter: --framework"**, o build do SAM está configurado para `makefile` no `template.yaml` e usa `src/Api/Makefile` para executar `dotnet publish -f net8.0`; mantenha `<TargetFramework>net8.0</TargetFramework>` no `src/Api/Api.csproj`.
+Se o `sam build` falhar com **"Missing required parameter: --framework"**, o build do SAM está configurado para `makefile` no `template.yaml` e usa `Makefile` na raiz para executar `dotnet publish src/Api/Api.csproj -f net8.0`; mantenha `<TargetFramework>net8.0</TargetFramework>` no `src/Api/Api.csproj`.
 
 
 ## Secrets do GitHub Actions (deploy AWS)
@@ -127,4 +127,4 @@ Para o workflow de deploy funcionar, configure estes secrets no repositório:
 > Se token do Mercado Pago não estiver definido, o deploy continua usando o valor default do template SAM.
 
 
-Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile` e se o alvo `build-JobeasyApiFunction` publica para `$(ARTIFACTS_DIR)` (sem subpastas).
+Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile` e se o alvo `build-JobeasyApiFunction` do `Makefile` (na raiz) publica para `$(ARTIFACTS_DIR)` (sem subpastas).
