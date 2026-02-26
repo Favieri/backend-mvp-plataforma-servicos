@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Marketplace MVP API (.NET 8 Minimal API + Lambda HTTP API v2)
+Description: Jobeasy API (.NET 8 Minimal API + Lambda HTTP API v2)
 
 Globals:
   Function:
@@ -30,12 +30,12 @@ Parameters:
     NoEcho: true
 
 Resources:
-  MarketplaceHttpApi:
+  JobeasyHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: '$default'
 
-  MarketplaceApiFunction:
+  JobeasyApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../
@@ -44,7 +44,7 @@ Resources:
         ProxyEvent:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MarketplaceHttpApi
+            ApiId: !Ref JobeasyHttpApi
             Path: /{proxy+}
             Method: ANY
       Policies:
@@ -53,4 +53,4 @@ Resources:
 Outputs:
   ApiUrl:
     Description: HTTP API endpoint URL
-    Value: !Sub 'https://${MarketplaceHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Value: !Sub 'https://${JobeasyHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
