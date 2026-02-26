@@ -56,8 +56,7 @@ jobs:
         run: |
           test -f Makefile || (echo "ERROR: root Makefile not found" >&2; exit 1)
           if [ -f src/Api/Makefile ]; then
-            echo "ERROR: src/Api/Makefile should not exist (causes isolated build context issues)." >&2
-            exit 1
+            echo "WARN: src/Api/Makefile exists, but build will use root Makefile because CodeUri points to repository root." >&2
           fi
           awk 'NR>=35 && NR<=58 {print}' infra/sam/template.yaml
 
