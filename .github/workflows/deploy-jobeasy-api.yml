@@ -24,6 +24,8 @@ jobs:
     env:
       AWS_REGION: sa-east-1
       STACK_NAME: jobeasy-api
+      DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
+      MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN }}
 
     steps:
       - name: Checkout
@@ -52,6 +54,18 @@ jobs:
       - name: SAM Build
         run: sam build -t infra/sam/template.yaml
 
+      - name: Validate required deploy secrets
+        run: |
+          if [ -z "${DB_CONNECTION}" ]; then
+            echo "ERROR: GitHub secret DB_CONNECTION is empty or not configured." >&2
+            exit 1
+          fi
+
+          if [ -z "${MP_ACCESS_TOKEN}" ]; then
+            echo "ERROR: GitHub secret MP_ACCESS_TOKEN is empty or not configured." >&2
+            exit 1
+          fi
+
       - name: SAM Deploy
         run: |
           sam deploy \
@@ -63,5 +77,5 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              DbConnection="${{ secrets.DB_CONNECTION }}" \
-              MercadoPagoAccessToken="${{ secrets.MP_ACCESS_TOKEN }}"
+              ParameterKey=DbConnection,ParameterValue="${DB_CONNECTION}" \
+              ParameterKey=MercadoPagoAccessToken,ParameterValue="${MP_ACCESS_TOKEN}"

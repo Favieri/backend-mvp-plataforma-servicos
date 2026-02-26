@@ -112,4 +112,15 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 ## Troubleshooting (CI/CD AWS SAM)
 
 Se o `sam build` falhar com **"No .NET project found"**, verifique se o `CodeUri` no `infra/sam/template.yaml` aponta para o projeto da Lambda (`src/Api`) e não para a raiz do repositório.
+
 Se o `sam build` falhar com **"Missing required parameter: --framework"**, defina explicitamente `<TargetFramework>net8.0</TargetFramework>` no `src/Api/Api.csproj` e mantenha em `template.yaml` os metadados de build (`BuildMethod: dotnet8` + `BuildProperties.Framework: net8.0`).
+
+
+## Secrets do GitHub Actions (deploy AWS)
+
+Para o workflow de deploy funcionar, configure estes secrets no repositório:
+
+- `DB_CONNECTION`
+- `MP_ACCESS_TOKEN`
+
+> Se algum estiver vazio, o workflow interrompe antes do `sam deploy` com mensagem explícita de validação.
