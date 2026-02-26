@@ -120,7 +120,7 @@ Se o `sam build` falhar com **"Missing required parameter: --framework"**, defin
 
 Para o workflow de deploy funcionar, configure estes secrets no repositório:
 
-- `DB_CONNECTION`
-- `MP_ACCESS_TOKEN`
+- `DB_CONNECTION` *(fallback: `DATABASE_URL`)*
+- `MP_ACCESS_TOKEN` *(fallback: `MERCADOPAGO_ACCESS_TOKEN`)*
 
-> Se algum estiver vazio, o workflow interrompe antes do `sam deploy` com mensagem explícita de validação.
+> Se nenhum dos nomes estiver configurado, o workflow interrompe antes do `sam deploy` com mensagem explícita de validação.

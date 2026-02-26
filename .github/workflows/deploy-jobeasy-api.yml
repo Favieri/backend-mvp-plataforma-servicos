@@ -24,8 +24,8 @@ jobs:
     env:
       AWS_REGION: sa-east-1
       STACK_NAME: jobeasy-api
-      DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
-      MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN }}
+      DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
+      MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN }}
 
     steps:
       - name: Checkout
@@ -57,12 +57,12 @@ jobs:
       - name: Validate required deploy secrets
         run: |
           if [ -z "${DB_CONNECTION}" ]; then
-            echo "ERROR: GitHub secret DB_CONNECTION is empty or not configured." >&2
+            echo "ERROR: configure DB_CONNECTION (or DATABASE_URL) in GitHub Secrets." >&2
             exit 1
           fi
 
           if [ -z "${MP_ACCESS_TOKEN}" ]; then
-            echo "ERROR: GitHub secret MP_ACCESS_TOKEN is empty or not configured." >&2
+            echo "ERROR: configure MP_ACCESS_TOKEN (or MERCADOPAGO_ACCESS_TOKEN) in GitHub Secrets." >&2
             exit 1
           fi
 
