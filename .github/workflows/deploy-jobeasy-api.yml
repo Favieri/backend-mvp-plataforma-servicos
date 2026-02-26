@@ -10,6 +10,7 @@ on:
       - "Jobeasy.sln"
       - "Directory.Build.props"
       - "Dockerfile"
+      - "Makefile"
       - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
@@ -50,6 +51,15 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
           aws-region: sa-east-1
+
+      - name: Validate SAM build context
+        run: |
+          test -f Makefile || (echo "ERROR: root Makefile not found" >&2; exit 1)
+          if [ -f src/Api/Makefile ]; then
+            echo "ERROR: src/Api/Makefile should not exist (causes isolated build context issues)." >&2
+            exit 1
+          fi
+          awk 'NR>=35 && NR<=58 {print}' infra/sam/template.yaml
 
       - name: SAM Build
         run: sam build -t infra/sam/template.yaml
