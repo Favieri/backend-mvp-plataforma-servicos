@@ -39,7 +39,7 @@ Resources:
   JobeasyApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../../src/Api
+      CodeUri: ../../
       Handler: Api
       Events:
         ProxyEvent:
