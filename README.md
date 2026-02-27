@@ -17,6 +17,7 @@ Novo backend portátil para **AWS Lambda + API Gateway HTTP API v2** e também e
 - `GET /health`
 - `POST /api/auth`
 - `GET /api/orders`
+- `GET /professionals` *(compat: alias para listagem usada pelo frontend legado)*
 - `POST /api/orders`
 - `GET /api/orders/mine`
 - `POST /api/orders/{id}/complete`
