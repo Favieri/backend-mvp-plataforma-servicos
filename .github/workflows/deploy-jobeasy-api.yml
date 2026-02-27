@@ -81,7 +81,7 @@ jobs:
           fi
 
           sam deploy \
-            --template-file infra/sam/template.yaml \
+            --template-file .aws-sam/build/template.yaml \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \
