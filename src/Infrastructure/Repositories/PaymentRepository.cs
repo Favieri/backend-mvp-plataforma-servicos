@@ -13,7 +13,7 @@ public sealed class PaymentRepository(IConnectionFactory factory) : IPaymentRepo
         const string sql = @"insert into payment(id,order_id,gateway,gateway_ref,method,amount_cents,status,created_at,updated_at,paid_at)
 values(@Id,@OrderId,@Gateway,@GatewayRef,@Method,@AmountCents,@Status,now(),now(),@PaidAt)
 on conflict (gateway,gateway_ref) do update set status=excluded.status,updated_at=now(),paid_at=excluded.paid_at
-returning id AS \"Id\",order_id AS \"OrderId\",gateway AS \"Gateway\",gateway_ref AS \"GatewayRef\",method AS \"Method\",amount_cents AS \"AmountCents\",status AS \"Status\",created_at AS \"CreatedAt\",paid_at AS \"PaidAt\"";
+returning id AS ""Id"",order_id AS ""OrderId"",gateway AS ""Gateway"",gateway_ref AS ""GatewayRef"",method AS ""Method"",amount_cents AS ""AmountCents"",status AS ""Status"",created_at AS ""CreatedAt"",paid_at AS ""PaidAt""";
         return await conn.QuerySingleAsync<Payment>(new CommandDefinition(sql, payment, cancellationToken: ct));
     }
 
