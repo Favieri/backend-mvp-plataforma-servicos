@@ -36,6 +36,20 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: '$default'
+      CorsConfiguration:
+        AllowOrigins:
+          - '*' #ALTERAR CORS
+        AllowHeaders:
+          - 'Content-Type'
+          - 'Authorization'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        MaxAge: 86400
 
   JobeasyApiFunction:
     Type: AWS::Serverless::Function
