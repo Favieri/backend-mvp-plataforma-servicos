@@ -21,6 +21,9 @@ public static class ApiEndpoints
         app.MapGet("/api/orders", async (string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
             => Results.Ok(await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, ct)));
 
+        app.MapGet("/professionals", async (string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
+            => Results.Ok(await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, ct)));
+
         app.MapPost("/api/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
             var val = await validator.ValidateAsync(body, ct);
