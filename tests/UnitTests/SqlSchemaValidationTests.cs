@@ -43,6 +43,11 @@ public sealed class SqlSchemaValidationTests
             var table = m.Groups[1].Value;
             var alias = m.Groups[2].Value;
 
+            if (SqlKeywords.Contains(table))
+            {
+                continue;
+            }
+
             if (!schema.ContainsKey(table) && !AllowedMissingTables.Contains(table))
             {
                 failures.Add($"{Path.GetFileName(file)}: tabela inexistente '{table}' em SQL => {OneLine(sql)}");
@@ -104,5 +109,5 @@ public sealed class SqlSchemaValidationTests
         "where", "on", "set", "values", "order", "group", "limit"
     ];
 
-    private sealed record SchemaRow(string table, int pos, string column, string type, bool nullable);
+    private sealed record SchemaRow(string table, int pos, string column, string type, string nullable);
 }
