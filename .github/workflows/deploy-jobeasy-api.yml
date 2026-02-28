@@ -3,15 +3,6 @@ name: Deploy jobeasy-api (SAM)
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "infra/**"
-      - "Jobeasy.sln"
-      - "Directory.Build.props"
-      - "Dockerfile"
-      - "Makefile"
-      - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
 permissions:
