@@ -127,6 +127,29 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 - Desenvolvimento: `http://localhost:5080`
 - Produção: URL do API Gateway
 
+### Correlation ID (observabilidade por request)
+
+O backend lê `x-correlation-id` (case-insensitive) em toda request.
+
+- Se vier no header, o valor é reaproveitado na resposta (`x-correlation-id`).
+- Se não vier, o backend gera um GUID e devolve no header da resposta.
+- Todos os logs estruturados do request carregam `CorrelationId`, `TraceId`, `SpanId`, `RequestPath` e `StatusCode` (quando disponíveis).
+
+No front-end, gere e envie um correlation id por request:
+
+```ts
+const correlationId = crypto.randomUUID();
+
+await fetch(`${API_BASE_URL}/api/orders`, {
+  method: 'GET',
+  headers: {
+    'x-correlation-id': correlationId,
+  },
+});
+```
+
+Isso facilita rastrear a jornada completa (browser -> API Gateway/Lambda -> backend -> banco) no CloudWatch hoje e em ECS/Fargate amanhã.
+
 ## Segurança/autenticação
 
 - Login compatível com hash bcrypt existente.
