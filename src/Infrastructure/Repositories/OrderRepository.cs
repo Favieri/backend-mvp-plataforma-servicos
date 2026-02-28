@@ -55,7 +55,7 @@ public sealed class OrderRepository(IConnectionFactory factory) : IOrderReposito
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
         const string sql = "select id,status,date as \"scheduledAt\",\"createdAt\" as \"createdAt\" from \"Order\" where \"clientId\"=@clientId order by \"createdAt\" desc";
-        var rows = await conn.QueryAsync(sql, new { clientId });
+        var rows = await conn.QueryAsync(new CommandDefinition(sql, new { clientId }, cancellationToken: ct));
         return rows.ToList();
     }
 }

@@ -44,6 +44,11 @@ Copie `.env.example` e configure:
 - `CORS_ALLOWED_ORIGINS`
 - `MercadoPago__AccessToken`
 - `MercadoPago__BaseUrl`
+- `DB_TIMEOUT_SECONDS`
+- `DB_COMMAND_TIMEOUT_SECONDS`
+- `DB_MAX_POOL_SIZE`
+- `DB_POOLER_PORT` *(default 6543 para Supabase pooler em produção)*
+- `DB_MAX_CONCURRENT_REQUESTS` *(backpressure interno para rotas críticas)*
 
 ### CORS (backend como fonte da verdade)
 
@@ -54,6 +59,17 @@ Copie `.env.example` e configure:
 - Wildcard de subdomínio → ex.: `https://*.vercel.app`.
 
 A API responde preflight `OPTIONS` para qualquer path e expõe `x-correlation-id` para leitura no browser.
+
+### Performance e proteção de banco (Lambda/ECS)
+
+- `NpgsqlDataSource` singleton com pooling (evita custo de handshake por request).
+- Backpressure em rotas críticas (`/professionals`, `/api/orders`, `/api/orders/mine`) com resposta `429` + `Retry-After` quando limite interno for atingido.
+- Cache in-memory por instância (TTL curto):
+  - `GET /professionals` (60s)
+  - `GET /api/orders` (30s)
+- Bypass de cache com header `Cache-Control: no-cache`.
+
+> Em Lambda o cache é por instância quente; em ECS, o mesmo padrão funciona e pode ser evoluído para Redis se necessário.
 
 ### Teste rápido de CORS (local)
 

@@ -33,6 +33,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache();
 
 var corsAllowedOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"];
 builder.Services.AddCors(options =>
@@ -44,6 +45,7 @@ var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<DbBackpressureMiddleware>();
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
