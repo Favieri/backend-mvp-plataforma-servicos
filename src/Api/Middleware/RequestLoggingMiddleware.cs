@@ -6,7 +6,7 @@ namespace Api.Middleware;
 
 public sealed class RequestLoggingMiddleware(RequestDelegate next)
 {
-    private static readonly ILogger Logger = Log.ForContext<RequestLoggingMiddleware>();
+    private static readonly Serilog.ILogger Logger = Log.ForContext<RequestLoggingMiddleware>();
 
     public async Task InvokeAsync(HttpContext context)
     {

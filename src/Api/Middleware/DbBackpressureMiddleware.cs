@@ -4,7 +4,7 @@ namespace Api.Middleware;
 
 public sealed class DbBackpressureMiddleware(RequestDelegate next, IConfiguration configuration)
 {
-    private static readonly ILogger Logger = Log.ForContext<DbBackpressureMiddleware>();
+    private static readonly Serilog.ILogger Logger = Log.ForContext<DbBackpressureMiddleware>();
     private static readonly string[] ProtectedPaths = ["/professionals", "/api/orders", "/api/orders/mine"];
     private readonly SemaphoreSlim _semaphore = BuildSemaphore(configuration);
 
