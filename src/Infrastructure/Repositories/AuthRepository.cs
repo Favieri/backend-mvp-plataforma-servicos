@@ -9,7 +9,7 @@ public sealed class AuthRepository(IConnectionFactory factory) : IAuthRepository
     public async Task<object?> LoginAsync(string email, string password, CancellationToken ct)
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "select id,name,email,phone,role,senha,createdat as createdAt from \"User\" where email=@email";
+        const string sql = "select id,name,email,phone,role,senha,\"createdAt\" AS \"CreatedAt\" from \"User\" where email=@email";
         var row = await conn.QuerySingleOrDefaultAsync<dynamic>(new CommandDefinition(sql, new { email }, cancellationToken: ct));
         if (row is null) return null;
         string hash = row.senha;
@@ -22,7 +22,7 @@ public sealed class AuthRepository(IConnectionFactory factory) : IAuthRepository
             email = (string)row.email,
             phone = (string?)row.phone,
             role = (string)row.role,
-            createdAt = (DateTime)row.createdat
+            createdAt = (DateTime)row.CreatedAt
         };
     }
 }

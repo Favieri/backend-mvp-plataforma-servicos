@@ -45,6 +45,30 @@ Copie `.env.example` e configure:
 - `MercadoPago__AccessToken`
 - `MercadoPago__BaseUrl`
 
+### CORS (backend como fonte da verdade)
+
+`CORS_ALLOWED_ORIGINS` controla totalmente o CORS da API (Lambda hoje, portátil para ECS amanhã):
+
+- `*` → permite qualquer origem (MVP/preview do Vercel).
+- Lista por vírgula → ex.: `http://localhost:3000,https://app.jobeasy.com.br`.
+- Wildcard de subdomínio → ex.: `https://*.vercel.app`.
+
+A API responde preflight `OPTIONS` para qualquer path e expõe `x-correlation-id` para leitura no browser.
+
+### Teste rápido de CORS (local)
+
+```bash
+# GET simples com Origin
+curl -i -H "Origin: http://localhost:3000" http://localhost:5080/professionals
+
+# Preflight OPTIONS
+curl -i -X OPTIONS \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization,X-Correlation-Id" \
+  http://localhost:5080/professionals
+```
+
 ## Executar local
 
 ```bash

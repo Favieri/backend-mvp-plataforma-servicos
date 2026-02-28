@@ -12,6 +12,12 @@ public static class ApiEndpoints
     {
         app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "v1" }));
 
+        app.MapGet("/cors-test", (HttpContext context) =>
+        {
+            var origin = context.Request.Headers.Origin.FirstOrDefault();
+            return Results.Ok(new { origin, ok = true });
+        });
+
         app.MapPost("/api/auth", async (LoginRequest body, IAuthRepository db, CancellationToken ct) =>
         {
             var user = await db.LoginAsync(body.Email, body.Senha, ct);
