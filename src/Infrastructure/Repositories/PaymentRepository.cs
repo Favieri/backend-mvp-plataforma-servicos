@@ -13,14 +13,14 @@ public sealed class PaymentRepository(IConnectionFactory factory) : IPaymentRepo
         const string sql = @"insert into payment(id,order_id,gateway,gateway_ref,method,amount_cents,status,created_at,updated_at,paid_at)
 values(@Id,@OrderId,@Gateway,@GatewayRef,@Method,@AmountCents,@Status,now(),now(),@PaidAt)
 on conflict (gateway,gateway_ref) do update set status=excluded.status,updated_at=now(),paid_at=excluded.paid_at
-returning id,order_id as OrderId,gateway,gateway_ref as GatewayRef,method,amount_cents as AmountCents,status,created_at as CreatedAt,paid_at as PaidAt";
+returning id AS ""Id"",order_id AS ""OrderId"",gateway AS ""Gateway"",gateway_ref AS ""GatewayRef"",method AS ""Method"",amount_cents AS ""AmountCents"",status AS ""Status"",created_at AS ""CreatedAt"",paid_at AS ""PaidAt""";
         return await conn.QuerySingleAsync<Payment>(new CommandDefinition(sql, payment, cancellationToken: ct));
     }
 
     public async Task<Payment?> GetLatestByOrderAsync(string orderId, CancellationToken ct)
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "select id,order_id as OrderId,gateway,gateway_ref as GatewayRef,method,amount_cents as AmountCents,status,created_at as CreatedAt,paid_at as PaidAt from payment where order_id=@orderId order by created_at desc limit 1";
+        const string sql = "select id AS \"Id\",order_id AS \"OrderId\",gateway AS \"Gateway\",gateway_ref AS \"GatewayRef\",method AS \"Method\",amount_cents AS \"AmountCents\",status AS \"Status\",created_at AS \"CreatedAt\",paid_at AS \"PaidAt\" from payment where order_id=@orderId order by created_at desc limit 1";
         return await conn.QuerySingleOrDefaultAsync<Payment>(new CommandDefinition(sql, new { orderId }, cancellationToken: ct));
     }
 
@@ -62,7 +62,7 @@ on conflict(provider,event_id) do nothing";
     public async Task<IReadOnlyList<object>> GetLedgerAsync(string professionalId, CancellationToken ct)
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "select id,type,amount_cents as amountCents,created_at as createdAt,order_id as orderId,payment_id as paymentId,payout_item_id as payoutItemId from ledger_entry where professional_id=@professionalId order by created_at desc limit 100";
+        const string sql = "select id,type,amount_cents as \"amountCents\",created_at as \"createdAt\",order_id as \"orderId\",payment_id as \"paymentId\",payout_item_id as \"payoutItemId\" from ledger_entry where professional_id=@professionalId order by created_at desc limit 100";
         return (await conn.QueryAsync(new CommandDefinition(sql, new { professionalId }, cancellationToken: ct))).ToList();
     }
 }
