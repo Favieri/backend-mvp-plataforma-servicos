@@ -19,6 +19,7 @@ Globals:
 Parameters:
   DbConnection:
     Type: String
+    NoEcho: true
   DbTimeoutSeconds:
     Type: String
     Default: '15'
