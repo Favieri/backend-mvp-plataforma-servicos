@@ -1,5 +1,6 @@
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using Api.Extensions;
+using Api.Logging;
 using Api.Middleware;
 using Application.Services;
 using Infrastructure;
@@ -7,16 +8,26 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
+using Serilog.Formatting.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
+builder.Logging.ClearProviders();
+builder.Services.AddHttpContextAccessor();
 
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
+builder.Host.UseSerilog((context, services, cfg) => cfg
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.AspNetCore.Routing", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.AspNetCore.Cors", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", Serilog.Events.LogEventLevel.Information)
     .Enrich.FromLogContext()
-    .WriteTo.Console());
+    .Enrich.With(services.GetRequiredService<RequestObservabilityEnricher>())
+    .WriteTo.Console(new JsonFormatter()));
 
+builder.Services.AddSingleton<RequestObservabilityEnricher>();
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Services.AddProblemDetails();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -30,6 +41,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
@@ -47,8 +61,6 @@ app.UseExceptionHandler(exceptionHandlerApp =>
     });
 });
 
-app.UseSerilogRequestLogging();
-app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRouting();
 app.UseCors("default");
 
