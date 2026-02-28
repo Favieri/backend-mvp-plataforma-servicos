@@ -3,6 +3,7 @@ using Api.Extensions;
 using Api.Middleware;
 using Application.Services;
 using Infrastructure;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
@@ -22,14 +23,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var corsOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"] ?? "*";
+var corsAllowedOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"];
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("mvp", policy =>
-    {
-        if (corsOrigins == "*") policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-        else policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).AllowAnyHeader().AllowAnyMethod();
-    });
+    options.AddPolicy("default", policy => ConfigureCorsPolicy(policy, corsAllowedOrigins));
 });
 
 var app = builder.Build();
@@ -52,7 +49,8 @@ app.UseExceptionHandler(exceptionHandlerApp =>
 
 app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseCors("mvp");
+app.UseRouting();
+app.UseCors("default");
 
 if (app.Environment.IsDevelopment())
 {
@@ -60,8 +58,42 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapMarketplaceEndpoints();
+var apiGroup = app.MapGroup(string.Empty).RequireCors("default");
+apiGroup.MapMarketplaceEndpoints();
+
+app.MapMethods("/{**path}", ["OPTIONS"], () => Results.NoContent())
+    .RequireCors("default");
 
 app.Run();
+
+static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrigins)
+{
+    var origins = (configuredOrigins ?? "*")
+        .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    if (origins.Length == 0 || origins.Contains("*", StringComparer.Ordinal))
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .WithExposedHeaders("x-correlation-id");
+        return;
+    }
+
+    policy
+        .WithOrigins(origins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .WithExposedHeaders("x-correlation-id");
+
+    if (origins.Any(origin => origin.Contains('*')))
+    {
+        policy.SetIsOriginAllowedToAllowWildcardSubdomains();
+    }
+}
 
 public partial class Program;
