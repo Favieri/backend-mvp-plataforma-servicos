@@ -11,12 +11,14 @@ Novo backend portátil para **AWS Lambda + API Gateway HTTP API v2** e também e
 - `tests/UnitTests`: regras críticas (transição/idempotência)
 - `tests/IntegrationTests`: smoke test do `/health`
 - `infra/sam/template.yaml`: IaC para Lambda + HTTP API v2
+- `docs/api-contracts.md`: contratos de resposta dos endpoints principais
 
 ## Endpoints MVP migrados
 
 - `GET /health`
 - `POST /api/auth`
 - `GET /api/orders`
+- `GET /professionals` *(compat: alias para listagem usada pelo frontend legado)*
 - `POST /api/orders`
 - `GET /api/orders/mine`
 - `POST /api/orders/{id}/complete`
@@ -43,6 +45,46 @@ Copie `.env.example` e configure:
 - `CORS_ALLOWED_ORIGINS`
 - `MercadoPago__AccessToken`
 - `MercadoPago__BaseUrl`
+- `DB_TIMEOUT_SECONDS`
+- `DB_COMMAND_TIMEOUT_SECONDS`
+- `DB_MAX_POOL_SIZE`
+- `DB_POOLER_PORT` *(default 6543 para Supabase pooler em produção)*
+- `DB_MAX_CONCURRENT_REQUESTS` *(backpressure interno para rotas críticas)*
+
+### CORS (backend como fonte da verdade)
+
+`CORS_ALLOWED_ORIGINS` controla totalmente o CORS da API (Lambda hoje, portátil para ECS amanhã):
+
+- `*` → permite qualquer origem (MVP/preview do Vercel).
+- Lista por vírgula → ex.: `http://localhost:3000,https://app.jobeasy.com.br`.
+- Wildcard de subdomínio → ex.: `https://*.vercel.app`.
+
+A API responde preflight `OPTIONS` para qualquer path e expõe `x-correlation-id` para leitura no browser.
+
+### Performance e proteção de banco (Lambda/ECS)
+
+- `NpgsqlDataSource` singleton com pooling (evita custo de handshake por request).
+- Backpressure em rotas críticas (`/professionals`, `/api/orders`, `/api/orders/mine`) com resposta `429` + `Retry-After` quando limite interno for atingido.
+- Cache in-memory por instância (TTL curto):
+  - `GET /professionals` (60s)
+  - `GET /api/orders` (30s)
+- Bypass de cache com header `Cache-Control: no-cache`.
+
+> Em Lambda o cache é por instância quente; em ECS, o mesmo padrão funciona e pode ser evoluído para Redis se necessário.
+
+### Teste rápido de CORS (local)
+
+```bash
+# GET simples com Origin
+curl -i -H "Origin: http://localhost:3000" http://localhost:5080/professionals
+
+# Preflight OPTIONS
+curl -i -X OPTIONS \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization,X-Correlation-Id" \
+  http://localhost:5080/professionals
+```
 
 ## Executar local
 
@@ -101,6 +143,29 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 
 - Desenvolvimento: `http://localhost:5080`
 - Produção: URL do API Gateway
+
+### Correlation ID (observabilidade por request)
+
+O backend lê `x-correlation-id` (case-insensitive) em toda request.
+
+- Se vier no header, o valor é reaproveitado na resposta (`x-correlation-id`).
+- Se não vier, o backend gera um GUID e devolve no header da resposta.
+- Todos os logs estruturados do request carregam `CorrelationId`, `TraceId`, `SpanId`, `RequestPath` e `StatusCode` (quando disponíveis).
+
+No front-end, gere e envie um correlation id por request:
+
+```ts
+const correlationId = crypto.randomUUID();
+
+await fetch(`${API_BASE_URL}/api/orders`, {
+  method: 'GET',
+  headers: {
+    'x-correlation-id': correlationId,
+  },
+});
+```
+
+Isso facilita rastrear a jornada completa (browser -> API Gateway/Lambda -> backend -> banco) no CloudWatch hoje e em ECS/Fargate amanhã.
 
 ## Segurança/autenticação
 

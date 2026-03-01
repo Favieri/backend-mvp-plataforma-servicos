@@ -97,8 +97,23 @@ public static class ApiEndpoints
             return user is null ? Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401) : Results.Ok(user);
         });
 
-        app.MapGet("/api/orders", async (string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
-            => Results.Ok(await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, ct)));
+        app.MapGet("/api/orders", async (HttpContext context, IMemoryCache cache, string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
+            => await GetOrSetCachedListAsync(
+                context,
+                cache,
+                "api-orders",
+                TimeSpan.FromSeconds(30),
+                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token),
+                ct));
+
+        app.MapGet("/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? zoneId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IProfessionalRepository repo, CancellationToken ct)
+            => await GetOrSetCachedListAsync(
+                context,
+                cache,
+                "professionals-cards",
+                TimeSpan.FromSeconds(60),
+                async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token),
+                ct));
 
         app.MapPost("/api/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
