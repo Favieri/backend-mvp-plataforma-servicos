@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
 using FluentValidation;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Api.Extensions;
 
@@ -24,11 +24,23 @@ public static class ApiEndpoints
             return user is null ? Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401) : Results.Ok(user);
         });
 
-        app.MapGet("/api/orders", async (string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
-            => Results.Ok(await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, ct)));
+        app.MapGet("/api/orders", async (HttpContext context, IMemoryCache cache, string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
+            => await GetOrSetCachedListAsync(
+                context,
+                cache,
+                "api-orders",
+                TimeSpan.FromSeconds(30),
+                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token),
+                ct));
 
-        app.MapGet("/professionals", async (string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
-            => Results.Ok(await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, ct)));
+        app.MapGet("/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? zoneId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IProfessionalRepository repo, CancellationToken ct)
+            => await GetOrSetCachedListAsync(
+                context,
+                cache,
+                "professionals-cards",
+                TimeSpan.FromSeconds(60),
+                async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token),
+                ct));
 
         app.MapPost("/api/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
@@ -104,5 +116,35 @@ public static class ApiEndpoints
             => Results.Ok(await repo.GetLedgerAsync(professionalId, ct)));
 
         return app;
+    }
+
+    private static async Task<IResult> GetOrSetCachedListAsync<T>(
+        HttpContext context,
+        IMemoryCache cache,
+        string cachePrefix,
+        TimeSpan ttl,
+        Func<CancellationToken, Task<T>> factory,
+        CancellationToken ct)
+    {
+        if (ShouldBypassCache(context.Request))
+        {
+            return Results.Ok(await factory(ct));
+        }
+
+        var cacheKey = $"{cachePrefix}:{context.Request.Path.Value}:{context.Request.QueryString.Value}";
+        if (cache.TryGetValue(cacheKey, out T? cached) && cached is not null)
+        {
+            return Results.Ok(cached);
+        }
+
+        var value = await factory(ct);
+        cache.Set(cacheKey, value, ttl);
+        return Results.Ok(value);
+    }
+
+    private static bool ShouldBypassCache(HttpRequest request)
+    {
+        var cacheControl = request.Headers.CacheControl.ToString();
+        return cacheControl.Contains("no-cache", StringComparison.OrdinalIgnoreCase);
     }
 }
