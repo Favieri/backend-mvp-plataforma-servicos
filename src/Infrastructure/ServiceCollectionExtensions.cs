@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IProfessionalRepository, ProfessionalRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IAuthRepository, AuthRepository>();

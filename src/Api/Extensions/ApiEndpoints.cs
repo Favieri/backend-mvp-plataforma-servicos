@@ -33,13 +33,13 @@ public static class ApiEndpoints
                 async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token),
                 ct));
 
-        app.MapGet("/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct)
+        app.MapGet("/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? zoneId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IProfessionalRepository repo, CancellationToken ct)
             => await GetOrSetCachedListAsync(
                 context,
                 cache,
-                "professionals",
+                "professionals-cards",
                 TimeSpan.FromSeconds(60),
-                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token),
+                async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token),
                 ct));
 
         app.MapPost("/api/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>

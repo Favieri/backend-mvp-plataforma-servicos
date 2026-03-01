@@ -11,6 +11,7 @@ Novo backend portátil para **AWS Lambda + API Gateway HTTP API v2** e também e
 - `tests/UnitTests`: regras críticas (transição/idempotência)
 - `tests/IntegrationTests`: smoke test do `/health`
 - `infra/sam/template.yaml`: IaC para Lambda + HTTP API v2
+- `docs/api-contracts.md`: contratos de resposta dos endpoints principais
 
 ## Endpoints MVP migrados
 
