@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IAuthRepository, AuthRepository>();
+        services.AddScoped<IProfessionalReadRepository, ProfessionalReadRepository>();
         services.AddHttpClient<IMercadoPagoClient, MercadoPagoClient>();
         return services;
     }
