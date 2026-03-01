@@ -1,4 +1,4 @@
-# Backend .NET 8 (MVP Marketplace)
+# Backend .NET 8 (Jobeasy)
 
 Novo backend portátil para **AWS Lambda + API Gateway HTTP API v2** e também executável como **container (ECS/Fargate)** sem mudanças de domínio.
 
@@ -47,9 +47,9 @@ Copie `.env.example` e configure:
 ## Executar local
 
 ```bash
-dotnet restore MarketplaceMvp.sln
-dotnet build MarketplaceMvp.sln
-dotnet test MarketplaceMvp.sln
+dotnet restore Jobeasy.sln
+dotnet build Jobeasy.sln
+dotnet test Jobeasy.sln
 dotnet run --project src/Api/Api.csproj
 ```
 
@@ -71,8 +71,8 @@ sam deploy --guided --template-file infra/sam/template.yaml
 ## Container (futuro ECS/Fargate)
 
 ```bash
-docker build -t marketplace-api-dotnet .
-docker run --rm -p 8080:8080 --env-file .env marketplace-api-dotnet
+docker build -t jobeasy-api-dotnet .
+docker run --rm -p 8080:8080 --env-file .env jobeasy-api-dotnet
 ```
 
 ## Webhook + idempotência
@@ -107,3 +107,24 @@ No front, adicione `API_BASE_URL` para alternar entre rotas do Next API e novo b
 - Login compatível com hash bcrypt existente.
 - JWT de Supabase: placeholder documentado em `.env.example` para ativação do middleware de validação (próxima iteração).
 
+
+
+## Troubleshooting (CI/CD AWS SAM)
+
+Se o `sam build` falhar com **"No .NET project found"**, confirme que o `CodeUri` está na raiz do repositório e que o `Makefile` publica explicitamente o projeto `src/Api/Api.csproj`.
+
+Se o `sam build` falhar com **"Missing required parameter: --framework"**, o build do SAM está configurado para `makefile` no `template.yaml` e usa `Makefile` na raiz para executar `dotnet publish src/Api/Api.csproj -f net8.0`; mantenha `<TargetFramework>net8.0</TargetFramework>` no `src/Api/Api.csproj`.
+
+
+## Secrets do GitHub Actions (deploy AWS)
+
+Para o workflow de deploy funcionar, configure estes secrets no repositório:
+
+- `DB_CONNECTION` *(fallback: `DATABASE_URL`)*
+- `MP_ACCESS_TOKEN` *(fallback: `MERCADOPAGO_ACCESS_TOKEN`)* **(opcional no deploy)**
+
+> O workflow exige `DB_CONNECTION` (ou `DATABASE_URL`).
+> Se token do Mercado Pago não estiver definido, o deploy continua usando o valor default do template SAM.
+
+
+Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile` e se o alvo `build-JobeasyApiFunction` do `Makefile` (na raiz) publica para `$(ARTIFACTS_DIR)` (sem subpastas).

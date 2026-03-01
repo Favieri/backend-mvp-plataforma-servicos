@@ -4,7 +4,13 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - "backend-dotnet/**"
+      - "src/**"
+      - "tests/**"
+      - "infra/**"
+      - "Jobeasy.sln"
+      - "Directory.Build.props"
+      - "Dockerfile"
+      - "Makefile"
       - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
@@ -19,6 +25,8 @@ jobs:
     env:
       AWS_REGION: sa-east-1
       STACK_NAME: jobeasy-api
+      DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
+      MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN }}
 
     steps:
       - name: Checkout
@@ -30,11 +38,10 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore/Build/Test
-        working-directory: backend-dotnet
         run: |
-          dotnet restore
-          dotnet build -c Release --no-restore
-          dotnet test -c Release --no-build
+          dotnet restore Jobeasy.sln
+          dotnet build Jobeasy.sln -c Release --no-restore
+          dotnet test Jobeasy.sln -c Release --no-build
 
       - name: Setup AWS SAM
         uses: aws-actions/setup-sam@v2
@@ -45,20 +52,40 @@ jobs:
           role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
           aws-region: sa-east-1
 
+      - name: Validate SAM build context
+        run: |
+          test -f Makefile || (echo "ERROR: root Makefile not found" >&2; exit 1)
+          if [ -f src/Api/Makefile ]; then
+            echo "WARN: src/Api/Makefile exists, but build will use root Makefile because CodeUri points to repository root." >&2
+          fi
+          awk 'NR>=35 && NR<=58 {print}' infra/sam/template.yaml
+
       - name: SAM Build
-        working-directory: backend-dotnet
-        run: sam build
+        run: sam build -t infra/sam/template.yaml
+
+      - name: Validate required deploy secrets
+        run: |
+          if [ -z "${DB_CONNECTION}" ]; then
+            echo "ERROR: configure DB_CONNECTION (or DATABASE_URL) in GitHub Secrets." >&2
+            exit 1
+          fi
 
       - name: SAM Deploy
-        working-directory: backend-dotnet
         run: |
+          PARAM_OVERRIDES=("ParameterKey=DbConnection,ParameterValue=${DB_CONNECTION}")
+
+          if [ -n "${MP_ACCESS_TOKEN}" ]; then
+            PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
+          else
+            echo "INFO: MP_ACCESS_TOKEN/MERCADOPAGO_ACCESS_TOKEN não configurado; usando valor default do template." >&2
+          fi
+
           sam deploy \
+            --template-file infra/sam/template.yaml \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides \
-              DbConnection="${{ secrets.DB_CONNECTION }}" \
-              MpAccessToken="${{ secrets.MP_ACCESS_TOKEN }}
+            --parameter-overrides "${PARAM_OVERRIDES[@]}"
