@@ -20,9 +20,9 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
             where += @"
                 and exists (
                     select 1
-                    from \"ProfessionalZone\" pz
-                    where pz.\"professionalId\" = p.\"id\"
-                      and pz.\"zoneId\" = @zoneId
+                    from ""ProfessionalZone"" pz
+                    where pz.""professionalId"" = p.""id""
+                      and pz.""zoneId"" = @zoneId
                 )";
             p.Add("zoneId", zoneId);
         }
@@ -32,27 +32,27 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
             where += @"
                 and exists (
                     select 1
-                    from \"ProfessionalService\" ps
-                    where ps.\"professionalId\" = p.\"id\"
-                      and ps.\"serviceId\" = @serviceId
+                    from ""ProfessionalService"" ps
+                    where ps.""professionalId"" = p.""id""
+                      and ps.""serviceId"" = @serviceId
                 )";
             p.Add("serviceId", serviceId);
         }
 
         var baseSql = $@"
             select
-                p.\"id\" as \"Id\",
-                p.\"userId\" as \"UserId\",
-                coalesce(u.\"name\", u.\"nome\", '') as \"Name\",
-                coalesce(u.\"avatarUrl\", p.\"avatarUrl\") as \"AvatarUrl\",
-                p.\"rating\" as \"Rating\",
-                coalesce(p.\"active\", true) as \"Active\",
-                coalesce(p.\"completedJobsCount\", 0) as \"CompletedJobsCount\",
-                p.\"availabilityText\" as \"AvailabilityText\"
-            from \"Professional\" p
-            join \"User\" u on u.\"id\" = p.\"userId\"
+                p.""id"" as ""Id"",
+                p.""userId"" as ""UserId"",
+                coalesce(u.""name"", u.""nome"", '') as ""Name"",
+                coalesce(u.""avatarUrl"", p.""avatarUrl"") as ""AvatarUrl"",
+                p.""rating"" as ""Rating"",
+                coalesce(p.""active"", true) as ""Active"",
+                coalesce(p.""completedJobsCount"", 0) as ""CompletedJobsCount"",
+                p.""availabilityText"" as ""AvailabilityText""
+            from ""Professional"" p
+            join ""User"" u on u.""id"" = p.""userId""
             {where}
-            order by p.\"id\"";
+            order by p.""id""";
 
         var professionals = (await conn.QueryAsync<ProfessionalRow>(new CommandDefinition(baseSql, p, cancellationToken: ct))).ToList();
         if (professionals.Count == 0) return Array.Empty<ProfessionalCardDto>();
@@ -61,28 +61,28 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
 
         const string servicesSql = @"
             select
-                ps.\"professionalId\" as \"ProfessionalId\",
-                ps.\"id\" as \"Id\",
-                ps.\"serviceId\" as \"ServiceId\",
-                ps.\"nomeServico\" as \"Name\",
-                coalesce(ps.\"preco\", 0) as \"Price\",
-                ps.\"descricao\" as \"Description\",
-                s.\"icon\" as \"Icon\"
-            from \"ProfessionalService\" ps
-            left join \"Service\" s on s.\"id\" = ps.\"serviceId\"
-            where ps.\"professionalId\" = any(@professionalIds)";
+                ps.""professionalId"" as ""ProfessionalId"",
+                ps.""id"" as ""Id"",
+                ps.""serviceId"" as ""ServiceId"",
+                ps.""nomeServico"" as ""Name"",
+                coalesce(ps.""preco"", 0) as ""Price"",
+                ps.""descricao"" as ""Description"",
+                s.""icon"" as ""Icon""
+            from ""ProfessionalService"" ps
+            left join ""Service"" s on s.""id"" = ps.""serviceId""
+            where ps.""professionalId"" = any(@professionalIds)";
 
         var serviceRows = await conn.QueryAsync<ProfessionalServiceRow>(new CommandDefinition(servicesSql, new { professionalIds }, cancellationToken: ct));
 
         const string zonesSql = @"
             select
-                pz.\"professionalId\" as \"ProfessionalId\",
-                z.\"id\" as \"Id\",
-                z.\"name\" as \"Name\"
-            from \"ProfessionalZone\" pz
-            join \"Zone\" z on z.\"id\" = pz.\"zoneId\"
-            where pz.\"professionalId\" = any(@professionalIds)
-              and z.\"active\" = true";
+                pz.""professionalId"" as ""ProfessionalId"",
+                z.""id"" as ""Id"",
+                z.""name"" as ""Name""
+            from ""ProfessionalZone"" pz
+            join ""Zone"" z on z.""id"" = pz.""zoneId""
+            where pz.""professionalId"" = any(@professionalIds)
+              and z.""active"" = true";
 
         var zoneRows = await conn.QueryAsync<ProfessionalZoneRow>(new CommandDefinition(zonesSql, new { professionalIds }, cancellationToken: ct));
 
@@ -119,10 +119,10 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
         const string sql = @"
-            select z.\"id\" as \"Id\", z.\"name\" as \"Name\"
-            from \"Zone\" z
-            where z.\"active\" = true
-            order by z.\"name\"";
+            select z.""id"" as ""Id"", z.""name"" as ""Name""
+            from ""Zone"" z
+            where z.""active"" = true
+            order by z.""name""";
 
         var rows = await conn.QueryAsync<ZoneDto>(new CommandDefinition(sql, cancellationToken: ct));
         return rows.ToList();
@@ -132,9 +132,9 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
     {
         using var conn = await factory.CreateOpenConnectionAsync(ct);
         const string sql = @"
-            select s.\"id\" as \"Id\", s.\"name\" as \"Name\", s.\"icon\" as \"Icon\"
-            from \"Service\" s
-            order by s.\"name\"";
+            select s.""id"" as ""Id"", s.""name"" as ""Name"", s.""icon"" as ""Icon""
+            from ""Service"" s
+            order by s.""name""";
 
         var rows = await conn.QueryAsync<ServiceDto>(new CommandDefinition(sql, cancellationToken: ct));
         return rows.ToList();
