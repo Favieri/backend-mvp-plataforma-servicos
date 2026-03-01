@@ -3,6 +3,15 @@ name: Deploy jobeasy-api (SAM)
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "infra/**"
+      - "Jobeasy.sln"
+      - "Directory.Build.props"
+      - "Dockerfile"
+      - "Makefile"
+      - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
 permissions:
@@ -72,7 +81,7 @@ jobs:
           fi
 
           sam deploy \
-            --template-file .aws-sam/build/template.yaml \
+            --template-file infra/sam/template.yaml \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \

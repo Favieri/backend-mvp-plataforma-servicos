@@ -192,4 +192,4 @@ Para o workflow de deploy funcionar, configure estes secrets no repositório:
 > Se token do Mercado Pago não estiver definido, o deploy continua usando o valor default do template SAM.
 
 
-Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile`, se o alvo `build-JobeasyApiFunction` do `Makefile` (na raiz) publica para `$(ARTIFACTS_DIR)` (sem subpastas) **e se o deploy usa o template gerado** (`.aws-sam/build/template.yaml`) em vez do template fonte.
+Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile` e se o alvo `build-JobeasyApiFunction` do `Makefile` (na raiz) publica para `$(ARTIFACTS_DIR)` (sem subpastas).

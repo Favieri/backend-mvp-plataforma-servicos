@@ -29,6 +29,7 @@ builder.Host.UseSerilog((context, services, cfg) => cfg
 builder.Services.AddSingleton<RequestObservabilityEnricher>();
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Services.AddProblemDetails();
+builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
