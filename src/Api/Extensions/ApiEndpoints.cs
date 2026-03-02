@@ -106,7 +106,7 @@ public static class ApiEndpoints
                 async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token),
                 ct));
 
-        app.MapGet("/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? zoneId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IProfessionalRepository repo, CancellationToken ct)
+        app.MapGet("/api/professionals", async (HttpContext context, IMemoryCache cache, string? serviceId, string? zoneId, string? excludeProfessionalId, string? professionalId, bool? filterZones, IProfessionalRepository repo, CancellationToken ct)
             => await GetOrSetCachedListAsync(
                 context,
                 cache,
@@ -193,7 +193,30 @@ public static class ApiEndpoints
 
     private static bool ShouldBypassCache(HttpRequest req)
         => req.Headers.TryGetValue("Cache-Control", out var values)
-           && values.Any(v => v.Contains("no-cache", StringComparison.OrdinalIgnoreCase));
+           && values.Any(v => v?.Contains("no-cache", StringComparison.OrdinalIgnoreCase) == true);
+
+    private static async Task<IResult> GetOrSetCachedListAsync<T>(
+        HttpContext context,
+        IMemoryCache cache,
+        string keyPrefix,
+        TimeSpan ttl,
+        Func<CancellationToken, Task<IReadOnlyList<T>>> factory,
+        CancellationToken ct)
+    {
+        var cacheKey = $"{keyPrefix}:{context.Request.QueryString.Value ?? string.Empty}";
+        var bypassCache = ShouldBypassCache(context.Request);
+
+        var items = await GetOrCreateCachedAsync(
+            cache,
+            cacheKey,
+            ttl,
+            bypassCache,
+            () => factory(ct),
+            logger: null,
+            ct);
+
+        return Results.Ok(items);
+    }
 
     private static async Task<T> GetOrCreateCachedAsync<T>(
         IMemoryCache cache,
