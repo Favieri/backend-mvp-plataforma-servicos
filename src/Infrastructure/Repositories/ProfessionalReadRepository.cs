@@ -91,28 +91,37 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
             .ToDictionary(
                 g => g.Key,
                 g => (IReadOnlyList<ProfessionalServiceDto>)g
-                    .Select(x => new ProfessionalServiceDto(x.Id, x.ServiceId, x.Name ?? string.Empty, x.Price, x.Description, x.Icon))
+                    .Select(x => new ProfessionalServiceDto
+                    {
+                        Id = x.Id,
+                        ServiceId = x.ServiceId,
+                        Name = x.Name ?? string.Empty,
+                        Price = (double)x.Price,
+                        Description = x.Description
+                    })
                     .ToList());
 
         var zonesByProfessional = zoneRows
             .GroupBy(x => x.ProfessionalId)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<ZoneDto>)g
-                    .Select(x => new ZoneDto(x.Id, x.Name ?? string.Empty))
+                g => (IReadOnlyList<string>)g
+                    .Select(x => x.Name ?? string.Empty)
                     .ToList());
 
-        return professionals.Select(pf => new ProfessionalCardDto(
-            pf.Id,
-            pf.UserId,
-            pf.Name,
-            pf.AvatarUrl,
-            pf.Rating,
-            pf.Active,
-            pf.CompletedJobsCount,
-            pf.AvailabilityText,
-            servicesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<ProfessionalServiceDto>(),
-            zonesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<ZoneDto>())).ToList();
+        return professionals.Select(pf => new ProfessionalCardDto
+        {
+            Id = pf.Id,
+            UserId = pf.UserId,
+            Name = pf.Name,
+            AvatarUrl = pf.AvatarUrl,
+            Rating = pf.Rating.HasValue ? (double)pf.Rating.Value : null,
+            Active = pf.Active,
+            CompletedJobsCount = pf.CompletedJobsCount,
+            AvailabilityText = pf.AvailabilityText,
+            Services = servicesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<ProfessionalServiceDto>(),
+            Zones = zonesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<string>()
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<ZoneDto>> GetZonesAsync(CancellationToken ct)
