@@ -13,6 +13,8 @@ build-JobeasyApiFunction:
 	@test -f $(ARTIFACTS_DIR)/Api.deps.json    || (echo "ERRO: Api.deps.json ausente"    >&2; exit 1)
 	@test -f $(ARTIFACTS_DIR)/Api.runtimeconfig.json || (echo "ERRO: Api.runtimeconfig.json ausente" >&2; exit 1)
 	@echo "Artefatos OK."
+	@echo "--- Conteúdo de ARTIFACTS_DIR ---"
+	@ls -la $(ARTIFACTS_DIR)
 
 sam-verify:
 	bash scripts/validate-sam-artifact.sh
