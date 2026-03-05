@@ -41,7 +41,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../
-      Handler: Api::Amazon.Lambda.AspNetCoreServer.Hosting.LambdaEntryPoint::FunctionHandlerAsync
+      Handler: Api
       Events:
         ProxyEvent:
           Type: HttpApi
