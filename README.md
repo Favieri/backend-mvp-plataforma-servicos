@@ -104,6 +104,20 @@ sam build -t infra/sam/template.yaml
 sam local start-api -t infra/sam/template.yaml
 ```
 
+## Validar artefato SAM (anti-regressão)
+
+Após o build do SAM, valide automaticamente se o assembly esperado da Lambda está no root do bundle:
+
+```bash
+./scripts/validate-sam-artifact.sh
+```
+
+Ou execute o fluxo completo:
+
+```bash
+make sam-verify
+```
+
 ## Deploy inicial (opcional)
 
 ```bash
