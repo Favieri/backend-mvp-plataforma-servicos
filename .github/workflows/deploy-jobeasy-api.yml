@@ -63,6 +63,14 @@ jobs:
       - name: SAM Build
         run: sam build -t infra/sam/template.yaml
 
+      - name: Inspect SAM build artifacts
+        run: |
+          echo "=== Conteúdo da função buildada ==="
+          ls -la .aws-sam/build/JobeasyApiFunction/
+          echo ""
+          echo "=== Arquivos .deps.json e .runtimeconfig.json ==="
+          find .aws-sam/build/JobeasyApiFunction/ -name "*.deps.json" -o -name "*.runtimeconfig.json"
+
       - name: Validate required deploy secrets
         run: |
           if [ -z "${DB_CONNECTION}" ]; then
