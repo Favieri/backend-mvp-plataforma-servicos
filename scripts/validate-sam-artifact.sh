@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+rm -rf .aws-sam
 sam build -t infra/sam/template.yaml
 
 ARTIFACT_DLL=".aws-sam/build/JobeasyApiFunction/Api.dll"
