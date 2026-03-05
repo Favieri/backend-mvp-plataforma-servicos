@@ -9,13 +9,12 @@ on:
       - "infra/**"
       - "Jobeasy.sln"
       - "Directory.Build.props"
-      - "Dockerfile"
       - "Makefile"
       - ".github/workflows/deploy-jobeasy-api.yml"
   workflow_dispatch:
 
 permissions:
-  id-token: write   # necessário para OIDC
+  id-token: write
   contents: read
 
 jobs:
@@ -37,7 +36,15 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore/Build/Test
+      # ✅ Secrets validados antes de qualquer build para falhar rápido
+      - name: Validate required secrets
+        run: |
+          if [ -z "${DB_CONNECTION}" ]; then
+            echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2
+            exit 1
+          fi
+
+      - name: Restore / Build / Test
         run: |
           dotnet restore Jobeasy.sln
           dotnet build Jobeasy.sln -c Release --no-restore
@@ -50,33 +57,33 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
-          aws-region: sa-east-1
+          aws-region: ${{ env.AWS_REGION }}   # ✅ usa a env var em vez de valor hardcoded duplicado
 
-      - name: Validate SAM build context
+      # ✅ Validação simplificada — o awk com linha fixa era frágil e quebrava se o template mudasse
+      - name: Validate SAM template and Makefile
         run: |
-          test -f Makefile || (echo "ERROR: root Makefile not found" >&2; exit 1)
-          if [ -f src/Api/Makefile ]; then
-            echo "WARN: src/Api/Makefile exists, but build will use root Makefile because CodeUri points to repository root." >&2
-          fi
-          awk 'NR>=35 && NR<=58 {print}' infra/sam/template.yaml
+          test -f Makefile              || (echo "ERROR: Makefile não encontrado na raiz" >&2; exit 1)
+          test -f infra/sam/template.yaml || (echo "ERROR: infra/sam/template.yaml não encontrado" >&2; exit 1)
+          sam validate -t infra/sam/template.yaml --lint
 
       - name: SAM Build
         run: sam build -t infra/sam/template.yaml
 
-      - name: Inspect SAM build artifacts
+      # ✅ Valida que os artefatos críticos foram gerados corretamente
+      - name: Validate SAM build artifacts
         run: |
           echo "=== Conteúdo da função buildada ==="
           ls -la .aws-sam/build/JobeasyApiFunction/
           echo ""
-          echo "=== Arquivos .deps.json e .runtimeconfig.json ==="
-          find .aws-sam/build/JobeasyApiFunction/ -name "*.deps.json" -o -name "*.runtimeconfig.json"
-
-      - name: Validate required deploy secrets
-        run: |
-          if [ -z "${DB_CONNECTION}" ]; then
-            echo "ERROR: configure DB_CONNECTION (or DATABASE_URL) in GitHub Secrets." >&2
-            exit 1
-          fi
+          test -f .aws-sam/build/JobeasyApiFunction/Api.dll \
+            || (echo "ERRO: Api.dll ausente no artefato" >&2; exit 1)
+          test -f .aws-sam/build/JobeasyApiFunction/Api.deps.json \
+            || (echo "ERRO: Api.deps.json ausente no artefato" >&2; exit 1)
+          test -f .aws-sam/build/JobeasyApiFunction/Api.runtimeconfig.json \
+            || (echo "ERRO: Api.runtimeconfig.json ausente no artefato" >&2; exit 1)
+          test ! -f .aws-sam/build/JobeasyApiFunction/Api \
+            || (echo "ERRO: binário nativo 'Api' presente — remova UseAppHost" >&2; exit 1)
+          echo "Artefatos OK."
 
       - name: SAM Deploy
         run: |
@@ -85,11 +92,11 @@ jobs:
           if [ -n "${MP_ACCESS_TOKEN}" ]; then
             PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
           else
-            echo "INFO: MP_ACCESS_TOKEN/MERCADOPAGO_ACCESS_TOKEN não configurado; usando valor default do template." >&2
+            echo "INFO: MP_ACCESS_TOKEN não configurado; usando valor default do template." >&2
           fi
 
           sam deploy \
-            --template-file infra/sam/template.yaml \
+            --template-file .aws-sam/build/template.yaml \   # ✅ usa o template buildado, não o fonte
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \
