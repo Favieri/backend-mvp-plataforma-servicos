@@ -104,6 +104,24 @@ sam build -t infra/sam/template.yaml
 sam local start-api -t infra/sam/template.yaml
 ```
 
+## Validar artefato SAM (anti-regressão)
+
+Valide automaticamente se o bundle gerado pelo SAM contém o assembly esperado da Lambda no root (`/var/task`).
+
+```bash
+./scripts/validate-sam-artifact.sh
+```
+
+Esse script já executa `sam build -t infra/sam/template.yaml` e falha com erro se `Api.dll` não existir em `.aws-sam/build/JobeasyApiFunction/`.
+
+Alternativa via Makefile:
+
+```bash
+make sam-verify
+```
+
+Se o comando falhar, o deploy deve ser bloqueado até o `Handler` e o DLL publicado estarem alinhados.
+
 ## Deploy inicial (opcional)
 
 ```bash
