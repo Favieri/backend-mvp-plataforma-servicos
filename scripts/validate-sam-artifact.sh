@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FUNCTION_DIR="${1:-.aws-sam/build/JobeasyApiFunction}"
-EXPECTED_DLL="${2:-Api.dll}"
+TEMPLATE_PATH="${TEMPLATE_PATH:-infra/sam/template.yaml}"
+FUNCTION_DIR="${FUNCTION_DIR:-.aws-sam/build/JobeasyApiFunction}"
+EXPECTED_DLL="${EXPECTED_DLL:-Api.dll}"
 ARTIFACT_PATH="${FUNCTION_DIR%/}/${EXPECTED_DLL}"
 
+sam build -t "$TEMPLATE_PATH"
+
 if [[ ! -d "$FUNCTION_DIR" ]]; then
-  echo "[ERROR] SAM artifact directory not found: $FUNCTION_DIR"
-  echo "Run: sam build -t infra/sam/template.yaml"
+  echo "[ERROR] SAM artifact directory not found after build: $FUNCTION_DIR"
   exit 1
 fi
 
 if [[ ! -f "$ARTIFACT_PATH" ]]; then
   echo "[ERROR] Expected Lambda assembly not found: $ARTIFACT_PATH"
-  echo "The Lambda handler is configured as '${EXPECTED_DLL%.dll}', so the DLL must exist at the artifact root (/var/task)."
-  echo "Current artifact root contents:"
+  echo "Handler expects '${EXPECTED_DLL%.dll}', therefore ${EXPECTED_DLL} must be at artifact root (/var/task)."
+  echo "Artifact root files:"
   find "$FUNCTION_DIR" -maxdepth 1 -type f -printf ' - %f\n' | sort || true
   exit 1
 fi
 
 echo "[OK] Lambda artifact validated: $ARTIFACT_PATH"
+echo "[INFO] Artifact root listing:"
+find "$FUNCTION_DIR" -maxdepth 1 -printf '%P\n' | sed '/^$/d' | sort
