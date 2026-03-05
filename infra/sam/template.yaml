@@ -56,5 +56,5 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Description: HTTP API endpoint URL
+    Description: HTTP API endpoint URL 
     Value: !Sub 'https://${JobeasyHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
