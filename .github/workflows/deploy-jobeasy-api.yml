@@ -36,7 +36,6 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      # ✅ Secrets validados antes de qualquer build para falhar rápido
       - name: Validate required secrets
         run: |
           if [ -z "${DB_CONNECTION}" ]; then
@@ -57,9 +56,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
-          aws-region: ${{ env.AWS_REGION }}   # ✅ usa a env var em vez de valor hardcoded duplicado
+          aws-region: ${{ env.AWS_REGION }} 
 
-      # ✅ Validação simplificada — o awk com linha fixa era frágil e quebrava se o template mudasse
       - name: Validate SAM template and Makefile
         run: |
           test -f Makefile              || (echo "ERROR: Makefile não encontrado na raiz" >&2; exit 1)
@@ -69,7 +67,6 @@ jobs:
       - name: SAM Build
         run: sam build -t infra/sam/template.yaml
 
-      # ✅ Valida que os artefatos críticos foram gerados corretamente
       - name: Validate SAM build artifacts
         run: |
           echo "=== Conteúdo da função buildada ==="
@@ -96,7 +93,7 @@ jobs:
           fi
 
           sam deploy \
-            --template-file .aws-sam/build/template.yaml \   # ✅ usa o template buildado, não o fonte
+            --template-file .aws-sam/build/template.yaml \
             --stack-name "${STACK_NAME}" \
             --region "${AWS_REGION}" \
             --resolve-s3 \
