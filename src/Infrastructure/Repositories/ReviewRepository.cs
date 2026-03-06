@@ -1,155 +1,181 @@
 using Application.Abstractions;
-using Dapper;
-using Infrastructure.Data;
+using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class ReviewRepository(IConnectionFactory factory) : IReviewRepository
+public sealed class ReviewRepository(AppDbContext ctx) : IReviewRepository
 {
     public async Task<object> GetByProfessionalAsync(string professionalId, int limit, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
         var clampedLimit = Math.Max(1, Math.Min(limit, 50));
-        var reviews = (await conn.QueryAsync(new CommandDefinition(
-            """
-            select r.id,r.rating,r.comment,r."createdAt",u.name as "clientName"
-            from "Review" r left join "User" u on u.id=r."clientId"
-            where r."professionalId"=@professionalId
-            order by r."createdAt" desc limit @limit
-            """,
-            new { professionalId, limit = clampedLimit }, cancellationToken: ct))).ToList();
 
-        var agg = await conn.QuerySingleAsync(new CommandDefinition(
-            "select coalesce(avg(rating),0) as avg, count(*) as cnt from \"Review\" where \"professionalId\"=@professionalId",
-            new { professionalId }, cancellationToken: ct));
+        var reviews = await (
+            from r in ctx.Reviews.AsNoTracking()
+            join u in ctx.Users.AsNoTracking() on r.ClientId equals u.Id into userJoin
+            from u in userJoin.DefaultIfEmpty()
+            where r.ProfessionalId == professionalId
+            orderby r.CreatedAt descending
+            select new
+            {
+                id = r.Id,
+                rating = r.Rating,
+                comment = r.Comment,
+                createdAt = r.CreatedAt,
+                clientName = u != null ? u.Name : "Cliente"
+            }
+        ).Take(clampedLimit).ToListAsync(ct);
+
+        var agg = await ctx.Reviews
+            .AsNoTracking()
+            .Where(r => r.ProfessionalId == professionalId)
+            .GroupBy(_ => 1)
+            .Select(g => new { avg = g.Average(r => (double)r.Rating), cnt = g.Count() })
+            .FirstOrDefaultAsync(ct);
 
         return new
         {
-            reviews = reviews.Select(r => { IDictionary<string, object?> d = r; return new { id = d["id"], rating = d["rating"], comment = d["comment"], createdAt = d["createdAt"], clientName = d["clientName"] ?? "Cliente" }; }),
-            average = Convert.ToDouble(((IDictionary<string, object?>)(dynamic)agg)["avg"]),
-            count = Convert.ToInt64(((IDictionary<string, object?>)(dynamic)agg)["cnt"])
+            reviews,
+            average = agg?.avg ?? 0.0,
+            count = (long)(agg?.cnt ?? 0)
         };
     }
 
     public async Task<object?> GetByIdAsync(string id, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.QuerySingleOrDefaultAsync(new CommandDefinition(
-            "select id,\"orderId\",\"professionalId\",\"clientId\",rating,comment,\"createdAt\" from \"Review\" where id=@id",
-            new { id }, cancellationToken: ct));
+        return await ctx.Reviews
+            .AsNoTracking()
+            .Where(r => r.Id == id)
+            .Select(r => new
+            {
+                id = r.Id,
+                orderId = r.OrderId,
+                professionalId = r.ProfessionalId,
+                clientId = r.ClientId,
+                rating = r.Rating,
+                comment = r.Comment,
+                createdAt = r.CreatedAt
+            })
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<object> CreateAsync(string professionalId, string clientId, string orderId, int rating, string? comment, CancellationToken ct)
+    public async Task<object> CreateAsync(
+        string professionalId, string clientId, string orderId,
+        int rating, string? comment, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = """
-            insert into "Review"(id,"orderId","professionalId","clientId",rating,comment,"createdAt")
-            values(gen_random_uuid()::text,@orderId,@professionalId,@clientId,@rating,@comment,now())
-            returning id,rating,comment,"createdAt"
-            """;
-        var created = await conn.QuerySingleAsync(new CommandDefinition(sql,
-            new { orderId, professionalId, clientId, rating, comment }, cancellationToken: ct));
+        var review = new Review(
+            Id: Guid.NewGuid().ToString(),
+            OrderId: orderId,
+            ProfessionalId: professionalId,
+            ClientId: clientId,
+            Rating: rating,
+            Comment: comment,
+            CreatedAt: DateTime.UtcNow);
 
-        // Recalculate avg
-        var agg = await conn.QuerySingleAsync(new CommandDefinition(
-            "select coalesce(avg(rating),0) as avg, count(*) as cnt from \"Review\" where \"professionalId\"=@professionalId",
-            new { professionalId }, cancellationToken: ct));
-        double average = Convert.ToDouble(((IDictionary<string, object?>)(dynamic)agg)["avg"]);
-        long count = Convert.ToInt64(((IDictionary<string, object?>)(dynamic)agg)["cnt"]);
+        ctx.Reviews.Add(review);
+        await ctx.SaveChangesAsync(ct);
 
-        // Update professional rating
-        await conn.ExecuteAsync(new CommandDefinition(
-            "update \"Professional\" set rating=@rating where id=@professionalId",
-            new { rating = average, professionalId }, cancellationToken: ct));
+        // Recalculate professional avg rating
+        var (average, count) = await RecalculateAndUpdateRatingAsync(professionalId, ct);
 
-        IDictionary<string, object?> c = created;
-        return new { ok = true, review = new { id = c["id"], rating = c["rating"], comment = c["comment"], createdAt = c["createdAt"] }, average, count };
+        return new
+        {
+            ok = true,
+            review = new { id = review.Id, rating = review.Rating, comment = review.Comment, createdAt = review.CreatedAt },
+            average,
+            count
+        };
     }
 
     public async Task<object?> UpdateAsync(string id, int? rating, string? comment, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var existing = await conn.QuerySingleOrDefaultAsync<(string ProfessionalId, string Id)>(new CommandDefinition(
-            "select \"professionalId\" as ProfessionalId, id as Id from \"Review\" where id=@id",
-            new { id }, cancellationToken: ct));
-        if (existing == default) return null;
+        var existing = await ctx.Reviews
+            .AsNoTracking()
+            .Where(r => r.Id == id)
+            .Select(r => new { r.ProfessionalId })
+            .FirstOrDefaultAsync(ct);
 
-        var setClauses = new List<string>();
-        var p = new DynamicParameters();
-        p.Add("id", id);
-        if (rating is not null) { setClauses.Add("rating=@rating"); p.Add("rating", rating); }
-        if (comment is not null) { setClauses.Add("comment=@comment"); p.Add("comment", comment); }
-        if (setClauses.Count > 0)
+        if (existing is null) return null;
+
+        if (rating is not null || comment is not null)
         {
-            await conn.ExecuteAsync(new CommandDefinition($"update \"Review\" set {string.Join(",", setClauses)} where id=@id", p, cancellationToken: ct));
+            await ctx.Reviews
+                .Where(r => r.Id == id)
+                .ExecuteUpdateAsync(s =>
+                {
+                    var u = s;
+                    if (rating is not null)
+                        u = u.SetProperty(r => r.Rating, rating.Value);
+                    if (comment is not null)
+                        u = u.SetProperty(r => r.Comment, comment);
+                    return u;
+                }, ct);
 
-            // Recalculate avg
-            var agg = await conn.QuerySingleAsync(new CommandDefinition(
-                "select coalesce(avg(r.rating),0) as avg from \"Review\" r where r.\"professionalId\"=@professionalId",
-                new { professionalId = existing.ProfessionalId }, cancellationToken: ct));
-            double avg = Convert.ToDouble(((IDictionary<string, object?>)(dynamic)agg)["avg"]);
-            await conn.ExecuteAsync(new CommandDefinition(
-                "update \"Professional\" set rating=@avg where id=@professionalId",
-                new { avg, professionalId = existing.ProfessionalId }, cancellationToken: ct));
+            await RecalculateAndUpdateRatingAsync(existing.ProfessionalId, ct);
         }
 
         return await GetByIdAsync(id, ct);
     }
 
     public async Task<bool> OrderAlreadyReviewedAsync(string orderId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "select count(1) from \"Review\" where \"orderId\"=@orderId",
-            new { orderId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Reviews.AsNoTracking().AnyAsync(r => r.OrderId == orderId, ct);
 
     public async Task<bool> OrderBelongsToClientAsync(string orderId, string clientId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "select count(1) from \"Order\" where id=@orderId and \"clientId\"=@clientId",
-            new { orderId, clientId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Orders.AsNoTracking().AnyAsync(o => o.Id == orderId && o.ClientId == clientId, ct);
 
     public async Task<string?> GetProfessionalUserIdAsync(string professionalId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition(
-            "select \"userId\" from \"Professional\" where id=@professionalId",
-            new { professionalId }, cancellationToken: ct));
-    }
+        => await ctx.Professionals
+            .AsNoTracking()
+            .Where(p => p.Id == professionalId)
+            .Select(p => p.UserId)
+            .FirstOrDefaultAsync(ct);
 
-    public async Task<IReadOnlyList<object>> GetEligibleOrdersAsync(string clientId, string professionalId, CancellationToken ct)
+    public async Task<IReadOnlyList<object>> GetEligibleOrdersAsync(
+        string clientId, string professionalId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
         const int ReviewWindowDays = 14;
         var since = DateTime.UtcNow.AddDays(-ReviewWindowDays);
 
-        var rows = (await conn.QueryAsync(new CommandDefinition(
-            """
-            select o.id,o."createdAt",o.date as "scheduledAt",o.status,s.name as "serviceName"
-            from "Order" o
-            left join "Service" s on s.id=o."serviceId"
-            where o."clientId"=@clientId
-              and o.status in ('concluido','auto_concluido')
-              and o."createdAt" >= @since
-              and not exists (select 1 from "Review" r where r."orderId"=o.id)
-            order by o."createdAt" desc
-            """,
-            new { clientId, since }, cancellationToken: ct))).ToList();
-
-        return rows.Select(r =>
-        {
-            IDictionary<string, object?> d = r;
-            return (object)new
+        var rows = await (
+            from o in ctx.Orders.AsNoTracking()
+            join s in ctx.Services.AsNoTracking() on o.ServiceId equals s.Id into svcJoin
+            from s in svcJoin.DefaultIfEmpty()
+            where o.ClientId == clientId
+                && (o.Status == "concluido" || o.Status == "auto_concluido")
+                && o.CreatedAt >= since
+                && !ctx.Reviews.Any(r => r.OrderId == o.Id)
+            orderby o.CreatedAt descending
+            select new
             {
-                id = d["id"],
-                createdAt = d["createdAt"],
-                scheduledAt = d["scheduledAt"],
-                status = d["status"],
-                serviceName = d["serviceName"] ?? "Serviço"
-            };
-        }).ToList();
+                id = o.Id,
+                createdAt = o.CreatedAt,
+                scheduledAt = o.Date,
+                status = o.Status,
+                serviceName = s != null ? s.Name : "Serviço"
+            }
+        ).ToListAsync(ct);
+
+        return rows.Cast<object>().ToList();
+    }
+
+    private async Task<(double average, long count)> RecalculateAndUpdateRatingAsync(
+        string professionalId, CancellationToken ct)
+    {
+        var agg = await ctx.Reviews
+            .AsNoTracking()
+            .Where(r => r.ProfessionalId == professionalId)
+            .GroupBy(_ => 1)
+            .Select(g => new { avg = g.Average(r => (double)r.Rating), cnt = g.Count() })
+            .FirstOrDefaultAsync(ct);
+
+        var average = agg?.avg ?? 0.0;
+        var count = (long)(agg?.cnt ?? 0);
+
+        await ctx.Professionals
+            .Where(p => p.Id == professionalId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Rating, average), ct);
+
+        return (average, count);
     }
 }

@@ -1,9 +1,13 @@
 using Application.Abstractions;
 using Infrastructure.Data;
 using Infrastructure.Email;
+using Infrastructure.Persistence;
 using Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Npgsql;
 
 namespace Infrastructure;
 
@@ -20,7 +24,42 @@ public static class ServiceCollectionExtensions
             o.PoolerPort = int.TryParse(config["DB_POOLER_PORT"], out var poolerPort) ? poolerPort : 6543;
         });
 
-        services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
+            var rawConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
+            var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
+            var maxPoolSize = int.TryParse(config["DB_MAX_POOL_SIZE"], out var mp) ? mp : 30;
+            var timeout = int.TryParse(config["DB_TIMEOUT_SECONDS"], out var t) ? t : 15;
+            var poolerPort = int.TryParse(config["DB_POOLER_PORT"], out var pp) ? pp : 6543;
+
+            var csb = new NpgsqlConnectionStringBuilder(rawConnectionString)
+            {
+                Timeout = timeout,
+                CommandTimeout = commandTimeout,
+                MaxPoolSize = maxPoolSize,
+                Pooling = true,
+                NoResetOnClose = true
+            };
+
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            if (!env.IsDevelopment() && NpgsqlConnectionFactory.ShouldUseSupabasePooler(csb))
+            {
+                csb.Port = poolerPort;
+            }
+
+            options.UseNpgsql(csb.ConnectionString, npgsql =>
+            {
+                npgsql.CommandTimeout(commandTimeout);
+                npgsql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+            });
+
+            if (env.IsDevelopment())
+            {
+                options.EnableDetailedErrors();
+                // EnableSensitiveDataLogging only in development — never in production
+                options.EnableSensitiveDataLogging();
+            }
+        });
 
         // Core repositories
         services.AddScoped<IOrderRepository, OrderRepository>();
