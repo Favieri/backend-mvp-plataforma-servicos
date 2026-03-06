@@ -1,139 +1,169 @@
 using Application.Abstractions;
-using Dapper;
-using Infrastructure.Data;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class ProfessionalDetailRepository(IConnectionFactory factory) : IProfessionalDetailRepository
+public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfessionalDetailRepository
 {
     public async Task<object?> GetByIdAsync(string id, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
+        var row = await (
+            from p in ctx.Professionals.AsNoTracking()
+            join u in ctx.Users.AsNoTracking() on p.UserId equals u.Id
+            where p.Id == id
+            select new
+            {
+                p.Id, p.UserId, p.Bio, p.Rating, p.Active, p.AvatarUrl, p.AvailabilityText,
+                p.CompletedJobsCount, p.SlotMinutes, p.LeadTimeMinutes, p.MaxAdvanceDays, p.AllowInstantBooking,
+                UserId2 = u.Id, UserName = u.Name, UserEmail = u.Email, UserPhone = u.Phone,
+                UserRole = u.Role, UserZoneId = u.ZoneId, UserCreatedAt = u.CreatedAt
+            }
+        ).FirstOrDefaultAsync(ct);
 
-        // Professional + User
-        const string sqlPro = """
-            select p.id,p."userId",p.bio,p.rating,p.active,p."avatarUrl",p."availabilityText",
-                   p."completedJobsCount",p."slotMinutes",p."leadTimeMinutes",p."maxAdvanceDays",p."allowInstantBooking",
-                   u.id as "uid",u.name,u.email,u.phone,u.role,u."zoneId",u."createdAt"
-            from "Professional" p join "User" u on u.id=p."userId"
-            where p.id=@id
-            """;
-        var row = await conn.QuerySingleOrDefaultAsync(new CommandDefinition(sqlPro, new { id }, cancellationToken: ct));
         if (row is null) return null;
 
-        // Services
-        var services = (await conn.QueryAsync(new CommandDefinition(
-            """select id,"serviceId","professionalId","nomeServico",preco,descricao from "ProfessionalService" where "professionalId"=@id""",
-            new { id }, cancellationToken: ct))).ToList();
+        var services = await ctx.ProfessionalServices
+            .AsNoTracking()
+            .Where(ps => ps.ProfessionalId == id)
+            .Select(ps => new
+            {
+                id = ps.Id,
+                serviceId = ps.ServiceId,
+                professionalId = ps.ProfessionalId,
+                nomeServico = ps.NomeServico,
+                preco = ps.Preco,
+                descricao = ps.Descricao
+            })
+            .ToListAsync(ct);
 
-        // Portfolio
-        var portfolio = (await conn.QueryAsync(new CommandDefinition(
-            """select id,"professionalId","imageUrl",title,description,"orderIndex","createdAt" from "ProfessionalPortfolio" where "professionalId"=@id order by "orderIndex" asc nulls last, "createdAt" desc""",
-            new { id }, cancellationToken: ct))).ToList();
+        var portfolio = await ctx.ProfessionalPortfolios
+            .AsNoTracking()
+            .Where(p => p.ProfessionalId == id)
+            .OrderBy(p => p.OrderIndex == null ? 1 : 0)
+            .ThenBy(p => p.OrderIndex)
+            .ThenByDescending(p => p.CreatedAt)
+            .Select(p => new
+            {
+                id = p.Id,
+                professionalId = p.ProfessionalId,
+                imageUrl = p.ImageUrl,
+                title = p.Title,
+                description = p.Description,
+                orderIndex = p.OrderIndex,
+                createdAt = p.CreatedAt
+            })
+            .ToListAsync(ct);
 
-        // Zones with zone info
-        var zones = (await conn.QueryAsync(new CommandDefinition(
-            """select pz."professionalId",pz."zoneId",z.id as "zid",z.name as "zname",z.active as "zactive" from "ProfessionalZone" pz join "Zone" z on z.id=pz."zoneId" where pz."professionalId"=@id""",
-            new { id }, cancellationToken: ct))).ToList();
+        var zones = await (
+            from pz in ctx.ProfessionalZones.AsNoTracking()
+            join z in ctx.Zones.AsNoTracking() on pz.ZoneId equals z.Id
+            where pz.ProfessionalId == id
+            select new
+            {
+                professionalId = pz.ProfessionalId,
+                zoneId = pz.ZoneId,
+                zone = new { id = z.Id, name = z.Name, active = z.Active }
+            }
+        ).ToListAsync(ct);
 
-        IDictionary<string, object?> r = row;
         return new
         {
-            id = r["id"],
-            userId = r["userId"],
-            bio = r["bio"],
-            rating = r["rating"],
-            active = r["active"],
-            avatarUrl = r["avatarUrl"],
-            availabilityText = r["availabilityText"],
-            completedJobsCount = r["completedJobsCount"],
-            slotMinutes = r["slotMinutes"],
-            leadTimeMinutes = r["leadTimeMinutes"],
-            maxAdvanceDays = r["maxAdvanceDays"],
-            allowInstantBooking = r["allowInstantBooking"],
-            user = new { id = r["uid"], name = r["name"], email = r["email"], phone = r["phone"], role = r["role"], zoneId = r["zoneId"], createdAt = r["createdAt"] },
+            id = row.Id,
+            userId = row.UserId,
+            bio = row.Bio,
+            rating = row.Rating,
+            active = row.Active,
+            avatarUrl = row.AvatarUrl,
+            availabilityText = row.AvailabilityText,
+            completedJobsCount = row.CompletedJobsCount,
+            slotMinutes = row.SlotMinutes,
+            leadTimeMinutes = row.LeadTimeMinutes,
+            maxAdvanceDays = row.MaxAdvanceDays,
+            allowInstantBooking = row.AllowInstantBooking,
+            user = new { id = row.UserId2, name = row.UserName, email = row.UserEmail, phone = row.UserPhone, role = row.UserRole, zoneId = row.UserZoneId, createdAt = row.UserCreatedAt },
             services,
             portfolio,
-            zones = zones.Select(z =>
-            {
-                IDictionary<string, object?> zd = z;
-                return new
-                {
-                    professionalId = zd["professionalId"],
-                    zoneId = zd["zoneId"],
-                    zone = new { id = zd["zid"], name = zd["zname"], active = zd["zactive"] }
-                };
-            }).ToList()
+            zones
         };
     }
 
-    public async Task<object?> UpdateAsync(string id, string? bio, bool? active, string? availabilityText, string? avatarUrl, CancellationToken ct)
+    public async Task<object?> UpdateAsync(
+        string id, string? bio, bool? active, string? availabilityText, string? avatarUrl, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
+        var existing = await ctx.Professionals
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
 
-        // Build dynamic SET
-        var setClauses = new List<string>();
-        var p = new DynamicParameters();
-        p.Add("id", id);
+        if (existing is null) return null;
 
-        if (bio is not null) { setClauses.Add("bio=@bio"); p.Add("bio", bio); }
-        if (active is not null) { setClauses.Add("active=@active"); p.Add("active", active); }
-        if (availabilityText is not null) { setClauses.Add("\"availabilityText\"=@availabilityText"); p.Add("availabilityText", availabilityText); }
-        if (avatarUrl is not null) { setClauses.Add("\"avatarUrl\"=@avatarUrl"); p.Add("avatarUrl", avatarUrl); }
+        var newBio = bio ?? existing.Bio;
+        var newActive = active ?? existing.Active;
+        var newAvailabilityText = availabilityText ?? existing.AvailabilityText;
+        var newAvatarUrl = avatarUrl ?? existing.AvatarUrl;
 
-        if (setClauses.Count == 0)
-            return await GetByIdAsync(id, ct);
+        await ctx.Professionals
+            .Where(p => p.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Bio, newBio)
+                .SetProperty(p => p.Active, newActive)
+                .SetProperty(p => p.AvailabilityText, newAvailabilityText)
+                .SetProperty(p => p.AvatarUrl, newAvatarUrl), ct);
 
-        var sql = $"update \"Professional\" set {string.Join(",", setClauses)} where id=@id";
-        await conn.ExecuteAsync(new CommandDefinition(sql, p, cancellationToken: ct));
         return await GetByIdAsync(id, ct);
     }
 
     public async Task<IReadOnlyList<object>> GetZonesAsync(string professionalId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var rows = await conn.QueryAsync(new CommandDefinition(
-            """select pz."professionalId",pz."zoneId",z.id as "zid",z.name as "zname",z.active as "zactive" from "ProfessionalZone" pz join "Zone" z on z.id=pz."zoneId" where pz."professionalId"=@professionalId""",
-            new { professionalId }, cancellationToken: ct));
-        return rows.Select(z =>
-        {
-            IDictionary<string, object?> zd = z;
-            return (object)new
+        var rows = await (
+            from pz in ctx.ProfessionalZones.AsNoTracking()
+            join z in ctx.Zones.AsNoTracking() on pz.ZoneId equals z.Id
+            where pz.ProfessionalId == professionalId
+            select new
             {
-                professionalId = zd["professionalId"],
-                zoneId = zd["zoneId"],
-                zone = new { id = zd["zid"], name = zd["zname"], active = zd["zactive"] }
-            };
-        }).ToList();
+                professionalId = pz.ProfessionalId,
+                zoneId = pz.ZoneId,
+                zone = new { id = z.Id, name = z.Name, active = z.Active }
+            }
+        ).ToListAsync(ct);
+
+        return rows.Cast<object>().ToList();
     }
 
     public async Task<object?> UpdateZonesAsync(string professionalId, string[] zoneIds, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-
         // Validate zones exist and are active
         if (zoneIds.Length > 0)
         {
-            var found = (await conn.QueryAsync<string>(new CommandDefinition(
-                "select id from \"Zone\" where id = any(@ids) and active=true",
-                new { ids = zoneIds }, cancellationToken: ct))).ToHashSet();
+            var found = await ctx.Zones
+                .AsNoTracking()
+                .Where(z => zoneIds.Contains(z.Id) && z.Active)
+                .Select(z => z.Id)
+                .ToHashSetAsync(ct);
+
             var invalid = zoneIds.Where(z => !found.Contains(z)).ToList();
             if (invalid.Count > 0)
                 throw new InvalidOperationException($"Zonas inválidas/inativas: {string.Join(", ", invalid)}");
         }
 
-        using var tx = conn.BeginTransaction();
-        await conn.ExecuteAsync(new CommandDefinition(
-            "delete from \"ProfessionalZone\" where \"professionalId\"=@professionalId",
-            new { professionalId }, transaction: tx, cancellationToken: ct));
+        await using var tx = await ctx.Database.BeginTransactionAsync(ct);
+
+        await ctx.ProfessionalZones
+            .Where(pz => pz.ProfessionalId == professionalId)
+            .ExecuteDeleteAsync(ct);
 
         if (zoneIds.Length > 0)
         {
-            await conn.ExecuteAsync(new CommandDefinition(
-                "insert into \"ProfessionalZone\"(\"professionalId\",\"zoneId\",\"createdAt\") select @professionalId,unnest(@zoneIds::text[]),now() on conflict do nothing",
-                new { professionalId, zoneIds }, transaction: tx, cancellationToken: ct));
+            var entities = zoneIds.Select(zId => new Domain.Entities.ProfessionalZone(
+                ProfessionalId: professionalId,
+                ZoneId: zId,
+                CreatedAt: DateTime.UtcNow)).ToList();
+
+            await ctx.ProfessionalZones.AddRangeAsync(entities, ct);
+            await ctx.SaveChangesAsync(ct);
         }
-        tx.Commit();
+
+        await tx.CommitAsync(ct);
 
         return await GetByIdAsync(professionalId, ct);
     }

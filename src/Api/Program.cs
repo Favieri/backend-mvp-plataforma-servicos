@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using Serilog.Formatting.Json;
 
+// Required for Npgsql timestamp compatibility: maps timestamptz columns to DateTime (not DateTimeOffset)
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();

@@ -44,7 +44,7 @@ public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposab
         await _dataSource.DisposeAsync();
     }
 
-    private static bool ShouldUseSupabasePooler(NpgsqlConnectionStringBuilder builder)
+    internal static bool ShouldUseSupabasePooler(NpgsqlConnectionStringBuilder builder)
     {
         return !string.IsNullOrWhiteSpace(builder.Host)
                && builder.Host.Contains("supabase", StringComparison.OrdinalIgnoreCase)

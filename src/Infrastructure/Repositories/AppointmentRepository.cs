@@ -1,106 +1,160 @@
 using Application.Abstractions;
-using Dapper;
 using Domain.Entities;
-using Infrastructure.Data;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class AppointmentRepository(IConnectionFactory factory) : IAppointmentRepository
+public sealed class AppointmentRepository(AppDbContext ctx) : IAppointmentRepository
 {
-    private const string AppointmentSelect = """
-        id AS "Id","professionalId" AS "ProfessionalId","clientId" AS "ClientId","serviceId" AS "ServiceId",
-        "startsAt" AS "StartsAt","endsAt" AS "EndsAt",status AS "Status",location AS "Location",notes AS "Notes"
-        """;
-
     public async Task<IReadOnlyList<Appointment>> GetByClientAsync(string clientId, CancellationToken ct)
+        => await ctx.Appointments
+            .AsNoTracking()
+            .Where(a => a.ClientId == clientId)
+            .OrderByDescending(a => a.StartsAt)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<object>> GetByProfessionalAsync(
+        string professionalId, string? status, DateTime? from, DateTime? to, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var sql = $"select {AppointmentSelect} from \"Appointment\" where \"clientId\"=@clientId order by \"startsAt\" desc";
-        return (await conn.QueryAsync<Appointment>(new CommandDefinition(sql, new { clientId }, cancellationToken: ct))).ToList();
+        var query = ctx.Appointments
+            .AsNoTracking()
+            .Where(a => a.ProfessionalId == professionalId);
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(a => a.Status == status.ToUpperInvariant());
+
+        if (from.HasValue)
+            query = query.Where(a => a.StartsAt >= from.Value);
+
+        if (to.HasValue)
+            query = query.Where(a => a.EndsAt <= to.Value);
+
+        var rows = await query
+            .OrderBy(a => a.StartsAt)
+            .Select(a => new
+            {
+                id = a.Id,
+                professionalId = a.ProfessionalId,
+                clientId = a.ClientId,
+                serviceId = a.ServiceId,
+                startsAt = a.StartsAt,
+                endsAt = a.EndsAt,
+                status = a.Status,
+                location = a.Location,
+                notes = a.Notes
+            })
+            .ToListAsync(ct);
+
+        return rows.Cast<object>().ToList();
     }
 
-    public async Task<IReadOnlyList<object>> GetByProfessionalAsync(string professionalId, string? status, DateTime? from, DateTime? to, CancellationToken ct)
+    public async Task<bool> HasConflictAsync(
+        string professionalId, DateTime startsAt, DateTime endsAt, CancellationToken ct)
+        => await ctx.Appointments
+            .AsNoTracking()
+            .Where(a =>
+                a.ProfessionalId == professionalId
+                && (a.Status == "PENDING" || a.Status == "CONFIRMED")
+                && !(a.EndsAt <= startsAt || a.StartsAt >= endsAt))
+            .AnyAsync(ct);
+
+    public async Task<(int? SlotMinutes, bool? AllowInstantBooking)> GetProfessionalConfigAsync(
+        string professionalId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var where = "where \"professionalId\"=@professionalId";
-        var p = new DynamicParameters();
-        p.Add("professionalId", professionalId);
+        var row = await ctx.Professionals
+            .AsNoTracking()
+            .Where(p => p.Id == professionalId)
+            .Select(p => new { p.SlotMinutes, p.AllowInstantBooking })
+            .FirstOrDefaultAsync(ct);
 
-        if (!string.IsNullOrWhiteSpace(status)) { where += " and status=@status"; p.Add("status", status.ToUpperInvariant()); }
-        if (from.HasValue) { where += " and \"startsAt\">=@from"; p.Add("from", from); }
-        if (to.HasValue) { where += " and \"endsAt\"<=@to"; p.Add("to", to); }
-
-        var sql = $"select {AppointmentSelect} from \"Appointment\" {where} order by \"startsAt\" asc";
-        return (await conn.QueryAsync(new CommandDefinition(sql, p, cancellationToken: ct))).Cast<object>().ToList();
-    }
-
-    public async Task<bool> HasConflictAsync(string professionalId, DateTime startsAt, DateTime endsAt, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        // Overlap: NOT (endsAt <= startsAt OR startsAt >= endsAt)
-        const string sql = """
-            select count(1) from "Appointment"
-            where "professionalId"=@professionalId
-              and status in ('PENDING','CONFIRMED')
-              and not ("endsAt" <= @startsAt or "startsAt" >= @endsAt)
-            """;
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(sql, new { professionalId, startsAt, endsAt }, cancellationToken: ct)) > 0;
-    }
-
-    public async Task<(int? SlotMinutes, bool? AllowInstantBooking)> GetProfessionalConfigAsync(string professionalId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var row = await conn.QuerySingleOrDefaultAsync(new CommandDefinition(
-            "select \"slotMinutes\",\"allowInstantBooking\" from \"Professional\" where id=@professionalId",
-            new { professionalId }, cancellationToken: ct));
-        if (row is null) return (null, null);
-        IDictionary<string, object?> d = row;
-        var slotMinutes = d["slotMinutes"] is null ? (int?)null : Convert.ToInt32(d["slotMinutes"]);
-        var allowInstant = d["allowInstantBooking"] is null ? (bool?)null : Convert.ToBoolean(d["allowInstantBooking"]);
-        return (slotMinutes, allowInstant);
+        return row is null ? (null, null) : (row.SlotMinutes, row.AllowInstantBooking);
     }
 
     public async Task<bool> ProfessionalExistsAsync(string professionalId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "select count(1) from \"Professional\" where id=@professionalId",
-            new { professionalId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.Id == professionalId, ct);
 
     public async Task<Appointment> CreateAsync(Appointment appointment, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var sql = $"""
-            insert into "Appointment"(id,"professionalId","clientId","serviceId","startsAt","endsAt",status,location,notes,"createdAt","updatedAt")
-            values (gen_random_uuid()::text,@ProfessionalId,@ClientId,@ServiceId,@StartsAt,@EndsAt,@Status,@Location,@Notes,now(),now())
-            returning {AppointmentSelect}
-            """;
-        return await conn.QuerySingleAsync<Appointment>(new CommandDefinition(sql, appointment, cancellationToken: ct));
+        var entity = new Appointment(
+            Id: Guid.NewGuid().ToString(),
+            ProfessionalId: appointment.ProfessionalId,
+            ClientId: appointment.ClientId,
+            ServiceId: appointment.ServiceId,
+            StartsAt: appointment.StartsAt,
+            EndsAt: appointment.EndsAt,
+            Status: appointment.Status,
+            Location: appointment.Location,
+            Notes: appointment.Notes);
+
+        ctx.Appointments.Add(entity);
+        await ctx.SaveChangesAsync(ct);
+        return entity;
     }
 
     public async Task<Appointment?> UpdateStatusAsync(string id, string status, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var sql = $"update \"Appointment\" set status=@status,\"updatedAt\"=now() where id=@id returning {AppointmentSelect}";
-        return await conn.QuerySingleOrDefaultAsync<Appointment>(new CommandDefinition(sql, new { id, status }, cancellationToken: ct));
+        await ctx.Appointments
+            .Where(a => a.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, status), ct);
+
+        return await ctx.Appointments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
     public async Task<object?> GetAppointmentWithParticipantsAsync(string id, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = """
-            select a.id,a."professionalId",a."clientId",a."serviceId",a."startsAt",a."endsAt",a.status,a.location,a.notes,
-                   prousr.email as "professionalEmail",prousr.name as "professionalName",
-                   client.email as "clientEmail",client.name as "clientName",
-                   s.name as "serviceName"
-            from "Appointment" a
-            join "Professional" pro on pro.id=a."professionalId"
-            join "User" prousr on prousr.id=pro."userId"
-            left join "User" client on client.id=a."clientId"
-            left join "Service" s on s.id=a."serviceId"
-            where a.id=@id
-            """;
-        return await conn.QuerySingleOrDefaultAsync(new CommandDefinition(sql, new { id }, cancellationToken: ct));
+        var result = await (
+            from a in ctx.Appointments.AsNoTracking()
+            join pro in ctx.Professionals.AsNoTracking() on a.ProfessionalId equals pro.Id
+            join proUsr in ctx.Users.AsNoTracking() on pro.UserId equals proUsr.Id
+            join svc in ctx.Services.AsNoTracking() on a.ServiceId equals svc.Id into svcJoin
+            from svc in svcJoin.DefaultIfEmpty()
+            where a.Id == id
+            select new
+            {
+                id = a.Id,
+                professionalId = a.ProfessionalId,
+                clientId = a.ClientId,
+                serviceId = a.ServiceId,
+                startsAt = a.StartsAt,
+                endsAt = a.EndsAt,
+                status = a.Status,
+                location = a.Location,
+                notes = a.Notes,
+                professionalEmail = proUsr.Email,
+                professionalName = proUsr.Name,
+                serviceName = svc != null ? svc.Name : null
+            }
+        ).FirstOrDefaultAsync(ct);
+
+        if (result is null) return null;
+
+        // Load client info separately (nullable)
+        if (result.clientId is null)
+            return new { result.id, result.professionalId, result.clientId, result.serviceId, result.startsAt, result.endsAt, result.status, result.location, result.notes, result.professionalEmail, result.professionalName, clientEmail = (string?)null, clientName = (string?)null, result.serviceName };
+
+        var client = await ctx.Users
+            .AsNoTracking()
+            .Where(u => u.Id == result.clientId)
+            .Select(u => new { u.Email, u.Name })
+            .FirstOrDefaultAsync(ct);
+
+        return new
+        {
+            result.id,
+            result.professionalId,
+            result.clientId,
+            result.serviceId,
+            result.startsAt,
+            result.endsAt,
+            result.status,
+            result.location,
+            result.notes,
+            result.professionalEmail,
+            result.professionalName,
+            clientEmail = client?.Email,
+            clientName = client?.Name,
+            result.serviceName
+        };
     }
 }

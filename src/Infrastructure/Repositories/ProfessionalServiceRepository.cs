@@ -1,94 +1,114 @@
 using Application.Abstractions;
-using Dapper;
-using Infrastructure.Data;
+using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class ProfessionalServiceRepository(IConnectionFactory factory) : IProfessionalServiceRepository
+public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessionalServiceRepository
 {
-    private const string SelectCols = """
-        ps.id,ps."serviceId",ps."professionalId",ps."nomeServico",ps.preco,ps.descricao,
-        s.id as "sid",s.name as "sname",s.icon as "sicon"
-        """;
+    private async Task<object?> ProjectByIdAsync(string id, CancellationToken ct)
+        => await (
+            from ps in ctx.ProfessionalServices.AsNoTracking()
+            join s in ctx.Services.AsNoTracking() on ps.ServiceId equals s.Id
+            where ps.Id == id
+            select new
+            {
+                id = ps.Id,
+                serviceId = ps.ServiceId,
+                professionalId = ps.ProfessionalId,
+                nomeServico = ps.NomeServico,
+                preco = ps.Preco,
+                descricao = ps.Descricao,
+                service = new { id = s.Id, name = s.Name, icon = s.Icon }
+            }
+        ).FirstOrDefaultAsync(ct);
 
-    private static object Map(dynamic row)
+    public async Task<IReadOnlyList<object>> GetAsync(
+        string? professionalId, string? serviceId, CancellationToken ct)
     {
-        IDictionary<string, object?> r = row;
-        return new
-        {
-            id = r["id"],
-            serviceId = r["serviceId"],
-            professionalId = r["professionalId"],
-            nomeServico = r["nomeServico"],
-            preco = r["preco"],
-            descricao = r["descricao"],
-            service = new { id = r["sid"], name = r["sname"], icon = r["sicon"] }
-        };
-    }
+        var query =
+            from ps in ctx.ProfessionalServices.AsNoTracking()
+            join s in ctx.Services.AsNoTracking() on ps.ServiceId equals s.Id
+            select new { ps, s };
 
-    public async Task<IReadOnlyList<object>> GetAsync(string? professionalId, string? serviceId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var where = "where 1=1";
-        var p = new DynamicParameters();
-        if (!string.IsNullOrWhiteSpace(professionalId)) { where += " and ps.\"professionalId\"=@professionalId"; p.Add("professionalId", professionalId); }
-        if (!string.IsNullOrWhiteSpace(serviceId)) { where += " and ps.\"serviceId\"=@serviceId"; p.Add("serviceId", serviceId); }
-        var sql = $"""select {SelectCols} from "ProfessionalService" ps join "Service" s on s.id=ps."serviceId" {where} order by ps."nomeServico" asc""";
-        var rows = await conn.QueryAsync(new CommandDefinition(sql, p, cancellationToken: ct));
-        return rows.Select(r => Map(r)).ToList();
+        if (!string.IsNullOrWhiteSpace(professionalId))
+            query = query.Where(x => x.ps.ProfessionalId == professionalId);
+
+        if (!string.IsNullOrWhiteSpace(serviceId))
+            query = query.Where(x => x.ps.ServiceId == serviceId);
+
+        var rows = await query
+            .OrderBy(x => x.ps.NomeServico)
+            .Select(x => new
+            {
+                id = x.ps.Id,
+                serviceId = x.ps.ServiceId,
+                professionalId = x.ps.ProfessionalId,
+                nomeServico = x.ps.NomeServico,
+                preco = x.ps.Preco,
+                descricao = x.ps.Descricao,
+                service = new { id = x.s.Id, name = x.s.Name, icon = x.s.Icon }
+            })
+            .ToListAsync(ct);
+
+        return rows.Cast<object>().ToList();
     }
 
     public async Task<object?> GetByIdAsync(string id, CancellationToken ct)
+        => await ProjectByIdAsync(id, ct);
+
+    public async Task<object> CreateAsync(
+        string professionalId, string serviceId, string nomeServico,
+        decimal preco, string? descricao, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var sql = $"""select {SelectCols} from "ProfessionalService" ps join "Service" s on s.id=ps."serviceId" where ps.id=@id""";
-        var row = await conn.QuerySingleOrDefaultAsync(new CommandDefinition(sql, new { id }, cancellationToken: ct));
-        return row is null ? null : Map(row);
+        var entity = new ProfessionalService(
+            Id: Guid.NewGuid().ToString(),
+            ProfessionalId: professionalId,
+            ServiceId: serviceId,
+            NomeServico: nomeServico,
+            Preco: (double)preco,
+            Descricao: descricao);
+
+        ctx.ProfessionalServices.Add(entity);
+        await ctx.SaveChangesAsync(ct);
+        return (await ProjectByIdAsync(entity.Id, ct))!;
     }
 
-    public async Task<object> CreateAsync(string professionalId, string serviceId, string nomeServico, decimal preco, string? descricao, CancellationToken ct)
+    public async Task<object?> UpdateAsync(
+        string id, string? nomeServico, decimal? preco, string? descricao, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = """
-            insert into "ProfessionalService"(id,"professionalId","serviceId","nomeServico",preco,descricao)
-            values(gen_random_uuid()::text,@professionalId,@serviceId,@nomeServico,@preco,@descricao)
-            returning id
-            """;
-        var id = await conn.ExecuteScalarAsync<string>(new CommandDefinition(sql, new { professionalId, serviceId, nomeServico, preco, descricao }, cancellationToken: ct));
-        return (await GetByIdAsync(id!, ct))!;
-    }
+        var existing = await ctx.ProfessionalServices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ps => ps.Id == id, ct);
 
-    public async Task<object?> UpdateAsync(string id, string? nomeServico, decimal? preco, string? descricao, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var setClauses = new List<string>();
-        var p = new DynamicParameters();
-        p.Add("id", id);
-        if (nomeServico is not null) { setClauses.Add("\"nomeServico\"=@nomeServico"); p.Add("nomeServico", nomeServico); }
-        if (preco is not null) { setClauses.Add("preco=@preco"); p.Add("preco", preco); }
-        if (descricao is not null) { setClauses.Add("descricao=@descricao"); p.Add("descricao", descricao); }
-        if (setClauses.Count == 0) return await GetByIdAsync(id, ct);
-        var sql = $"update \"ProfessionalService\" set {string.Join(",", setClauses)} where id=@id";
-        await conn.ExecuteAsync(new CommandDefinition(sql, p, cancellationToken: ct));
-        return await GetByIdAsync(id, ct);
+        if (existing is null) return null;
+
+        var newNome = nomeServico ?? existing.NomeServico;
+        var newPreco = preco.HasValue ? (double)preco.Value : existing.Preco;
+        var newDesc = descricao ?? existing.Descricao;
+
+        await ctx.ProfessionalServices
+            .Where(ps => ps.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(ps => ps.NomeServico, newNome)
+                .SetProperty(ps => ps.Preco, newPreco)
+                .SetProperty(ps => ps.Descricao, newDesc), ct);
+
+        return await ProjectByIdAsync(id, ct);
     }
 
     public async Task<bool> DeleteAsync(string id, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition("delete from \"ProfessionalService\" where id=@id", new { id }, cancellationToken: ct));
-        return affected > 0;
+        var deleted = await ctx.ProfessionalServices
+            .Where(ps => ps.Id == id)
+            .ExecuteDeleteAsync(ct);
+        return deleted > 0;
     }
 
     public async Task<bool> ProfessionalExistsAsync(string professionalId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition("select count(1) from \"Professional\" where id=@professionalId", new { professionalId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.Id == professionalId, ct);
 
     public async Task<bool> ServiceExistsAsync(string serviceId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition("select count(1) from \"Service\" where id=@serviceId", new { serviceId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Services.AsNoTracking().AnyAsync(s => s.Id == serviceId, ct);
 }

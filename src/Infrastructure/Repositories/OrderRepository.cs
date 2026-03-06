@@ -1,61 +1,89 @@
-using System.Data;
 using Application.Abstractions;
-using Dapper;
 using Domain.Entities;
 using Domain.Enums;
-using Infrastructure.Data;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class OrderRepository(IConnectionFactory factory) : IOrderRepository
+public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 {
-    public async Task<IReadOnlyList<Order>> GetOrdersAsync(string? serviceId, string? excludeProfessionalId, string? professionalId, bool filterZones, CancellationToken ct)
+    public async Task<IReadOnlyList<Order>> GetOrdersAsync(
+        string? serviceId,
+        string? excludeProfessionalId,
+        string? professionalId,
+        bool filterZones,
+        CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        var where = " where 1=1 ";
-        var p = new DynamicParameters();
-        if (!string.IsNullOrWhiteSpace(serviceId)) { where += " and o.\"serviceId\"=@serviceId"; p.Add("serviceId", serviceId); }
+        var query = ctx.Orders.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(serviceId))
+            query = query.Where(o => o.ServiceId == serviceId);
+
         if (filterZones && !string.IsNullOrWhiteSpace(professionalId))
         {
-            where += " and o.\"clientId\" in (select u.id from \"User\" u where u.\"zoneId\" in (select pz.\"zoneId\" from \"ProfessionalZone\" pz where pz.\"professionalId\"=@professionalId))";
-            p.Add("professionalId", professionalId);
+            var professionalZones = ctx.ProfessionalZones
+                .Where(pz => pz.ProfessionalId == professionalId)
+                .Select(pz => pz.ZoneId);
+
+            query = query.Where(o =>
+                ctx.Users
+                    .Where(u => u.Id == o.ClientId && u.ZoneId != null && professionalZones.Contains(u.ZoneId!))
+                    .Any());
         }
+
         if (!string.IsNullOrWhiteSpace(excludeProfessionalId))
         {
-            where += " and o.id not in (select poi.\"orderId\" from \"ProfessionalOrderIgnore\" poi where poi.\"professionalId\"=@excludeProfessionalId)";
-            p.Add("excludeProfessionalId", excludeProfessionalId);
+            query = query.Where(o =>
+                !ctx.ProfessionalOrderIgnores
+                    .Any(poi => poi.ProfessionalId == excludeProfessionalId && poi.OrderId == o.Id));
         }
-        var sql = $"select o.id AS \"Id\",o.\"clientId\" AS \"ClientId\",o.\"serviceId\" AS \"ServiceId\",o.description AS \"Description\",o.location AS \"Location\",o.date AS \"Date\",o.status AS \"Status\",o.\"createdAt\" AS \"CreatedAt\" from \"Order\" o {where} order by o.\"createdAt\" desc";
-        var rows = await conn.QueryAsync<Order>(new CommandDefinition(sql, p, cancellationToken: ct));
-        return rows.ToList();
+
+        return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
     }
 
     public async Task<Order?> GetByIdAsync(string id, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "select id AS \"Id\",\"clientId\" AS \"ClientId\",\"serviceId\" AS \"ServiceId\",description AS \"Description\",location AS \"Location\",date AS \"Date\",status AS \"Status\",\"createdAt\" AS \"CreatedAt\" from \"Order\" where id=@id";
-        return await conn.QuerySingleOrDefaultAsync<Order>(new CommandDefinition(sql, new { id }, cancellationToken: ct));
-    }
+        => await ctx.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == id, ct);
 
-    public async Task<Order> CreateAsync(string clientId, string serviceId, string? description, string? location, DateTime? date, CancellationToken ct)
+    public async Task<Order> CreateAsync(
+        string clientId, string serviceId, string? description, string? location,
+        DateTime? date, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "insert into \"Order\"(id,\"clientId\",\"serviceId\",description,location,date,status,\"createdAt\") values (gen_random_uuid()::text,@clientId,@serviceId,@description,@location,@date,@status,now()) returning id AS \"Id\",\"clientId\" AS \"ClientId\",\"serviceId\" AS \"ServiceId\",description AS \"Description\",location AS \"Location\",date AS \"Date\",status AS \"Status\",\"createdAt\" AS \"CreatedAt\"";
-        return await conn.QuerySingleAsync<Order>(new CommandDefinition(sql, new { clientId, serviceId, description, location, date, status = OrderStatus.Aberto }, cancellationToken: ct));
+        var order = new Order(
+            Id: Guid.NewGuid().ToString(),
+            ClientId: clientId,
+            ServiceId: serviceId,
+            Description: description,
+            Location: location,
+            Date: date,
+            Status: OrderStatus.Aberto,
+            CreatedAt: DateTime.UtcNow);
+
+        ctx.Orders.Add(order);
+        await ctx.SaveChangesAsync(ct);
+        return order;
     }
 
     public async Task CompleteOrderAsync(string orderId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "update \"Order\" set status=@status where id=@orderId";
-        await conn.ExecuteAsync(new CommandDefinition(sql, new { status = OrderStatus.Concluido, orderId }, cancellationToken: ct));
-    }
+        => await ctx.Orders
+            .Where(o => o.Id == orderId)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Concluido), ct);
 
     public async Task<IReadOnlyList<object>> GetMineAsync(string clientId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = "select id,status,date as \"scheduledAt\",\"createdAt\" as \"createdAt\" from \"Order\" where \"clientId\"=@clientId order by \"createdAt\" desc";
-        var rows = await conn.QueryAsync(new CommandDefinition(sql, new { clientId }, cancellationToken: ct));
-        return rows.ToList();
+        var rows = await ctx.Orders
+            .AsNoTracking()
+            .Where(o => o.ClientId == clientId)
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new
+            {
+                id = o.Id,
+                status = o.Status,
+                scheduledAt = o.Date,
+                createdAt = o.CreatedAt
+            })
+            .ToListAsync(ct);
+
+        return rows.Cast<object>().ToList();
     }
 }

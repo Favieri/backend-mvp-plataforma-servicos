@@ -1,172 +1,124 @@
-using System.Data;
 using Application.Abstractions;
 using Application.DTOs;
-using Dapper;
-using Infrastructure.Data;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IProfessionalReadRepository
+public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessionalReadRepository
 {
-    public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(string? zoneId, string? serviceId, CancellationToken ct)
+    public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(
+        string? zoneId, string? serviceId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-
-        var where = "where p.\"active\" = true";
-        var p = new DynamicParameters();
+        var query =
+            from p in ctx.Professionals.AsNoTracking()
+            join u in ctx.Users.AsNoTracking() on p.UserId equals u.Id
+            where p.Active
+            select new { p, u };
 
         if (!string.IsNullOrWhiteSpace(zoneId))
         {
-            where += @"
-                and exists (
-                    select 1
-                    from ""ProfessionalZone"" pz
-                    where pz.""professionalId"" = p.""id""
-                      and pz.""zoneId"" = @zoneId
-                )";
-            p.Add("zoneId", zoneId);
+            query = query.Where(x =>
+                ctx.ProfessionalZones.Any(pz => pz.ProfessionalId == x.p.Id && pz.ZoneId == zoneId));
         }
 
         if (!string.IsNullOrWhiteSpace(serviceId))
         {
-            where += @"
-                and exists (
-                    select 1
-                    from ""ProfessionalService"" ps
-                    where ps.""professionalId"" = p.""id""
-                      and ps.""serviceId"" = @serviceId
-                )";
-            p.Add("serviceId", serviceId);
+            query = query.Where(x =>
+                ctx.ProfessionalServices.Any(ps => ps.ProfessionalId == x.p.Id && ps.ServiceId == serviceId));
         }
 
-        var baseSql = $@"
-            select
-                p.""id"" as ""Id"",
-                p.""userId"" as ""UserId"",
-                coalesce(u.""name"", u.""name"", '') as ""Name"",
-                coalesce(u.""avatarUrl"", p.""avatarUrl"") as ""AvatarUrl"",
-                p.""rating"" as ""Rating"",
-                coalesce(p.""active"", true) as ""Active"",
-                coalesce(p.""completedJobsCount"", 0) as ""CompletedJobsCount"",
-                p.""availabilityText"" as ""AvailabilityText""
-            from ""Professional"" p
-            join ""User"" u on u.""id"" = p.""userId""
-            {where}
-            order by p.""id""";
+        var professionals = await query
+            .OrderBy(x => x.p.Id)
+            .Select(x => new ProfessionalCardDto
+            {
+                Id = x.p.Id,
+                UserId = x.p.UserId,
+                Name = x.u.Name,
+                AvatarUrl = x.p.AvatarUrl,
+                Rating = x.p.Rating,
+                Active = x.p.Active,
+                CompletedJobsCount = x.p.CompletedJobsCount,
+                AvailabilityText = x.p.AvailabilityText
+            })
+            .ToListAsync(ct);
 
-        var professionals = (await conn.QueryAsync<ProfessionalRow>(new CommandDefinition(baseSql, p, cancellationToken: ct))).ToList();
-        if (professionals.Count == 0) return Array.Empty<ProfessionalCardDto>();
+        if (professionals.Count == 0)
+            return [];
 
         var professionalIds = professionals.Select(x => x.Id).Distinct().ToArray();
 
-        const string servicesSql = @"
-            select
-                ps.""professionalId"" as ""ProfessionalId"",
-                ps.""id"" as ""Id"",
-                ps.""serviceId"" as ""ServiceId"",
-                ps.""nomeServico"" as ""Name"",
-                coalesce(ps.""preco"", 0) as ""Price"",
-                ps.""descricao"" as ""Description"",
-                s.""icon"" as ""Icon""
-            from ""ProfessionalService"" ps
-            left join ""Service"" s on s.""id"" = ps.""serviceId""
-            where ps.""professionalId"" = any(@professionalIds)";
+        var serviceRows = await ctx.ProfessionalServices
+            .AsNoTracking()
+            .Where(ps => professionalIds.Contains(ps.ProfessionalId))
+            .Join(ctx.Services.AsNoTracking(), ps => ps.ServiceId, s => s.Id,
+                (ps, s) => new
+                {
+                    ps.ProfessionalId,
+                    ps.Id,
+                    ps.ServiceId,
+                    Name = ps.NomeServico ?? string.Empty,
+                    Price = ps.Preco,
+                    Description = ps.Descricao,
+                    Icon = s.Icon
+                })
+            .ToListAsync(ct);
 
-        var serviceRows = await conn.QueryAsync<ProfessionalServiceRow>(new CommandDefinition(servicesSql, new { professionalIds }, cancellationToken: ct));
-
-        const string zonesSql = @"
-            select
-                pz.""professionalId"" as ""ProfessionalId"",
-                z.""id"" as ""Id"",
-                z.""name"" as ""Name""
-            from ""ProfessionalZone"" pz
-            join ""Zone"" z on z.""id"" = pz.""zoneId""
-            where pz.""professionalId"" = any(@professionalIds)
-              and z.""active"" = true";
-
-        var zoneRows = await conn.QueryAsync<ProfessionalZoneRow>(new CommandDefinition(zonesSql, new { professionalIds }, cancellationToken: ct));
+        var zoneRows = await (
+            from pz in ctx.ProfessionalZones.AsNoTracking()
+            join z in ctx.Zones.AsNoTracking() on pz.ZoneId equals z.Id
+            where professionalIds.Contains(pz.ProfessionalId) && z.Active
+            select new { pz.ProfessionalId, ZoneName = z.Name }
+        ).ToListAsync(ct);
 
         var servicesByProfessional = serviceRows
-            .GroupBy(x => x.ProfessionalId)
+            .GroupBy(x => x.ProfessionalId, StringComparer.Ordinal)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<ProfessionalServiceDto>)g
-                    .Select(x => new ProfessionalServiceDto
-                    {
-                        Id = x.Id,
-                        ServiceId = x.ServiceId,
-                        Name = x.Name ?? string.Empty,
-                        Price = (double)x.Price,
-                        Description = x.Description
-                    })
-                    .ToList());
+                g => (IReadOnlyList<ProfessionalServiceDto>)g.Select(x => new ProfessionalServiceDto
+                {
+                    Id = x.Id,
+                    ServiceId = x.ServiceId,
+                    Name = x.Name,
+                    Price = x.Price,
+                    Description = x.Description
+                }).ToList(),
+                StringComparer.Ordinal);
 
         var zonesByProfessional = zoneRows
-            .GroupBy(x => x.ProfessionalId)
+            .GroupBy(x => x.ProfessionalId, StringComparer.Ordinal)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<string>)g
-                    .Select(x => x.Name ?? string.Empty)
-                    .ToList());
+                g => (IReadOnlyList<string>)g.Select(x => x.ZoneName).ToList(),
+                StringComparer.Ordinal);
 
-        return professionals.Select(pf => new ProfessionalCardDto
+        return professionals.Select(p => new ProfessionalCardDto
         {
-            Id = pf.Id,
-            UserId = pf.UserId,
-            Name = pf.Name,
-            AvatarUrl = pf.AvatarUrl,
-            Rating = pf.Rating.HasValue ? (double)pf.Rating.Value : null,
-            Active = pf.Active,
-            CompletedJobsCount = pf.CompletedJobsCount,
-            AvailabilityText = pf.AvailabilityText,
-            Services = servicesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<ProfessionalServiceDto>(),
-            Zones = zonesByProfessional.GetValueOrDefault(pf.Id) ?? Array.Empty<string>()
+            Id = p.Id,
+            UserId = p.UserId,
+            Name = p.Name,
+            AvatarUrl = p.AvatarUrl,
+            Rating = p.Rating,
+            Active = p.Active,
+            CompletedJobsCount = p.CompletedJobsCount,
+            AvailabilityText = p.AvailabilityText,
+            Services = servicesByProfessional.GetValueOrDefault(p.Id) ?? [],
+            Zones = zonesByProfessional.GetValueOrDefault(p.Id) ?? []
         }).ToList();
     }
 
     public async Task<IReadOnlyList<ZoneDto>> GetZonesAsync(CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = @"
-            select z.""id"" as ""Id"", z.""name"" as ""Name""
-            from ""Zone"" z
-            where z.""active"" = true
-            order by z.""name""";
-
-        var rows = await conn.QueryAsync<ZoneDto>(new CommandDefinition(sql, cancellationToken: ct));
-        return rows.ToList();
-    }
+        => await ctx.Zones
+            .AsNoTracking()
+            .Where(z => z.Active)
+            .OrderBy(z => z.Name)
+            .Select(z => new ZoneDto(z.Id, z.Name))
+            .ToListAsync(ct);
 
     public async Task<IReadOnlyList<ServiceDto>> GetServicesAsync(CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        const string sql = @"
-            select s.""id"" as ""Id"", s.""name"" as ""Name"", s.""icon"" as ""Icon""
-            from ""Service"" s
-            order by s.""name""";
-
-        var rows = await conn.QueryAsync<ServiceDto>(new CommandDefinition(sql, cancellationToken: ct));
-        return rows.ToList();
-    }
-
-    private sealed record ProfessionalRow(
-        string Id,
-        string UserId,
-        string Name,
-        string? AvatarUrl,
-        decimal? Rating,
-        bool Active,
-        int CompletedJobsCount,
-        string? AvailabilityText);
-
-    private sealed record ProfessionalServiceRow(
-        string ProfessionalId,
-        string Id,
-        string ServiceId,
-        string? Name,
-        decimal Price,
-        string? Description,
-        string? Icon);
-
-    private sealed record ProfessionalZoneRow(string ProfessionalId, string Id, string? Name);
+        => await ctx.Services
+            .AsNoTracking()
+            .OrderBy(s => s.Name)
+            .Select(s => new ServiceDto(s.Id, s.Name, s.Icon))
+            .ToListAsync(ct);
 }

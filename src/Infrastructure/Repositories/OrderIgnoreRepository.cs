@@ -1,40 +1,33 @@
 using Application.Abstractions;
-using Dapper;
-using Infrastructure.Data;
+using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public sealed class OrderIgnoreRepository(IConnectionFactory factory) : IOrderIgnoreRepository
+public sealed class OrderIgnoreRepository(AppDbContext ctx) : IOrderIgnoreRepository
 {
     public async Task UpsertAsync(string professionalId, string orderId, CancellationToken ct)
     {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        await conn.ExecuteAsync(new CommandDefinition(
-            "insert into \"ProfessionalOrderIgnore\"(\"professionalId\",\"orderId\",\"createdAt\") values(@professionalId,@orderId,now()) on conflict do nothing",
-            new { professionalId, orderId }, cancellationToken: ct));
+        var exists = await ctx.ProfessionalOrderIgnores
+            .AsNoTracking()
+            .AnyAsync(x => x.ProfessionalId == professionalId && x.OrderId == orderId, ct);
+
+        if (!exists)
+        {
+            ctx.ProfessionalOrderIgnores.Add(new ProfessionalOrderIgnore(professionalId, orderId, DateTime.UtcNow));
+            await ctx.SaveChangesAsync(ct);
+        }
     }
 
     public async Task DeleteAsync(string professionalId, string orderId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        await conn.ExecuteAsync(new CommandDefinition(
-            "delete from \"ProfessionalOrderIgnore\" where \"professionalId\"=@professionalId and \"orderId\"=@orderId",
-            new { professionalId, orderId }, cancellationToken: ct));
-    }
+        => await ctx.ProfessionalOrderIgnores
+            .Where(x => x.ProfessionalId == professionalId && x.OrderId == orderId)
+            .ExecuteDeleteAsync(ct);
 
     public async Task<bool> ProfessionalExistsAsync(string professionalId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "select count(1) from \"Professional\" where id=@professionalId",
-            new { professionalId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.Id == professionalId, ct);
 
     public async Task<bool> OrderExistsAsync(string orderId, CancellationToken ct)
-    {
-        using var conn = await factory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "select count(1) from \"Order\" where id=@orderId",
-            new { orderId }, cancellationToken: ct)) > 0;
-    }
+        => await ctx.Orders.AsNoTracking().AnyAsync(o => o.Id == orderId, ct);
 }
