@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Infrastructure.Data;
-using Infrastructure.Payments;
+using Infrastructure.Email;
 using Infrastructure.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,13 +21,28 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
+
+        // Core repositories
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IProfessionalRepository, ProfessionalRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
-        services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IProfessionalReadRepository, ProfessionalReadRepository>();
-        services.AddHttpClient<IMercadoPagoClient, MercadoPagoClient>();
+
+        // New repositories
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IProfessionalDetailRepository, ProfessionalDetailRepository>();
+        services.AddScoped<IProfessionalServiceRepository, ProfessionalServiceRepository>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IPortfolioRepository, PortfolioRepository>();
+        services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
+        services.AddScoped<IOrderIgnoreRepository, OrderIgnoreRepository>();
+
+        // Email / notifications
+        // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
+        services.AddScoped<IEmailService, SmtpEmailService>();
+
         return services;
     }
 }

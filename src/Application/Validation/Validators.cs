@@ -12,11 +12,3 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
     }
 }
 
-public sealed class CreatePaymentPreferenceRequestValidator : AbstractValidator<CreatePaymentPreferenceRequest>
-{
-    public CreatePaymentPreferenceRequestValidator()
-    {
-        RuleFor(x => x.OrderId).NotEmpty();
-        RuleFor(x => x.AmountCents).GreaterThan(0);
-    }
-}
