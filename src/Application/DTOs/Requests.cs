@@ -1,9 +1,44 @@
 namespace Application.DTOs;
 
+// Auth & Orders (existing)
 public sealed record CreateOrderRequest(string ClientId, string ServiceId, string? Description, string? Location, string? Date);
 public sealed record CompleteOrderRequest(string? ProfessionalId, string? ClientId);
 public sealed record LoginRequest(string Email, string Senha);
-public sealed record CreatePaymentPreferenceRequest(string OrderId, int AmountCents, string? Method, string? Title);
-public sealed record MercadoPagoWebhookRequest(string? Id, string? Type, string? Action, Dictionary<string, object>? Data);
 public sealed record UpdateAppointmentStatusRequest(string Status);
 public sealed record CreateAppointmentRequest(string ProfessionalId, string? ClientId, string? ServiceId, DateTime StartsAt, DateTime EndsAt, string? Location, string? Notes);
+
+// Users
+public sealed record CreateUserRequest(string Name, string Email, string? Phone, string Role, string Senha, string? ZoneId);
+
+// Professionals
+public sealed record UpdateProfessionalRequest(string? Bio, bool? Active, string? AvailabilityText, string? AvatarUrl);
+
+// Professional Services
+public sealed record CreateProfessionalServiceRequest(string ProfessionalId, string ServiceId, string NomeServico, decimal Preco, string? Descricao);
+public sealed record UpdateProfessionalServiceRequest(string? NomeServico, decimal? Preco, string? Descricao);
+
+// Professional Zones
+public sealed record UpdateProfessionalZonesRequest(string ProfessionalId, string[] Zones);
+
+// Conversations & Messages
+public sealed record CreateConversationRequest(string ClientId, string ProfessionalId, string? OrderId, string? AppointmentId);
+public sealed record SendMessageRequest(string ConversationId, string SenderId, string Text);
+public sealed record MarkReadRequest(string ConversationId, string UserId);
+
+// Reviews
+public sealed record CreateReviewRequest(string ProfessionalId, string ClientId, string? OrderId, string? AppointmentId, int Rating, string? Comment);
+public sealed record UpdateReviewRequest(int? Rating, string? Comment);
+
+// Portfolio
+public sealed record CreatePortfolioItemRequest(string ProfessionalId, string ImageUrl, string? Title, string? Description);
+public sealed record UpdatePortfolioItemRequest(string? Title, string? Description, string? ImageUrl, int? OrderIndex);
+
+// Availability
+public sealed record AvailabilityRow(int Weekday, int StartMinutes, int EndMinutes, bool Active);
+public sealed record SaveAvailabilityRequest(AvailabilityRow[]? Items, AvailabilityRow[]? Rows);
+
+// Blocks
+public sealed record CreateBlockRequest(string ProfessionalId, string StartsAt, string EndsAt, string? Reason);
+
+// Order Ignores
+public sealed record CreateOrderIgnoreRequest(string ProfessionalId, string OrderId);
