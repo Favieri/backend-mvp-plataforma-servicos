@@ -98,20 +98,28 @@ public sealed class ReviewRepository(AppDbContext ctx) : IReviewRepository
 
         if (existing is null) return null;
 
-        if (rating is not null || comment is not null)
+        var updated = false;
+
+        if (rating is not null)
         {
             await ctx.Reviews
                 .Where(r => r.Id == id)
-                .ExecuteUpdateAsync(s =>
-                {
-                    var u = s;
-                    if (rating is not null)
-                        u = u.SetProperty(r => r.Rating, rating.Value);
-                    if (comment is not null)
-                        u = u.SetProperty(r => r.Comment, comment);
-                    return u;
-                }, ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Rating, rating.Value), ct);
 
+            updated = true;
+        }
+
+        if (comment is not null)
+        {
+            await ctx.Reviews
+                .Where(r => r.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Comment, comment), ct);
+
+            updated = true;
+        }
+
+        if (updated)
+        {
             await RecalculateAndUpdateRatingAsync(existing.ProfessionalId, ct);
         }
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using Application.Abstractions;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -135,11 +136,11 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
         // Validate zones exist and are active
         if (zoneIds.Length > 0)
         {
-            var found = await ctx.Zones
+            var found = (await ctx.Zones
                 .AsNoTracking()
                 .Where(z => zoneIds.Contains(z.Id) && z.Active)
                 .Select(z => z.Id)
-                .ToHashSetAsync(ct);
+                .ToListAsync(ct)).ToHashSet();
 
             var invalid = zoneIds.Where(z => !found.Contains(z)).ToList();
             if (invalid.Count > 0)
