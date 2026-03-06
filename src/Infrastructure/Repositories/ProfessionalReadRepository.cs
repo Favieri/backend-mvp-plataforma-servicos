@@ -43,7 +43,7 @@ public sealed class ProfessionalReadRepository(IConnectionFactory factory) : IPr
             select
                 p.""id"" as ""Id"",
                 p.""userId"" as ""UserId"",
-                coalesce(u.""name"", u.""nome"", '') as ""Name"",
+                coalesce(u.""name"", u.""name"", '') as ""Name"",
                 coalesce(u.""avatarUrl"", p.""avatarUrl"") as ""AvatarUrl"",
                 p.""rating"" as ""Rating"",
                 coalesce(p.""active"", true) as ""Active"",
