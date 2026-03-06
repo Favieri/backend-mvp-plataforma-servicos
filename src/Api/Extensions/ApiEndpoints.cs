@@ -383,12 +383,15 @@ public static class ApiEndpoints
         });
 
         // ─── Reviews ───────────────────────────────────────────────────────────
-        app.MapGet("/api/reviews", async (string? professionalId, int? limit, IReviewRepository repo, CancellationToken ct) =>
+        static async Task<IResult> GetReviewsAsync(string? professionalId, int? limit, IReviewRepository repo, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
             return Results.Ok(await repo.GetByProfessionalAsync(professionalId, limit ?? 10, ct));
-        });
+        }
+
+        app.MapGet("/api/reviews", GetReviewsAsync);
+        app.MapGet("/reviews", GetReviewsAsync);
 
         app.MapPost("/api/reviews", async (CreateReviewRequest body, IReviewRepository repo, CancellationToken ct) =>
         {
@@ -413,17 +416,23 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetEligibleOrdersAsync(clientId, professionalId, ct));
         });
 
-        app.MapGet("/api/reviews/{id}", async (string id, IReviewRepository repo, CancellationToken ct) =>
+        static async Task<IResult> GetReviewByIdAsync(string id, IReviewRepository repo, CancellationToken ct)
         {
             var review = await repo.GetByIdAsync(id, ct);
             return review is null ? Results.NotFound(new { error = "Avaliação não encontrada" }) : Results.Ok(review);
-        });
+        }
 
-        app.MapMethods("/api/reviews/{id}", ["PATCH"], async (string id, UpdateReviewRequest body, IReviewRepository repo, CancellationToken ct) =>
+        app.MapGet("/api/reviews/{id}", GetReviewByIdAsync);
+        app.MapGet("/reviews/{id}", GetReviewByIdAsync);
+
+        static async Task<IResult> PatchReviewAsync(string id, UpdateReviewRequest body, IReviewRepository repo, CancellationToken ct)
         {
             var updated = await repo.UpdateAsync(id, body.Rating, body.Comment, ct);
             return updated is null ? Results.NotFound(new { error = "Avaliação não encontrada" }) : Results.Ok(updated);
-        });
+        }
+
+        app.MapMethods("/api/reviews/{id}", ["PATCH"], PatchReviewAsync);
+        app.MapMethods("/reviews/{id}", ["PATCH"], PatchReviewAsync);
 
         // ─── Portfolio ─────────────────────────────────────────────────────────
         app.MapGet("/api/portfolio", async (string? professionalId, IPortfolioRepository repo, CancellationToken ct) =>
