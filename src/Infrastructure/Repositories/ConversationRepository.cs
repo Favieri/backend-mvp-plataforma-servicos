@@ -154,9 +154,9 @@ public sealed class ConversationRepository(IConnectionFactory factory) : IConver
             new { senderId }, cancellationToken: ct));
 
         IDictionary<string, object?> msgDict = msg;
-        IDictionary<string, object?> senderDict = sender;
-        msgDict["senderName"] = senderDict?["name"];
-        msgDict["senderEmail"] = senderDict?["email"];
+        IDictionary<string, object?>? senderDict = sender as IDictionary<string, object?>;
+        msgDict["senderName"] = senderDict is null ? null : senderDict["name"];
+        msgDict["senderEmail"] = senderDict is null ? null : senderDict["email"];
         return msg;
     }
 
