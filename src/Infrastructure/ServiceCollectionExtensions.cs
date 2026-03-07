@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
+        services.AddHttpClient();
         services.Configure<DatabaseOptions>(o =>
         {
             o.ConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
@@ -77,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
         services.AddScoped<IOrderIgnoreRepository, OrderIgnoreRepository>();
+        services.AddScoped<IAvatarStorageRepository, AvatarStorageRepository>();
 
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
