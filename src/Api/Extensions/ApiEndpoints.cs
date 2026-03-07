@@ -13,17 +13,17 @@ public static class ApiEndpoints
         // ─── Health ────────────────────────────────────────────────────────────
         app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "v1" }));
 
-        // ─── Public marketplace (cached) ───────────────────────────────────────
-        //app.MapGet("/professionals", async (
-        //    HttpRequest req, string? zoneId, string? serviceId,
-        //    IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
-        //{
-        //    var logger = loggerFactory.CreateLogger("HomeEndpoints");
-        //    var cacheKey = $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
-        //    var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
-        //        () => repo.GetProfessionalsAsync(zoneId, serviceId, ct), logger, ct);
-        //    return Results.Ok(professionals);
-        //});
+         //─── Public marketplace(cached) ───────────────────────────────────────
+        app.MapGet("/professionals", async (
+            HttpRequest req, string? zoneId, string? serviceId,
+            IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("HomeEndpoints");
+            var cacheKey = $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
+            var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
+                () => repo.GetProfessionalsAsync(zoneId, serviceId, ct), logger, ct);
+            return Results.Ok(professionals);
+        });
 
         app.MapGet("/zones", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
         {
@@ -89,12 +89,12 @@ public static class ApiEndpoints
         });
 
         // ─── Professionals ─────────────────────────────────────────────────────
-        app.MapGet("/professionals", async (
-            HttpContext ctx, IMemoryCache cache, string? serviceId, string? zoneId,
-            string? excludeProfessionalId, string? professionalId, bool? filterZones,
-            IProfessionalRepository repo, CancellationToken ct) =>
-            await GetOrSetCachedListAsync(ctx, cache, "professionals-cards", TimeSpan.FromSeconds(60),
-                async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
+        //app.MapGet("/professionals", async (
+        //    HttpContext ctx, IMemoryCache cache, string? serviceId, string? zoneId,
+        //    string? excludeProfessionalId, string? professionalId, bool? filterZones,
+        //    IProfessionalRepository repo, CancellationToken ct) =>
+        //    await GetOrSetCachedListAsync(ctx, cache, "professionals-cards", TimeSpan.FromSeconds(60),
+        //        async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
 
         app.MapGet("/professionals/zones", async (string? professionalId, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
