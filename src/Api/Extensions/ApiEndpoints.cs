@@ -14,16 +14,16 @@ public static class ApiEndpoints
         app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "v1" }));
 
         // ─── Public marketplace (cached) ───────────────────────────────────────
-        app.MapGet("/professionals", async (
-            HttpRequest req, string? zoneId, string? serviceId,
-            IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
-        {
-            var logger = loggerFactory.CreateLogger("HomeEndpoints");
-            var cacheKey = $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
-            var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
-                () => repo.GetProfessionalsAsync(zoneId, serviceId, ct), logger, ct);
-            return Results.Ok(professionals);
-        });
+        //app.MapGet("/professionals", async (
+        //    HttpRequest req, string? zoneId, string? serviceId,
+        //    IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
+        //{
+        //    var logger = loggerFactory.CreateLogger("HomeEndpoints");
+        //    var cacheKey = $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
+        //    var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
+        //        () => repo.GetProfessionalsAsync(zoneId, serviceId, ct), logger, ct);
+        //    return Results.Ok(professionals);
+        //});
 
         app.MapGet("/zones", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
         {
@@ -65,7 +65,7 @@ public static class ApiEndpoints
         });
 
         // ─── Users ─────────────────────────────────────────────────────────────
-        app.MapPost("/api/users", async (CreateUserRequest body, IUserRepository repo, CancellationToken ct) =>
+        app.MapPost("/users", async (CreateUserRequest body, IUserRepository repo, CancellationToken ct) =>
         {
             var name = body.Name?.Trim() ?? "";
             var email = body.Email?.Trim() ?? "";
@@ -89,21 +89,21 @@ public static class ApiEndpoints
         });
 
         // ─── Professionals ─────────────────────────────────────────────────────
-        app.MapGet("/api/professionals", async (
+        app.MapGet("/professionals", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? zoneId,
             string? excludeProfessionalId, string? professionalId, bool? filterZones,
             IProfessionalRepository repo, CancellationToken ct) =>
             await GetOrSetCachedListAsync(ctx, cache, "professionals-cards", TimeSpan.FromSeconds(60),
                 async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
 
-        app.MapGet("/api/professionals/zones", async (string? professionalId, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapGet("/professionals/zones", async (string? professionalId, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
             return Results.Ok(await repo.GetZonesAsync(professionalId, ct));
         });
 
-        app.MapPut("/api/professionals/zones", async (UpdateProfessionalZonesRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapPut("/professionals/zones", async (UpdateProfessionalZonesRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
@@ -118,23 +118,23 @@ public static class ApiEndpoints
             }
         });
 
-        app.MapGet("/api/professionals/{id}", async (string id, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapGet("/professionals/{id}", async (string id, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             var pro = await repo.GetByIdAsync(id, ct);
             return pro is null ? Results.NotFound(new { error = "Profissional não encontrado." }) : Results.Ok(pro);
         });
 
-        app.MapPut("/api/professionals/{id}", async (string id, UpdateProfessionalRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapPut("/professionals/{id}", async (string id, UpdateProfessionalRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             var updated = await repo.UpdateAsync(id, body.Bio, body.Active, body.AvailabilityText, body.AvatarUrl, ct);
             return updated is null ? Results.NotFound(new { error = "Profissional não encontrado." }) : Results.Ok(updated);
         });
 
         // ─── Professional Services ──────────────────────────────────────────────
-        app.MapGet("/api/professional-services", async (string? professionalId, string? serviceId, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapGet("/professional-services", async (string? professionalId, string? serviceId, IProfessionalServiceRepository repo, CancellationToken ct) =>
             Results.Ok(await repo.GetAsync(professionalId, serviceId, ct)));
 
-        app.MapPost("/api/professional-services", async (CreateProfessionalServiceRequest body, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapPost("/professional-services", async (CreateProfessionalServiceRequest body, IProfessionalServiceRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.ServiceId) || string.IsNullOrWhiteSpace(body.NomeServico))
                 return Results.Json(new { error = "professionalId, serviceId e nomeServico são obrigatórios" }, statusCode: 400);
@@ -146,32 +146,32 @@ public static class ApiEndpoints
             return Results.Json(created, statusCode: 201);
         });
 
-        app.MapGet("/api/professional-services/{id}", async (string id, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapGet("/professional-services/{id}", async (string id, IProfessionalServiceRepository repo, CancellationToken ct) =>
         {
             var svc = await repo.GetByIdAsync(id, ct);
             return svc is null ? Results.NotFound(new { error = "Serviço não encontrado" }) : Results.Ok(svc);
         });
 
-        app.MapPut("/api/professional-services/{id}", async (string id, UpdateProfessionalServiceRequest body, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapPut("/professional-services/{id}", async (string id, UpdateProfessionalServiceRequest body, IProfessionalServiceRepository repo, CancellationToken ct) =>
         {
             var updated = await repo.UpdateAsync(id, body.NomeServico, body.Preco, body.Descricao, ct);
             return updated is null ? Results.NotFound(new { error = "Serviço não encontrado" }) : Results.Ok(updated);
         });
 
-        app.MapDelete("/api/professional-services/{id}", async (string id, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapDelete("/professional-services/{id}", async (string id, IProfessionalServiceRepository repo, CancellationToken ct) =>
         {
             var deleted = await repo.DeleteAsync(id, ct);
             return deleted ? Results.Ok(new { ok = true }) : Results.NotFound(new { error = "Serviço não encontrado" });
         });
 
         // ─── Orders ────────────────────────────────────────────────────────────
-        app.MapGet("/api/orders", async (
+        app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
             string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct) =>
             await GetOrSetCachedListAsync(ctx, cache, "api-orders", TimeSpan.FromSeconds(30),
                 async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
 
-        app.MapPost("/api/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
+        app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
             var val = await validator.ValidateAsync(body, ct);
             if (!val.IsValid) return Results.ValidationProblem(val.ToDictionary());
@@ -180,12 +180,12 @@ public static class ApiEndpoints
             return Results.Json(created, statusCode: 201);
         });
 
-        app.MapGet("/api/orders/mine", async (string clientId, IOrderRepository repo, CancellationToken ct) =>
+        app.MapGet("/orders/mine", async (string clientId, IOrderRepository repo, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(clientId)
                 ? Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400)
                 : Results.Ok(await repo.GetMineAsync(clientId, ct)));
 
-        app.MapPost("/api/orders/{id}/complete", async (string id, CompleteOrderRequest _, IOrderRepository repo, CancellationToken ct) =>
+        app.MapPost("/orders/{id}/complete", async (string id, CompleteOrderRequest _, IOrderRepository repo, CancellationToken ct) =>
         {
             var order = await repo.GetByIdAsync(id, ct);
             if (order is null) return Results.NotFound(new { error = "Pedido não encontrado" });
@@ -194,7 +194,7 @@ public static class ApiEndpoints
         });
 
         // ─── Appointments ──────────────────────────────────────────────────────
-        app.MapGet("/api/appointments", async (
+        app.MapGet("/appointments", async (
             string? professionalId, string? status, string? from, string? to,
             IAppointmentRepository repo, CancellationToken ct) =>
         {
@@ -205,10 +205,10 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetByProfessionalAsync(professionalId, status, fromDt, toDt, ct));
         });
 
-        app.MapGet("/api/appointments/mine", async (string clientId, IAppointmentRepository repo, CancellationToken ct) =>
+        app.MapGet("/appointments/mine", async (string clientId, IAppointmentRepository repo, CancellationToken ct) =>
             Results.Ok(await repo.GetByClientAsync(clientId, ct)));
 
-        app.MapGet("/api/appointments/slots", async (
+        app.MapGet("/appointments/slots", async (
             string? professionalId, string? date, IAvailabilityRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
@@ -265,7 +265,7 @@ public static class ApiEndpoints
             return Results.Ok(slots);
         });
 
-        app.MapPost("/api/appointments", async (
+        app.MapPost("/appointments", async (
             CreateAppointmentRequest body, IAppointmentRepository repo, IEmailService email, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId))
@@ -294,7 +294,7 @@ public static class ApiEndpoints
             return Results.Json(created, statusCode: 201);
         });
 
-        app.MapPut("/api/appointments/{id}", async (
+        app.MapPut("/appointments/{id}", async (
             string id, UpdateAppointmentStatusRequest body, IAppointmentRepository repo, IEmailService email, CancellationToken ct) =>
         {
             var allowed = new[] { "CONFIRMED", "CANCELLED" };
@@ -309,14 +309,14 @@ public static class ApiEndpoints
         });
 
         // ─── Conversations ─────────────────────────────────────────────────────
-        app.MapGet("/api/conversations", async (string? clientId, string? professionalId, IConversationRepository repo, CancellationToken ct) =>
+        app.MapGet("/conversations", async (string? clientId, string? professionalId, IConversationRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(clientId) && string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "clientId ou professionalId é obrigatório" }, statusCode: 400);
             return Results.Ok(await repo.GetByParticipantAsync(clientId, professionalId, ct));
         });
 
-        app.MapPost("/api/conversations", async (CreateConversationRequest body, IConversationRepository repo, CancellationToken ct) =>
+        app.MapPost("/conversations", async (CreateConversationRequest body, IConversationRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ClientId) || string.IsNullOrWhiteSpace(body.ProfessionalId))
                 return Results.Json(new { error = "clientId e professionalId são obrigatórios" }, statusCode: 400);
@@ -328,14 +328,14 @@ public static class ApiEndpoints
         });
 
         // ─── Messages ──────────────────────────────────────────────────────────
-        app.MapGet("/api/messages", async (string? conversationId, IConversationRepository repo, CancellationToken ct) =>
+        app.MapGet("/messages", async (string? conversationId, IConversationRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(conversationId))
                 return Results.Json(new { error = "conversationId é obrigatório" }, statusCode: 400);
             return Results.Ok(await repo.GetMessagesAsync(conversationId, ct));
         });
 
-        app.MapPost("/api/messages", async (SendMessageRequest body, IConversationRepository repo, IEmailService emailSvc, CancellationToken ct) =>
+        app.MapPost("/messages", async (SendMessageRequest body, IConversationRepository repo, IEmailService emailSvc, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.SenderId) || string.IsNullOrWhiteSpace(body.Text))
                 return Results.Json(new { error = "conversationId, senderId e text são obrigatórios" }, statusCode: 400);
@@ -366,7 +366,7 @@ public static class ApiEndpoints
             return Results.Ok(message);
         });
 
-        app.MapPost("/api/chat/read", async (MarkReadRequest body, IConversationRepository repo, CancellationToken ct) =>
+        app.MapPost("/chat/read", async (MarkReadRequest body, IConversationRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.UserId))
                 return Results.Json(new { error = "conversationId e userId são obrigatórios." }, statusCode: 400);
@@ -390,10 +390,10 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetByProfessionalAsync(professionalId, limit ?? 10, ct));
         }
 
-        app.MapGet("/api/reviews", GetReviewsAsync);
+        //app.MapGet("/reviews", GetReviewsAsync);
         app.MapGet("/reviews", GetReviewsAsync);
 
-        app.MapPost("/api/reviews", async (CreateReviewRequest body, IReviewRepository repo, CancellationToken ct) =>
+        app.MapPost("/reviews", async (CreateReviewRequest body, IReviewRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.ClientId))
                 return Results.Json(new { error = "Campos obrigatórios ausentes" }, statusCode: 400);
@@ -409,7 +409,7 @@ public static class ApiEndpoints
             return Results.Ok(await repo.CreateAsync(body.ProfessionalId, body.ClientId, orderId, body.Rating, body.Comment, ct));
         });
 
-        app.MapGet("/api/reviews/eligible-orders", async (string? clientId, string? professionalId, IReviewRepository repo, CancellationToken ct) =>
+        app.MapGet("/reviews/eligible-orders", async (string? clientId, string? professionalId, IReviewRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId e clientId são obrigatórios" }, statusCode: 400);
@@ -422,7 +422,7 @@ public static class ApiEndpoints
             return review is null ? Results.NotFound(new { error = "Avaliação não encontrada" }) : Results.Ok(review);
         }
 
-        app.MapGet("/api/reviews/{id}", GetReviewByIdAsync);
+        //app.MapGet("/reviews/{id}", GetReviewByIdAsync);
         app.MapGet("/reviews/{id}", GetReviewByIdAsync);
 
         static async Task<IResult> PatchReviewAsync(string id, UpdateReviewRequest body, IReviewRepository repo, CancellationToken ct)
@@ -431,47 +431,47 @@ public static class ApiEndpoints
             return updated is null ? Results.NotFound(new { error = "Avaliação não encontrada" }) : Results.Ok(updated);
         }
 
-        app.MapMethods("/api/reviews/{id}", ["PATCH"], PatchReviewAsync);
+        app.MapMethods("/reviews/{id}", ["PATCH"], PatchReviewAsync);
         app.MapMethods("/reviews/{id}", ["PATCH"], PatchReviewAsync);
 
         // ─── Portfolio ─────────────────────────────────────────────────────────
-        app.MapGet("/api/portfolio", async (string? professionalId, IPortfolioRepository repo, CancellationToken ct) =>
+        app.MapGet("/portfolio", async (string? professionalId, IPortfolioRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
             return Results.Ok(await repo.GetByProfessionalAsync(professionalId, ct));
         });
 
-        app.MapPost("/api/portfolio", async (CreatePortfolioItemRequest body, IPortfolioRepository repo, CancellationToken ct) =>
+        app.MapPost("/portfolio", async (CreatePortfolioItemRequest body, IPortfolioRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.ImageUrl))
                 return Results.Json(new { error = "professionalId e imageUrl são obrigatórios" }, statusCode: 400);
             return Results.Json(await repo.CreateAsync(body.ProfessionalId, body.ImageUrl, body.Title, body.Description, ct), statusCode: 201);
         });
 
-        app.MapGet("/api/portfolio/{id}", async (string id, IPortfolioRepository repo, CancellationToken ct) =>
+        app.MapGet("/portfolio/{id}", async (string id, IPortfolioRepository repo, CancellationToken ct) =>
         {
             var item = await repo.GetByIdAsync(id, ct);
             return item is null ? Results.NotFound(new { error = "Item não encontrado" }) : Results.Ok(item);
         });
 
-        app.MapPut("/api/portfolio/{id}", async (string id, UpdatePortfolioItemRequest body, IPortfolioRepository repo, CancellationToken ct) =>
+        app.MapPut("/portfolio/{id}", async (string id, UpdatePortfolioItemRequest body, IPortfolioRepository repo, CancellationToken ct) =>
         {
             var updated = await repo.UpdateAsync(id, body.Title, body.Description, body.ImageUrl, body.OrderIndex, ct);
             return updated is null ? Results.NotFound(new { error = "Item não encontrado" }) : Results.Ok(updated);
         });
 
-        app.MapDelete("/api/portfolio/{id}", async (string id, IPortfolioRepository repo, CancellationToken ct) =>
+        app.MapDelete("/portfolio/{id}", async (string id, IPortfolioRepository repo, CancellationToken ct) =>
         {
             var deleted = await repo.DeleteAsync(id, ct);
             return deleted ? Results.Ok(new { ok = true }) : Results.NotFound(new { error = "Item não encontrado" });
         });
 
         // ─── Availability ──────────────────────────────────────────────────────
-        app.MapGet("/api/pro-availability/{id}", async (string id, IAvailabilityRepository repo, CancellationToken ct) =>
+        app.MapGet("/pro-availability/{id}", async (string id, IAvailabilityRepository repo, CancellationToken ct) =>
             Results.Ok(await repo.GetByProfessionalAsync(id, ct)));
 
-        app.MapMethods("/api/pro-availability/{id}", ["PUT", "POST"], async (string id, SaveAvailabilityRequest body, IAvailabilityRepository repo, CancellationToken ct) =>
+        app.MapMethods("/pro-availability/{id}", ["PUT", "POST"], async (string id, SaveAvailabilityRequest body, IAvailabilityRepository repo, CancellationToken ct) =>
         {
             var rawRows = body.Items ?? body.Rows ?? [];
             var validRows = rawRows
@@ -487,7 +487,7 @@ public static class ApiEndpoints
         });
 
         // ─── Professional Blocks ────────────────────────────────────────────────
-        app.MapGet("/api/professional-blocks", async (string? professionalId, string? from, string? to, IAvailabilityRepository repo, CancellationToken ct) =>
+        app.MapGet("/professional-blocks", async (string? professionalId, string? from, string? to, IAvailabilityRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
@@ -496,7 +496,7 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetBlocksAsync(professionalId, fromDt, toDt, ct));
         });
 
-        app.MapPost("/api/professional-blocks", async (CreateBlockRequest body, IAvailabilityRepository repo, CancellationToken ct) =>
+        app.MapPost("/professional-blocks", async (CreateBlockRequest body, IAvailabilityRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
@@ -506,7 +506,7 @@ public static class ApiEndpoints
         });
 
         // ─── Order Ignores ─────────────────────────────────────────────────────
-        app.MapPost("/api/order-ignores", async (CreateOrderIgnoreRequest body, IOrderIgnoreRepository repo, CancellationToken ct) =>
+        app.MapPost("/order-ignores", async (CreateOrderIgnoreRequest body, IOrderIgnoreRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.OrderId))
                 return Results.Json(new { error = "professionalId e orderId são obrigatórios." }, statusCode: 400);
@@ -518,7 +518,7 @@ public static class ApiEndpoints
             return Results.Ok(new { ok = true });
         });
 
-        app.MapDelete("/api/order-ignores", async (string? professionalId, string? orderId, IOrderIgnoreRepository repo, CancellationToken ct) =>
+        app.MapDelete("/order-ignores", async (string? professionalId, string? orderId, IOrderIgnoreRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId) || string.IsNullOrWhiteSpace(orderId))
                 return Results.Json(new { error = "professionalId e orderId são obrigatórios." }, statusCode: 400);
