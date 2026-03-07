@@ -96,6 +96,31 @@ public static class ApiEndpoints
         //    await GetOrSetCachedListAsync(ctx, cache, "professionals-cards", TimeSpan.FromSeconds(60),
         //        async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
 
+        app.MapPost("/professionals", async (CreateProfessionalRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        {
+            var userId = body.UserId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Results.Json(new { error = "userId é obrigatório" }, statusCode: 400);
+
+            var zoneIds = (body.Zones ?? [])
+                .Where(z => !string.IsNullOrWhiteSpace(z))
+                .Select(z => z.Trim())
+                .Distinct()
+                .ToArray();
+
+            if (!await repo.UserExistsAsync(userId, ct))
+                return Results.Json(new { error = "Usuário não encontrado." }, statusCode: 400);
+
+            if (await repo.ProfessionalExistsByUserIdAsync(userId, ct))
+                return Results.Json(new { error = "Usuário já possui cadastro de profissional." }, statusCode: 400);
+
+            if (!await repo.ZonesExistAndActiveAsync(zoneIds, ct))
+                return Results.Json(new { error = "Uma ou mais zonas são inválidas ou estão inativas." }, statusCode: 400);
+
+            var created = await repo.CreateAsync(userId, body.Bio, body.Active ?? true, zoneIds, ct);
+            return Results.Json(created, statusCode: 201);
+        });
+
         app.MapGet("/professionals/zones", async (string? professionalId, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
