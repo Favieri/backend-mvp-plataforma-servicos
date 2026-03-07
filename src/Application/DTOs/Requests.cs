@@ -11,6 +11,7 @@ public sealed record CreateAppointmentRequest(string ProfessionalId, string? Cli
 public sealed record CreateUserRequest(string Name, string Email, string? Phone, string Role, string Senha, string? ZoneId);
 
 // Professionals
+public sealed record CreateProfessionalRequest(string UserId, string? Bio, string[]? Zones, bool? Active);
 public sealed record UpdateProfessionalRequest(string? Bio, bool? Active, string? AvailabilityText, string? AvatarUrl);
 
 // Professional Services
