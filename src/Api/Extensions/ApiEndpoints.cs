@@ -182,7 +182,7 @@ public static class ApiEndpoints
             if (file.Length > maxSizeBytes)
                 return Results.Json(new { error = "Arquivo excede 5MB." }, statusCode: 400);
 
-            await using var fileStream = file.OpenReadStream(maxSizeBytes);
+            await using var fileStream = file.OpenReadStream();
             var publicUrl = await avatarStorageRepo.UploadProfessionalAvatarAsync(professionalId, fileStream, contentType, ct);
             if (string.IsNullOrWhiteSpace(publicUrl))
                 return Results.Json(new { error = "Falha no upload." }, statusCode: 500);
