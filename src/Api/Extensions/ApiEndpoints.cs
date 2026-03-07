@@ -58,7 +58,7 @@ public static class ApiEndpoints
             Results.Redirect($"/bootstrap{ctx.Request.QueryString}"));
 
         // ─── Auth ──────────────────────────────────────────────────────────────
-        app.MapPost("/api/auth", async (LoginRequest body, IAuthRepository db, CancellationToken ct) =>
+        app.MapPost("/auth", async (LoginRequest body, IAuthRepository db, CancellationToken ct) =>
         {
             var user = await db.LoginAsync(body.Email, body.Senha, ct);
             return user is null ? Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401) : Results.Ok(user);
