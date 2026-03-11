@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ServiceTier> ServiceTiers => Set<ServiceTier>();
+    public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

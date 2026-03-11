@@ -19,6 +19,15 @@ public sealed class ProfessionalServiceConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.Preco).HasColumnName("preco").IsRequired();
         builder.Property(x => x.Descricao).HasColumnName("descricao");
 
+        builder.Property(x => x.TierId).HasColumnName("tierId");
+        builder.Property(x => x.ContractMode).HasColumnName("contractMode");
+        builder.Property(x => x.DurationMinutes).HasColumnName("durationMinutes");
+        builder.Property(x => x.IncludesDescription).HasColumnName("includesDescription");
+        builder.Property(x => x.ExcludesDescription).HasColumnName("excludesDescription");
+        builder.Property(x => x.MaterialIncluded).HasColumnName("materialIncluded");
+        builder.Property(x => x.VisitFeeCents).HasColumnName("visitFeeCents");
+        builder.Property(x => x.MinLeadTimeMinutes).HasColumnName("minLeadTimeMinutes");
+
         builder.HasIndex(x => x.ProfessionalId);
         builder.HasIndex(x => x.ServiceId);
     }

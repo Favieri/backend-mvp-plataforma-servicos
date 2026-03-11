@@ -25,6 +25,23 @@ public sealed class ProfessionalConfiguration : IEntityTypeConfiguration<Profess
         builder.Property(x => x.MaxAdvanceDays).HasColumnName("maxAdvanceDays");
         builder.Property(x => x.AllowInstantBooking).HasColumnName("allowInstantBooking");
 
+        builder.Property(x => x.EntityType).HasColumnName("entityType");
+        builder.Property(x => x.DocumentNumber).HasColumnName("documentNumber");
+        builder.Property(x => x.YearsOfExperience).HasColumnName("yearsOfExperience");
+        builder.Property(x => x.Specialties)
+            .HasColumnName("specialties")
+            .HasColumnType("text[]");
+        builder.Property(x => x.ResponseRate).HasColumnName("responseRate");
+        builder.Property(x => x.AvgResponseTimeMinutes).HasColumnName("avgResponseTimeMinutes");
+        builder.Property(x => x.CompletionRate).HasColumnName("completionRate");
+        builder.Property(x => x.VerificationStatus)
+            .HasColumnName("verificationStatus")
+            .HasDefaultValue("pending");
+        builder.Property(x => x.Badges).HasColumnName("badges");
+        builder.Property(x => x.BufferMinutes)
+            .HasColumnName("bufferMinutes")
+            .HasDefaultValue(0);
+
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => new { x.Active, x.Rating });
     }

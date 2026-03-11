@@ -12,4 +12,14 @@ public sealed record Professional(
     int? SlotMinutes,
     int? LeadTimeMinutes,
     int? MaxAdvanceDays,
-    bool? AllowInstantBooking);
+    bool? AllowInstantBooking,
+    string? EntityType = null,
+    string? DocumentNumber = null,
+    int? YearsOfExperience = null,
+    string[]? Specialties = null,
+    double? ResponseRate = null,
+    int? AvgResponseTimeMinutes = null,
+    double? CompletionRate = null,
+    string VerificationStatus = "pending",
+    string? Badges = null,
+    int BufferMinutes = 0);

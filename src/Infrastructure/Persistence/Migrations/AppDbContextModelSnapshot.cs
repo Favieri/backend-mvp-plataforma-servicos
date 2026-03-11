@@ -102,6 +102,16 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<double?>("Rating").HasColumnName("rating");
             b.Property<int?>("SlotMinutes").HasColumnName("slotMinutes");
             b.Property<string>("UserId").IsRequired().HasColumnName("userId");
+            b.Property<string>("EntityType").IsRequired(false).HasColumnName("entityType");
+            b.Property<string>("DocumentNumber").IsRequired(false).HasColumnName("documentNumber");
+            b.Property<int?>("YearsOfExperience").HasColumnName("yearsOfExperience");
+            b.Property<string[]>("Specialties").HasColumnName("specialties").HasColumnType("text[]");
+            b.Property<double?>("ResponseRate").HasColumnName("responseRate");
+            b.Property<int?>("AvgResponseTimeMinutes").HasColumnName("avgResponseTimeMinutes");
+            b.Property<double?>("CompletionRate").HasColumnName("completionRate");
+            b.Property<string>("VerificationStatus").IsRequired().HasColumnName("verificationStatus").HasDefaultValue("pending");
+            b.Property<string>("Badges").IsRequired(false).HasColumnName("badges");
+            b.Property<int>("BufferMinutes").IsRequired().HasColumnName("bufferMinutes").HasDefaultValue(0);
             b.HasKey("Id");
             b.HasIndex("Active", "Rating").HasDatabaseName("IX_Professional_active_rating");
             b.HasIndex("UserId").HasDatabaseName("IX_Professional_userId");
@@ -165,6 +175,14 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<double>("Preco").IsRequired().HasColumnName("preco");
             b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professionalId");
             b.Property<string>("ServiceId").IsRequired().HasColumnName("serviceId");
+            b.Property<int?>("TierId").HasColumnName("tierId");
+            b.Property<string>("ContractMode").IsRequired(false).HasColumnName("contractMode");
+            b.Property<int?>("DurationMinutes").HasColumnName("durationMinutes");
+            b.Property<string>("IncludesDescription").IsRequired(false).HasColumnName("includesDescription");
+            b.Property<string>("ExcludesDescription").IsRequired(false).HasColumnName("excludesDescription");
+            b.Property<bool?>("MaterialIncluded").HasColumnName("materialIncluded");
+            b.Property<int?>("VisitFeeCents").HasColumnName("visitFeeCents");
+            b.Property<int?>("MinLeadTimeMinutes").HasColumnName("minLeadTimeMinutes");
             b.HasKey("Id");
             b.HasIndex("ProfessionalId").HasDatabaseName("IX_ProfessionalService_professionalId");
             b.HasIndex("ServiceId").HasDatabaseName("IX_ProfessionalService_serviceId");
@@ -203,8 +221,39 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("createdAt");
             b.Property<string>("Icon").IsRequired(false).HasColumnName("icon");
             b.Property<string>("Name").IsRequired().HasColumnName("name");
+            b.Property<string>("CategoryId").IsRequired(false).HasColumnName("categoryId");
+            b.Property<int?>("TierId").HasColumnName("tierId");
             b.HasKey("Id");
             b.ToTable("Service");
+        });
+
+        modelBuilder.Entity("Domain.Entities.ServiceTier", b =>
+        {
+            b.Property<int>("Id").HasColumnName("id").ValueGeneratedOnAdd()
+                .HasAnnotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+            b.Property<string>("Name").IsRequired().HasColumnName("name");
+            b.Property<string>("Code").IsRequired().HasColumnName("code");
+            b.Property<bool>("AllowBookingDirect").IsRequired().HasColumnName("allow_booking_direct");
+            b.Property<bool>("RequiresProposal").IsRequired().HasColumnName("requires_proposal");
+            b.Property<bool>("RequiresChat").IsRequired().HasColumnName("requires_chat");
+            b.Property<string[]>("AllowedPriceFormats").IsRequired().HasColumnName("allowed_price_formats").HasColumnType("text[]");
+            b.Property<int>("DefaultSignalPercent").IsRequired().HasColumnName("default_signal_percent").HasDefaultValue(0);
+            b.Property<int>("MaxInstallments").IsRequired().HasColumnName("max_installments").HasDefaultValue(1);
+            b.Property<string>("CancellationRules").IsRequired(false).HasColumnName("cancellation_rules").HasColumnType("jsonb");
+            b.HasKey("Id");
+            b.HasIndex("Code").IsUnique();
+            b.ToTable("service_tier");
+        });
+
+        modelBuilder.Entity("Domain.Entities.ServiceCategory", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("Name").IsRequired().HasColumnName("name");
+            b.Property<string>("Icon").IsRequired(false).HasColumnName("icon");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.HasKey("Id");
+            b.HasIndex("Name");
+            b.ToTable("service_category");
         });
 
         modelBuilder.Entity("Domain.Entities.User", b =>

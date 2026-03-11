@@ -49,15 +49,13 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
         string clientId, string serviceId, string? description, string? location,
         DateTime? date, CancellationToken ct)
     {
-        var order = new Order(
-            Id: Guid.NewGuid().ToString(),
-            ClientId: clientId,
-            ServiceId: serviceId,
-            Description: description,
-            Location: location,
-            Date: date,
-            Status: OrderStatus.Aberto,
-            CreatedAt: DateTime.UtcNow);
+        var order = Order.Create(
+            id: Guid.NewGuid().ToString(),
+            clientId: clientId,
+            serviceId: serviceId,
+            description: description,
+            location: location,
+            date: date);
 
         ctx.Orders.Add(order);
         await ctx.SaveChangesAsync(ct);

@@ -119,6 +119,14 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
         => await ctx.Services
             .AsNoTracking()
             .OrderBy(s => s.Name)
-            .Select(s => new ServiceDto(s.Id, s.Name, s.Icon))
+            .Select(s => new ServiceDto(s.Id, s.Name, s.Icon, s.CategoryId, s.TierId))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ServiceDto>> GetServicesByCategoryAsync(string categoryId, CancellationToken ct)
+        => await ctx.Services
+            .AsNoTracking()
+            .Where(s => s.CategoryId == categoryId)
+            .OrderBy(s => s.Name)
+            .Select(s => new ServiceDto(s.Id, s.Name, s.Icon, s.CategoryId, s.TierId))
             .ToListAsync(ct);
 }

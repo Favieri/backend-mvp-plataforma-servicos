@@ -80,6 +80,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOrderIgnoreRepository, OrderIgnoreRepository>();
         services.AddScoped<IAvatarStorageRepository, AvatarStorageRepository>();
 
+        // Service catalog (tiers + categories)
+        services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();

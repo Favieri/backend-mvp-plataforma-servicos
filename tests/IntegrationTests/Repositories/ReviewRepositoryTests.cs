@@ -21,7 +21,9 @@ public sealed class ReviewRepositoryTests : RepositoryTestBase
         Ctx.Professionals.Add(new Professional("pro1", "pro-user", null, 0d, true, null, null, 0, null, null, null, null));
         Ctx.Users.Add(new User("client1", "Client", "client@test.com", null, "CLIENT", null, DateTime.UtcNow));
         Ctx.Services.Add(new Service("svc1", "Limpeza", null, DateTime.UtcNow));
-        Ctx.Orders.Add(new Order("order1", "client1", "svc1", null, null, null, "concluido", DateTime.UtcNow.AddDays(-1)));
+        var order = Order.Create("order1", "client1", "svc1", null, null, DateTime.UtcNow.AddDays(-1));
+        order.UpdateStatus("concluido");
+        Ctx.Orders.Add(order);
         await Ctx.SaveChangesAsync();
     }
 

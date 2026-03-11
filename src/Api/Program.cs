@@ -50,6 +50,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<DbBackpressureMiddleware>();
+app.UseMiddleware<SupabaseAuthMiddleware>();
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
