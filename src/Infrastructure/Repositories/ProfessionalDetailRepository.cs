@@ -7,6 +7,73 @@ namespace Infrastructure.Repositories;
 
 public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfessionalDetailRepository
 {
+    public async Task<bool> UserExistsAsync(string userId, CancellationToken ct)
+        => await ctx.Users.AsNoTracking().AnyAsync(u => u.Id == userId, ct);
+
+    public async Task<bool> ProfessionalExistsByUserIdAsync(string userId, CancellationToken ct)
+        => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.UserId == userId, ct);
+
+    public async Task<bool> ZonesExistAndActiveAsync(string[] zoneIds, CancellationToken ct)
+    {
+        if (zoneIds.Length == 0) return true;
+
+        var existing = await ctx.Zones
+            .AsNoTracking()
+            .Where(z => zoneIds.Contains(z.Id) && z.Active)
+            .Select(z => z.Id)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return existing.Count == zoneIds.Distinct().Count();
+    }
+
+    public async Task<object> CreateAsync(string userId, string? bio, bool active, string[] zoneIds, CancellationToken ct)
+    {
+        var professionalId = Guid.NewGuid().ToString();
+        var normalizedBio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
+
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
+
+            var professional = new Domain.Entities.Professional(
+                Id: professionalId,
+                UserId: userId,
+                Bio: normalizedBio,
+                Rating: null,
+                Active: active,
+                AvatarUrl: null,
+                AvailabilityText: null,
+                CompletedJobsCount: 0,
+                SlotMinutes: null,
+                LeadTimeMinutes: null,
+                MaxAdvanceDays: null,
+                AllowInstantBooking: null);
+
+            ctx.Professionals.Add(professional);
+
+            if (zoneIds.Length > 0)
+            {
+                var now = DateTime.UtcNow;
+                var zones = zoneIds
+                    .Distinct()
+                    .Select(zoneId => new Domain.Entities.ProfessionalZone(
+                        ProfessionalId: professionalId,
+                        ZoneId: zoneId,
+                        CreatedAt: now))
+                    .ToList();
+
+                await ctx.ProfessionalZones.AddRangeAsync(zones, ct);
+            }
+
+            await ctx.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
+
+        return new { id = professionalId, userId };
+    }
+
     public async Task<object?> GetByIdAsync(string id, CancellationToken ct)
     {
         var row = await (
@@ -147,24 +214,28 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 throw new InvalidOperationException($"Zonas inválidas/inativas: {string.Join(", ", invalid)}");
         }
 
-        await using var tx = await ctx.Database.BeginTransactionAsync(ct);
-
-        await ctx.ProfessionalZones
-            .Where(pz => pz.ProfessionalId == professionalId)
-            .ExecuteDeleteAsync(ct);
-
-        if (zoneIds.Length > 0)
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            var entities = zoneIds.Select(zId => new Domain.Entities.ProfessionalZone(
-                ProfessionalId: professionalId,
-                ZoneId: zId,
-                CreatedAt: DateTime.UtcNow)).ToList();
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-            await ctx.ProfessionalZones.AddRangeAsync(entities, ct);
-            await ctx.SaveChangesAsync(ct);
-        }
+            await ctx.ProfessionalZones
+                .Where(pz => pz.ProfessionalId == professionalId)
+                .ExecuteDeleteAsync(ct);
 
-        await tx.CommitAsync(ct);
+            if (zoneIds.Length > 0)
+            {
+                var entities = zoneIds.Select(zId => new Domain.Entities.ProfessionalZone(
+                    ProfessionalId: professionalId,
+                    ZoneId: zId,
+                    CreatedAt: DateTime.UtcNow)).ToList();
+
+                await ctx.ProfessionalZones.AddRangeAsync(entities, ct);
+                await ctx.SaveChangesAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+        });
 
         return await GetByIdAsync(professionalId, ct);
     }

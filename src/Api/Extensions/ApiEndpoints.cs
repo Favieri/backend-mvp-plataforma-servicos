@@ -96,6 +96,31 @@ public static class ApiEndpoints
         //    await GetOrSetCachedListAsync(ctx, cache, "professionals-cards", TimeSpan.FromSeconds(60),
         //        async token => await repo.GetProfessionalCardsAsync(serviceId, zoneId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
 
+        app.MapPost("/professionals", async (CreateProfessionalRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        {
+            var userId = body.UserId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Results.Json(new { error = "userId é obrigatório" }, statusCode: 400);
+
+            var zoneIds = (body.Zones ?? [])
+                .Where(z => !string.IsNullOrWhiteSpace(z))
+                .Select(z => z.Trim())
+                .Distinct()
+                .ToArray();
+
+            if (!await repo.UserExistsAsync(userId, ct))
+                return Results.Json(new { error = "Usuário não encontrado." }, statusCode: 400);
+
+            if (await repo.ProfessionalExistsByUserIdAsync(userId, ct))
+                return Results.Json(new { error = "Usuário já possui cadastro de profissional." }, statusCode: 400);
+
+            if (!await repo.ZonesExistAndActiveAsync(zoneIds, ct))
+                return Results.Json(new { error = "Uma ou mais zonas são inválidas ou estão inativas." }, statusCode: 400);
+
+            var created = await repo.CreateAsync(userId, body.Bio, body.Active ?? true, zoneIds, ct);
+            return Results.Json(created, statusCode: 201);
+        });
+
         app.MapGet("/professionals/zones", async (string? professionalId, IProfessionalDetailRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
@@ -128,6 +153,45 @@ public static class ApiEndpoints
         {
             var updated = await repo.UpdateAsync(id, body.Bio, body.Active, body.AvailabilityText, body.AvatarUrl, ct);
             return updated is null ? Results.NotFound(new { error = "Profissional não encontrado." }) : Results.Ok(updated);
+        });
+
+        app.MapPost("/upload-avatar", async (HttpRequest req, IProfessionalDetailRepository professionalRepo, IAvatarStorageRepository avatarStorageRepo, CancellationToken ct) =>
+        {
+            const long maxSizeBytes = 5 * 1024 * 1024;
+            var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "image/jpeg", "image/png", "image/webp" };
+
+            if (!req.HasFormContentType)
+                return Results.Json(new { error = "Content-Type deve ser multipart/form-data." }, statusCode: 400);
+
+            var form = await req.ReadFormAsync(ct);
+            var file = form.Files.GetFile("file");
+            var professionalId = (form["professionalId"].FirstOrDefault() ?? string.Empty).Trim();
+
+            if (file is null || file.Length == 0)
+                return Results.Json(new { error = "Arquivo não enviado." }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(professionalId))
+                return Results.Json(new { error = "professionalId é obrigatório." }, statusCode: 400);
+
+            var professional = await professionalRepo.GetByIdAsync(professionalId, ct);
+            if (professional is null)
+                return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
+
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+            if (!allowedTypes.Contains(contentType))
+                return Results.Json(new { error = "Formato inválido. Use JPG, PNG ou WEBP." }, statusCode: 400);
+            if (file.Length > maxSizeBytes)
+                return Results.Json(new { error = "Arquivo excede 5MB." }, statusCode: 400);
+
+            await using var fileStream = file.OpenReadStream();
+            var publicUrl = await avatarStorageRepo.UploadProfessionalAvatarAsync(professionalId, fileStream, contentType, ct);
+            if (string.IsNullOrWhiteSpace(publicUrl))
+                return Results.Json(new { error = "Falha no upload." }, statusCode: 500);
+
+            var updated = await professionalRepo.UpdateAsync(professionalId, bio: null, active: null, availabilityText: null, avatarUrl: publicUrl, ct: ct);
+            if (updated is null)
+                return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
+
+            return Results.Ok(new { ok = true, avatarUrl = publicUrl });
         });
 
         // ─── Professional Services ──────────────────────────────────────────────
