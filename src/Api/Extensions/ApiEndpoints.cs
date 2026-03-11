@@ -32,14 +32,38 @@ public static class ApiEndpoints
             return Results.Ok(zones);
         });
 
-        app.MapGet("/services", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
+        app.MapGet("/services", async (HttpRequest req, string? categoryId, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
         {
+            if (!string.IsNullOrWhiteSpace(categoryId))
+            {
+                var filtered = await GetOrCreateCachedAsync(cache, $"services:cat:{categoryId}", TimeSpan.FromMinutes(10), ShouldBypassCache(req),
+                    () => repo.GetServicesByCategoryAsync(categoryId, ct), logger: null, ct);
+                return Results.Ok(filtered);
+            }
             var services = await GetOrCreateCachedAsync(cache, "services:all", TimeSpan.FromMinutes(10), ShouldBypassCache(req),
                 () => repo.GetServicesAsync(ct), logger: null, ct);
             return Results.Ok(services);
         });
 
-        app.MapGet("/bootstrap", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
+        app.MapGet("/tiers", async (HttpRequest req, IServiceCatalogRepository catalog, IMemoryCache cache, CancellationToken ct) =>
+        {
+            var tiers = await GetOrCreateCachedAsync(cache, "tiers:all", TimeSpan.FromHours(1), ShouldBypassCache(req),
+                async () => (await catalog.GetTiersAsync(ct)).Select(t => new TierDto(
+                    t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
+                    t.AllowedPriceFormats, t.DefaultSignalPercent, t.MaxInstallments)).ToList(),
+                logger: null, ct);
+            return Results.Ok(tiers);
+        });
+
+        app.MapGet("/categories", async (HttpRequest req, IServiceCatalogRepository catalog, IMemoryCache cache, CancellationToken ct) =>
+        {
+            var categories = await GetOrCreateCachedAsync(cache, "categories:all", TimeSpan.FromHours(1), ShouldBypassCache(req),
+                async () => (await catalog.GetCategoriesAsync(ct)).Select(c => new CategoryDto(c.Id, c.Name, c.Icon)).ToList(),
+                logger: null, ct);
+            return Results.Ok(categories);
+        });
+
+        app.MapGet("/bootstrap", async (HttpRequest req, IProfessionalReadRepository repo, IServiceCatalogRepository catalog, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("HomeEndpoints");
             var bootstrap = await GetOrCreateCachedAsync(cache, "home:bootstrap", TimeSpan.FromSeconds(45), ShouldBypassCache(req),
@@ -48,8 +72,14 @@ public static class ApiEndpoints
                     var t1 = repo.GetProfessionalsAsync(null, null, ct);
                     var t2 = repo.GetZonesAsync(ct);
                     var t3 = repo.GetServicesAsync(ct);
-                    await Task.WhenAll(t1, t2, t3);
-                    return new HomeBootstrapDto(t1.Result, t2.Result, t3.Result);
+                    var t4 = catalog.GetCategoriesAsync(ct);
+                    var t5 = catalog.GetTiersAsync(ct);
+                    await Task.WhenAll(t1, t2, t3, t4, t5);
+                    var categories = t4.Result.Select(c => new CategoryDto(c.Id, c.Name, c.Icon)).ToList();
+                    var tiers = t5.Result.Select(t => new TierDto(
+                        t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
+                        t.AllowedPriceFormats, t.DefaultSignalPercent, t.MaxInstallments)).ToList();
+                    return new HomeBootstrapDto(t1.Result, t2.Result, t3.Result, categories, tiers);
                 }, logger, ct);
             return Results.Ok(bootstrap);
         });

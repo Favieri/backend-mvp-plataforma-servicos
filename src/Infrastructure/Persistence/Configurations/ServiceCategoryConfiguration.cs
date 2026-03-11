@@ -4,20 +4,19 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Persistence.Configurations;
 
-public sealed class ServiceConfiguration : IEntityTypeConfiguration<Service>
+public sealed class ServiceCategoryConfiguration : IEntityTypeConfiguration<ServiceCategory>
 {
-    public void Configure(EntityTypeBuilder<Service> builder)
+    public void Configure(EntityTypeBuilder<ServiceCategory> builder)
     {
-        builder.ToTable("Service");
+        builder.ToTable("service_category");
 
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id");
 
         builder.Property(x => x.Name).HasColumnName("name").IsRequired();
         builder.Property(x => x.Icon).HasColumnName("icon");
-        builder.Property(x => x.CreatedAt).HasColumnName("createdAt").IsRequired();
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
-        builder.Property(x => x.CategoryId).HasColumnName("categoryId");
-        builder.Property(x => x.TierId).HasColumnName("tierId");
+        builder.HasIndex(x => x.Name);
     }
 }
