@@ -1,9 +1,10 @@
+using Application.Abstractions;
+using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Dapper;
 
-namespace Application.Services;
+namespace Infrastructure.Services;
 
 /// <summary>
 /// Bridges the main Order (PascalCase schema) with the financial module (snake_case schema)
@@ -12,7 +13,7 @@ namespace Application.Services;
 /// </summary>
 public sealed class PaymentOrchestrationService(
     IConfiguration config,
-    ILogger<PaymentOrchestrationService> logger)
+    ILogger<PaymentOrchestrationService> logger) : IPaymentOrchestrationService
 {
     private string ConnectionString =>
         config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
