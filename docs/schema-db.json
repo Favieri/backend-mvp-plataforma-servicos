@@ -1,0 +1,2564 @@
+{
+    "schema": "public",
+    "tables": [
+        {
+            "table": "Appointment",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "clientId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "serviceId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "startsAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "endsAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "\"AppointmentStatus\"",
+                    "default": "'PENDING'::\"AppointmentStatus\"",
+                    "nullable": false
+                },
+                {
+                    "name": "location",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "notes",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "updatedAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "Appointment_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Appointment_pkey\" ON public.\"Appointment\" USING btree (id)"
+                },
+                {
+                    "name": "Appointment_professionalId_startsAt_idx",
+                    "definition": "CREATE INDEX \"Appointment_professionalId_startsAt_idx\" ON public.\"Appointment\" USING btree (\"professionalId\", \"startsAt\")"
+                },
+                {
+                    "name": "IX_Appointment_clientId",
+                    "definition": "CREATE INDEX \"IX_Appointment_clientId\" ON public.\"Appointment\" USING btree (\"clientId\")"
+                },
+                {
+                    "name": "IX_Appointment_professionalId",
+                    "definition": "CREATE INDEX \"IX_Appointment_professionalId\" ON public.\"Appointment\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "IX_Appointment_professionalId_startsAt_status",
+                    "definition": "CREATE INDEX \"IX_Appointment_professionalId_startsAt_status\" ON public.\"Appointment\" USING btree (\"professionalId\", \"startsAt\", status)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Appointment_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Conversation",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "orderId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "clientId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                },
+                {
+                    "name": "clientLastReadAt",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professionalLastReadAt",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "Conversation_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Conversation_pkey\" ON public.\"Conversation\" USING btree (id)"
+                },
+                {
+                    "name": "Conversation_unique_null_order_per_pair",
+                    "definition": "CREATE UNIQUE INDEX \"Conversation_unique_null_order_per_pair\" ON public.\"Conversation\" USING btree (\"clientId\", \"professionalId\") WHERE (\"orderId\" IS NULL)"
+                },
+                {
+                    "name": "Conversation_unique_pair",
+                    "definition": "CREATE UNIQUE INDEX \"Conversation_unique_pair\" ON public.\"Conversation\" USING btree (\"clientId\", \"professionalId\")"
+                },
+                {
+                    "name": "IX_Conversation_clientId",
+                    "definition": "CREATE INDEX \"IX_Conversation_clientId\" ON public.\"Conversation\" USING btree (\"clientId\")"
+                },
+                {
+                    "name": "IX_Conversation_clientId_professionalId",
+                    "definition": "CREATE INDEX \"IX_Conversation_clientId_professionalId\" ON public.\"Conversation\" USING btree (\"clientId\", \"professionalId\")"
+                },
+                {
+                    "name": "IX_Conversation_professionalId",
+                    "definition": "CREATE INDEX \"IX_Conversation_professionalId\" ON public.\"Conversation\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "conversation_client_lastread_idx",
+                    "definition": "CREATE INDEX conversation_client_lastread_idx ON public.\"Conversation\" USING btree (\"clientLastReadAt\")"
+                },
+                {
+                    "name": "conversation_professional_lastread_idx",
+                    "definition": "CREATE INDEX conversation_professional_lastread_idx ON public.\"Conversation\" USING btree (\"professionalLastReadAt\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Conversation_clientId_fkey",
+                    "columns": [
+                        "clientId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Conversation_orderId_fkey",
+                    "columns": [
+                        "orderId"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Conversation_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "EmailJob",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "to",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "subject",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "html",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "text",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "replyTo",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "from",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "attempts",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'pending'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "error",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "dedupeKey",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "sentAt",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "EmailJob_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"EmailJob_pkey\" ON public.\"EmailJob\" USING btree (id)"
+                },
+                {
+                    "name": "emailjob_createdat_idx",
+                    "definition": "CREATE INDEX emailjob_createdat_idx ON public.\"EmailJob\" USING btree (\"createdAt\")"
+                },
+                {
+                    "name": "emailjob_dedup_key_idx",
+                    "definition": "CREATE UNIQUE INDEX emailjob_dedup_key_idx ON public.\"EmailJob\" USING btree (\"dedupeKey\") WHERE (\"dedupeKey\" IS NOT NULL)"
+                },
+                {
+                    "name": "emailjob_status_createdat_idx",
+                    "definition": "CREATE INDEX emailjob_status_createdat_idx ON public.\"EmailJob\" USING btree (status, \"createdAt\")"
+                },
+                {
+                    "name": "emailjob_status_idx",
+                    "definition": "CREATE INDEX emailjob_status_idx ON public.\"EmailJob\" USING btree (status)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "Message",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "conversationId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "senderId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "text",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "sentAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_Message_conversationId",
+                    "definition": "CREATE INDEX \"IX_Message_conversationId\" ON public.\"Message\" USING btree (\"conversationId\")"
+                },
+                {
+                    "name": "IX_Message_conversationId_sentAt",
+                    "definition": "CREATE INDEX \"IX_Message_conversationId_sentAt\" ON public.\"Message\" USING btree (\"conversationId\", \"sentAt\")"
+                },
+                {
+                    "name": "Message_conversationId_sentAt_idx",
+                    "definition": "CREATE INDEX \"Message_conversationId_sentAt_idx\" ON public.\"Message\" USING btree (\"conversationId\", \"sentAt\" DESC)"
+                },
+                {
+                    "name": "Message_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Message_pkey\" ON public.\"Message\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Message_conversationId_fkey",
+                    "columns": [
+                        "conversationId"
+                    ],
+                    "references_table": "Conversation",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Message_senderId_fkey",
+                    "columns": [
+                        "senderId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Order",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "clientId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "serviceId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "location",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "date",
+                    "type": "timestamp(3) without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'aberto'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "tierId",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "origin",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "proposalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "appointmentId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "conversationId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "priceTotalCents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "signalCents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "balanceCents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "installments",
+                    "type": "integer",
+                    "default": "1",
+                    "nullable": false
+                },
+                {
+                    "name": "paymentMethod",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addressId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "scope",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "scheduledAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "completedAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "cancelledAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "cancelledBy",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "cancellationReason",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "autoConfirmAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_Order_autoConfirmAt",
+                    "definition": "CREATE INDEX \"IX_Order_autoConfirmAt\" ON public.\"Order\" USING btree (\"autoConfirmAt\") WHERE (\"autoConfirmAt\" IS NOT NULL)"
+                },
+                {
+                    "name": "IX_Order_clientId",
+                    "definition": "CREATE INDEX \"IX_Order_clientId\" ON public.\"Order\" USING btree (\"clientId\")"
+                },
+                {
+                    "name": "IX_Order_clientId_createdAt",
+                    "definition": "CREATE INDEX \"IX_Order_clientId_createdAt\" ON public.\"Order\" USING btree (\"clientId\", \"createdAt\")"
+                },
+                {
+                    "name": "IX_Order_professionalId",
+                    "definition": "CREATE INDEX \"IX_Order_professionalId\" ON public.\"Order\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "IX_Order_serviceId",
+                    "definition": "CREATE INDEX \"IX_Order_serviceId\" ON public.\"Order\" USING btree (\"serviceId\")"
+                },
+                {
+                    "name": "IX_Order_status",
+                    "definition": "CREATE INDEX \"IX_Order_status\" ON public.\"Order\" USING btree (status)"
+                },
+                {
+                    "name": "Order_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Order_pkey\" ON public.\"Order\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Order_clientId_fkey",
+                    "columns": [
+                        "clientId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Order_serviceId_fkey",
+                    "columns": [
+                        "serviceId"
+                    ],
+                    "references_table": "Service",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Professional",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "userId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "bio",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "rating",
+                    "type": "double precision",
+                    "default": "0",
+                    "nullable": true
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "default": "true",
+                    "nullable": false
+                },
+                {
+                    "name": "avatarUrl",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "availabilityText",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "completedJobsCount",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "slotMinutes",
+                    "type": "integer",
+                    "default": "60",
+                    "nullable": true
+                },
+                {
+                    "name": "leadTimeMinutes",
+                    "type": "integer",
+                    "default": "120",
+                    "nullable": true
+                },
+                {
+                    "name": "maxAdvanceDays",
+                    "type": "integer",
+                    "default": "30",
+                    "nullable": true
+                },
+                {
+                    "name": "allowInstantBooking",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_Professional_active_rating",
+                    "definition": "CREATE INDEX \"IX_Professional_active_rating\" ON public.\"Professional\" USING btree (active, rating)"
+                },
+                {
+                    "name": "IX_Professional_userId",
+                    "definition": "CREATE INDEX \"IX_Professional_userId\" ON public.\"Professional\" USING btree (\"userId\")"
+                },
+                {
+                    "name": "Professional_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Professional_pkey\" ON public.\"Professional\" USING btree (id)"
+                },
+                {
+                    "name": "Professional_userId_key",
+                    "definition": "CREATE UNIQUE INDEX \"Professional_userId_key\" ON public.\"Professional\" USING btree (\"userId\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Professional_userId_fkey",
+                    "columns": [
+                        "userId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalAvailability",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "weekday",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "startMinutes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "endMinutes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "default": "true",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_ProfessionalAvailability_professionalId_weekday",
+                    "definition": "CREATE INDEX \"IX_ProfessionalAvailability_professionalId_weekday\" ON public.\"ProfessionalAvailability\" USING btree (\"professionalId\", weekday)"
+                },
+                {
+                    "name": "ProfessionalAvailability_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalAvailability_pkey\" ON public.\"ProfessionalAvailability\" USING btree (id)"
+                },
+                {
+                    "name": "ProfessionalAvailability_prof_weekday_idx",
+                    "definition": "CREATE INDEX \"ProfessionalAvailability_prof_weekday_idx\" ON public.\"ProfessionalAvailability\" USING btree (\"professionalId\", weekday)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalAvailability_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalBlock",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": "(gen_random_uuid())::text",
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "startsAt",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "endsAt",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "reason",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_ProfessionalBlock_professionalId_startsAt_endsAt",
+                    "definition": "CREATE INDEX \"IX_ProfessionalBlock_professionalId_startsAt_endsAt\" ON public.\"ProfessionalBlock\" USING btree (\"professionalId\", \"startsAt\", \"endsAt\")"
+                },
+                {
+                    "name": "ProfessionalBlock_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalBlock_pkey\" ON public.\"ProfessionalBlock\" USING btree (id)"
+                },
+                {
+                    "name": "ProfessionalBlock_professionalId_startsAt_idx",
+                    "definition": "CREATE INDEX \"ProfessionalBlock_professionalId_startsAt_idx\" ON public.\"ProfessionalBlock\" USING btree (\"professionalId\", \"startsAt\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalBlock_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalOrderIgnore",
+            "columns": [
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "orderId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "ProfessionalOrderIgnore_orderId_idx",
+                    "definition": "CREATE INDEX \"ProfessionalOrderIgnore_orderId_idx\" ON public.\"ProfessionalOrderIgnore\" USING btree (\"orderId\")"
+                },
+                {
+                    "name": "ProfessionalOrderIgnore_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalOrderIgnore_pkey\" ON public.\"ProfessionalOrderIgnore\" USING btree (\"professionalId\", \"orderId\")"
+                },
+                {
+                    "name": "ProfessionalOrderIgnore_professionalId_idx",
+                    "definition": "CREATE INDEX \"ProfessionalOrderIgnore_professionalId_idx\" ON public.\"ProfessionalOrderIgnore\" USING btree (\"professionalId\")"
+                }
+            ],
+            "primary_key": [
+                "professionalId",
+                "orderId"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalOrderIgnore_orderId_fkey",
+                    "columns": [
+                        "orderId"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ProfessionalOrderIgnore_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalPortfolio",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "imageUrl",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "title",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "orderIndex",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_ProfessionalPortfolio_professionalId",
+                    "definition": "CREATE INDEX \"IX_ProfessionalPortfolio_professionalId\" ON public.\"ProfessionalPortfolio\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "ProfessionalPortfolio_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalPortfolio_pkey\" ON public.\"ProfessionalPortfolio\" USING btree (id)"
+                },
+                {
+                    "name": "ProfessionalPortfolio_professionalId_idx",
+                    "definition": "CREATE INDEX \"ProfessionalPortfolio_professionalId_idx\" ON public.\"ProfessionalPortfolio\" USING btree (\"professionalId\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalPortfolio_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalService",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "serviceId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "nomeServico",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "preco",
+                    "type": "double precision",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "descricao",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_ProfessionalService_professionalId",
+                    "definition": "CREATE INDEX \"IX_ProfessionalService_professionalId\" ON public.\"ProfessionalService\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "IX_ProfessionalService_serviceId",
+                    "definition": "CREATE INDEX \"IX_ProfessionalService_serviceId\" ON public.\"ProfessionalService\" USING btree (\"serviceId\")"
+                },
+                {
+                    "name": "ProfessionalService_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalService_pkey\" ON public.\"ProfessionalService\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalService_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ProfessionalService_serviceId_fkey",
+                    "columns": [
+                        "serviceId"
+                    ],
+                    "references_table": "Service",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "ProfessionalZone",
+            "columns": [
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "zoneId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_ProfessionalZone_zoneId",
+                    "definition": "CREATE INDEX \"IX_ProfessionalZone_zoneId\" ON public.\"ProfessionalZone\" USING btree (\"zoneId\")"
+                },
+                {
+                    "name": "ProfessionalZone_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"ProfessionalZone_pkey\" ON public.\"ProfessionalZone\" USING btree (\"professionalId\", \"zoneId\")"
+                },
+                {
+                    "name": "ProfessionalZone_professionalId_idx",
+                    "definition": "CREATE INDEX \"ProfessionalZone_professionalId_idx\" ON public.\"ProfessionalZone\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "ProfessionalZone_zoneId_idx",
+                    "definition": "CREATE INDEX \"ProfessionalZone_zoneId_idx\" ON public.\"ProfessionalZone\" USING btree (\"zoneId\")"
+                }
+            ],
+            "primary_key": [
+                "professionalId",
+                "zoneId"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "ProfessionalZone_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ProfessionalZone_zoneId_fkey",
+                    "columns": [
+                        "zoneId"
+                    ],
+                    "references_table": "Zone",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Review",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "orderId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professionalId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "clientId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "rating",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "comment",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_Review_clientId_createdAt",
+                    "definition": "CREATE INDEX \"IX_Review_clientId_createdAt\" ON public.\"Review\" USING btree (\"clientId\", \"createdAt\")"
+                },
+                {
+                    "name": "IX_Review_professionalId",
+                    "definition": "CREATE INDEX \"IX_Review_professionalId\" ON public.\"Review\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "Review_clientId_idx",
+                    "definition": "CREATE INDEX \"Review_clientId_idx\" ON public.\"Review\" USING btree (\"clientId\")"
+                },
+                {
+                    "name": "Review_orderId_key",
+                    "definition": "CREATE UNIQUE INDEX \"Review_orderId_key\" ON public.\"Review\" USING btree (\"orderId\")"
+                },
+                {
+                    "name": "Review_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Review_pkey\" ON public.\"Review\" USING btree (id)"
+                },
+                {
+                    "name": "Review_professionalId_idx",
+                    "definition": "CREATE INDEX \"Review_professionalId_idx\" ON public.\"Review\" USING btree (\"professionalId\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "Review_clientId_fkey",
+                    "columns": [
+                        "clientId"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Review_orderId_fkey",
+                    "columns": [
+                        "orderId"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "Review_professionalId_fkey",
+                    "columns": [
+                        "professionalId"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Service",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "icon",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "Service_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Service_pkey\" ON public.\"Service\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "User",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "email",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "phone",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "role",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                },
+                {
+                    "name": "senha",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "zoneId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_User_zoneId",
+                    "definition": "CREATE INDEX \"IX_User_zoneId\" ON public.\"User\" USING btree (\"zoneId\")"
+                },
+                {
+                    "name": "User_email_key",
+                    "definition": "CREATE UNIQUE INDEX \"User_email_key\" ON public.\"User\" USING btree (email)"
+                },
+                {
+                    "name": "User_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"User_pkey\" ON public.\"User\" USING btree (id)"
+                },
+                {
+                    "name": "User_zoneId_idx",
+                    "definition": "CREATE INDEX \"User_zoneId_idx\" ON public.\"User\" USING btree (\"zoneId\")"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "User_zoneId_fkey",
+                    "columns": [
+                        "zoneId"
+                    ],
+                    "references_table": "Zone",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "Zone",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "default": "true",
+                    "nullable": false
+                },
+                {
+                    "name": "createdAt",
+                    "type": "timestamp(3) without time zone",
+                    "default": "CURRENT_TIMESTAMP",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "Zone_name_key",
+                    "definition": "CREATE UNIQUE INDEX \"Zone_name_key\" ON public.\"Zone\" USING btree (name)"
+                },
+                {
+                    "name": "Zone_pkey",
+                    "definition": "CREATE UNIQUE INDEX \"Zone_pkey\" ON public.\"Zone\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "__EFMigrationsHistory",
+            "columns": [
+                {
+                    "name": "MigrationId",
+                    "type": "character varying(150)",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "ProductVersion",
+                    "type": "character varying(32)",
+                    "default": null,
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "PK___EFMigrationsHistory",
+                    "definition": "CREATE UNIQUE INDEX \"PK___EFMigrationsHistory\" ON public.\"__EFMigrationsHistory\" USING btree (\"MigrationId\")"
+                }
+            ],
+            "primary_key": [
+                "MigrationId"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "ledger_entry",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "type",
+                    "type": "ledger_type",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "payment_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "payout_item_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professional_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_ledger_type_created",
+                    "definition": "CREATE INDEX idx_ledger_type_created ON public.ledger_entry USING btree (type, created_at)"
+                },
+                {
+                    "name": "ledger_entry_pkey",
+                    "definition": "CREATE UNIQUE INDEX ledger_entry_pkey ON public.ledger_entry USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_ledger_order",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_ledger_payment",
+                    "columns": [
+                        "payment_id"
+                    ],
+                    "references_table": "payment",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_ledger_payoutitem",
+                    "columns": [
+                        "payout_item_id"
+                    ],
+                    "references_table": "payoutitem",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_ledger_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ledger_entry_order_id_fkey",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ledger_entry_payment_id_fkey",
+                    "columns": [
+                        "payment_id"
+                    ],
+                    "references_table": "payment",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ledger_entry_payout_item_id_fkey",
+                    "columns": [
+                        "payout_item_id"
+                    ],
+                    "references_table": "payoutitem",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "ledger_entry_professional_id_fkey",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "order",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "customer_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "completed_at",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "marketplace_order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_order_marketplace_order_id",
+                    "definition": "CREATE INDEX idx_order_marketplace_order_id ON public.\"order\" USING btree (marketplace_order_id) WHERE (marketplace_order_id IS NOT NULL)"
+                },
+                {
+                    "name": "idx_order_professional",
+                    "definition": "CREATE INDEX idx_order_professional ON public.\"order\" USING btree (professional_id)"
+                },
+                {
+                    "name": "order_pkey",
+                    "definition": "CREATE UNIQUE INDEX order_pkey ON public.\"order\" USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_order_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "order_professional_id_fkey",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "order_timeline",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "event_type",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "actor_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "actor_role",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "metadata",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_order_timeline_event_type",
+                    "definition": "CREATE INDEX \"IX_order_timeline_event_type\" ON public.order_timeline USING btree (event_type)"
+                },
+                {
+                    "name": "IX_order_timeline_order_id_created_at",
+                    "definition": "CREATE INDEX \"IX_order_timeline_order_id_created_at\" ON public.order_timeline USING btree (order_id, created_at)"
+                },
+                {
+                    "name": "PK_order_timeline",
+                    "definition": "CREATE UNIQUE INDEX \"PK_order_timeline\" ON public.order_timeline USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "payable",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "payable_status",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "hold_until",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "payout_item_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_payable_prof_status",
+                    "definition": "CREATE INDEX idx_payable_prof_status ON public.payable USING btree (professional_id, status)"
+                },
+                {
+                    "name": "idx_payable_status_hold",
+                    "definition": "CREATE INDEX idx_payable_status_hold ON public.payable USING btree (status, hold_until)"
+                },
+                {
+                    "name": "payable_pkey",
+                    "definition": "CREATE UNIQUE INDEX payable_pkey ON public.payable USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_payable_order",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_payable_payoutitem",
+                    "columns": [
+                        "payout_item_id"
+                    ],
+                    "references_table": "payoutitem",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_payable_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "payable_order_id_fkey",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "payable_professional_id_fkey",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "payment",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "gateway",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "gateway_ref",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "method",
+                    "type": "payment_method",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "gateway_fee_cents",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "platform_fee_cents",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "payment_status",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "paid_at",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_payment_order",
+                    "definition": "CREATE INDEX idx_payment_order ON public.payment USING btree (order_id)"
+                },
+                {
+                    "name": "idx_payment_status_paidat",
+                    "definition": "CREATE INDEX idx_payment_status_paidat ON public.payment USING btree (status, paid_at)"
+                },
+                {
+                    "name": "payment_gateway_gateway_ref_key",
+                    "definition": "CREATE UNIQUE INDEX payment_gateway_gateway_ref_key ON public.payment USING btree (gateway, gateway_ref)"
+                },
+                {
+                    "name": "payment_pkey",
+                    "definition": "CREATE UNIQUE INDEX payment_pkey ON public.payment USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_payment_order",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "payment_order_id_fkey",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "order",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "payoutbatch",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "period_from",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "period_to",
+                    "type": "timestamp with time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "payout_status",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "file_url",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_by",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "payoutbatch_pkey",
+                    "definition": "CREATE UNIQUE INDEX payoutbatch_pkey ON public.payoutbatch USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "payoutitem",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "batch_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "destination_snap",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "payout_item_status",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "transfer_ref",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "error_message",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_payoutitem_batch",
+                    "definition": "CREATE INDEX idx_payoutitem_batch ON public.payoutitem USING btree (batch_id)"
+                },
+                {
+                    "name": "idx_payoutitem_prof_status",
+                    "definition": "CREATE INDEX idx_payoutitem_prof_status ON public.payoutitem USING btree (professional_id, status)"
+                },
+                {
+                    "name": "payoutitem_pkey",
+                    "definition": "CREATE UNIQUE INDEX payoutitem_pkey ON public.payoutitem USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_payoutitem_batch",
+                    "columns": [
+                        "batch_id"
+                    ],
+                    "references_table": "payoutbatch",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "fk_payoutitem_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "payoutitem_batch_id_fkey",
+                    "columns": [
+                        "batch_id"
+                    ],
+                    "references_table": "payoutbatch",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "payoutitem_professional_id_fkey",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "professional",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "display_name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "payout_method_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "professional_pkey",
+                    "definition": "CREATE UNIQUE INDEX professional_pkey ON public.professional USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_professional_payout_method",
+                    "columns": [
+                        "payout_method_id"
+                    ],
+                    "references_table": "professional_payout_method",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "professional_payout_method",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                    "default": "gen_random_uuid()",
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "uuid",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "method",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "pix_key_type",
+                    "type": "pix_key_type",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "pix_key",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "bank_code",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "branch",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "account",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "account_digit",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "account_type",
+                    "type": "account_type",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "doc_type",
+                    "type": "doc_type",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "doc_number",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "holder_name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "verified",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_prof_payout_method_professional",
+                    "definition": "CREATE INDEX idx_prof_payout_method_professional ON public.professional_payout_method USING btree (professional_id)"
+                },
+                {
+                    "name": "professional_payout_method_pkey",
+                    "definition": "CREATE UNIQUE INDEX professional_payout_method_pkey ON public.professional_payout_method USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "fk_ppm_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "professional_payout_method_professional_id_fkey",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "proposal",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professional_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "client_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "service_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_service_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "conversation_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "scope",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "includes_description",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "excludes_description",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "price_total_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "price_by_stage",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "duration_estimate",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "suggested_datetime",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "visit_fee_cents",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "valid_until",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'draft'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "rejection_reason",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_proposal_client_id",
+                    "definition": "CREATE INDEX \"IX_proposal_client_id\" ON public.proposal USING btree (client_id)"
+                },
+                {
+                    "name": "IX_proposal_conversation_id",
+                    "definition": "CREATE INDEX \"IX_proposal_conversation_id\" ON public.proposal USING btree (conversation_id) WHERE (conversation_id IS NOT NULL)"
+                },
+                {
+                    "name": "IX_proposal_order_id",
+                    "definition": "CREATE INDEX \"IX_proposal_order_id\" ON public.proposal USING btree (order_id)"
+                },
+                {
+                    "name": "IX_proposal_professional_id",
+                    "definition": "CREATE INDEX \"IX_proposal_professional_id\" ON public.proposal USING btree (professional_id)"
+                },
+                {
+                    "name": "IX_proposal_status",
+                    "definition": "CREATE INDEX \"IX_proposal_status\" ON public.proposal USING btree (status)"
+                },
+                {
+                    "name": "IX_proposal_valid_until",
+                    "definition": "CREATE INDEX \"IX_proposal_valid_until\" ON public.proposal USING btree (valid_until)"
+                },
+                {
+                    "name": "PK_proposal",
+                    "definition": "CREATE UNIQUE INDEX \"PK_proposal\" ON public.proposal USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        }
+    ],
+    "database": "postgres"
+}
