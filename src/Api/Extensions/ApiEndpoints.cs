@@ -831,6 +831,9 @@ public static class ApiEndpoints
         // Phase 3 endpoints
         app.MapDisputeEndpoints();
 
+        // Phase 4 endpoints
+        app.MapRecurringEndpoints();
+
         return app;
     }
 

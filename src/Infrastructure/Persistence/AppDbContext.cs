@@ -28,6 +28,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
     // Phase 3: dispute + expanded review
     public DbSet<Dispute> Disputes => Set<Dispute>();
+    // Phase 4: recurring plans + occurrences
+    public DbSet<RecurringPlan> RecurringPlans => Set<RecurringPlan>();
+    public DbSet<RecurringOccurrence> RecurringOccurrences => Set<RecurringOccurrence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
