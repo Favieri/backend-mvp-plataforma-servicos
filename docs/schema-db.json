@@ -153,6 +153,12 @@
                     "type": "timestamp with time zone",
                     "default": null,
                     "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'active'::text",
+                    "nullable": false
                 }
             ],
             "indexes": [
@@ -179,6 +185,10 @@
                 {
                     "name": "IX_Conversation_professionalId",
                     "definition": "CREATE INDEX \"IX_Conversation_professionalId\" ON public.\"Conversation\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "IX_Conversation_status",
+                    "definition": "CREATE INDEX \"IX_Conversation_status\" ON public.\"Conversation\" USING btree (status)"
                 },
                 {
                     "name": "conversation_client_lastread_idx",
@@ -367,6 +377,24 @@
                     "type": "timestamp(3) without time zone",
                     "default": "CURRENT_TIMESTAMP",
                     "nullable": false
+                },
+                {
+                    "name": "type",
+                    "type": "text",
+                    "default": "'text'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "metadata",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "replyToId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -377,6 +405,14 @@
                 {
                     "name": "IX_Message_conversationId_sentAt",
                     "definition": "CREATE INDEX \"IX_Message_conversationId_sentAt\" ON public.\"Message\" USING btree (\"conversationId\", \"sentAt\")"
+                },
+                {
+                    "name": "IX_Message_replyToId",
+                    "definition": "CREATE INDEX \"IX_Message_replyToId\" ON public.\"Message\" USING btree (\"replyToId\") WHERE (\"replyToId\" IS NOT NULL)"
+                },
+                {
+                    "name": "IX_Message_type",
+                    "definition": "CREATE INDEX \"IX_Message_type\" ON public.\"Message\" USING btree (type)"
                 },
                 {
                     "name": "Message_conversationId_sentAt_idx",
@@ -391,6 +427,16 @@
                 "id"
             ],
             "foreign_keys": [
+                {
+                    "name": "FK_Message_replyToId",
+                    "columns": [
+                        "replyToId"
+                    ],
+                    "references_table": "Message",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
                 {
                     "name": "Message_conversationId_fkey",
                     "columns": [
@@ -1619,6 +1665,84 @@
                         "professional_id"
                     ],
                     "references_table": "professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "message_attachment",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "message_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "type",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "url",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "thumbnail_url",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "file_name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "size_bytes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_message_attachment_message_id",
+                    "definition": "CREATE INDEX \"IX_message_attachment_message_id\" ON public.message_attachment USING btree (message_id)"
+                },
+                {
+                    "name": "PK_message_attachment",
+                    "definition": "CREATE UNIQUE INDEX \"PK_message_attachment\" ON public.message_attachment USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "FK_message_attachment_message",
+                    "columns": [
+                        "message_id"
+                    ],
+                    "references_table": "Message",
                     "references_columns": [
                         "id"
                     ]
