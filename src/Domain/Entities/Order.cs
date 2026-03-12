@@ -2,6 +2,7 @@ namespace Domain.Entities;
 
 public class Order
 {
+    // ─── Core (original) ────────────────────────────────────────────────────
     public string Id { get; private set; } = default!;
     public string ClientId { get; private set; } = default!;
     public string ServiceId { get; private set; } = default!;
@@ -11,8 +12,30 @@ public class Order
     public string Status { get; private set; } = default!;
     public DateTime CreatedAt { get; private set; }
 
+    // ─── Phase 1: transactional model ──────────────────────────────────────
+    public string? ProfessionalId { get; private set; }
+    public int? TierId { get; private set; }
+    public string? Origin { get; private set; }
+    public string? ProposalId { get; private set; }
+    public string? AppointmentId { get; private set; }
+    public string? ConversationId { get; private set; }
+    public int? PriceTotalCents { get; private set; }
+    public int? SignalCents { get; private set; }
+    public int? BalanceCents { get; private set; }
+    public int Installments { get; private set; } = 1;
+    public string? PaymentMethod { get; private set; }
+    public string? AddressId { get; private set; }
+    public string? Scope { get; private set; }
+    public DateTime? ScheduledAt { get; private set; }
+    public DateTime? CompletedAt { get; private set; }
+    public DateTime? CancelledAt { get; private set; }
+    public string? CancelledBy { get; private set; }
+    public string? CancellationReason { get; private set; }
+    public DateTime? AutoConfirmAt { get; private set; }
+
     private Order() { }
 
+    /// <summary>Legacy factory — backward compatible with existing POST /orders.</summary>
     public static Order Create(
         string id,
         string clientId,
@@ -34,5 +57,138 @@ public class Order
         };
     }
 
+    /// <summary>Factory for Tier 1 direct booking.</summary>
+    public static Order CreateBooking(
+        string id,
+        string clientId,
+        string professionalId,
+        string serviceId,
+        int tierId,
+        int priceTotalCents,
+        int signalCents,
+        int balanceCents,
+        int installments,
+        string? paymentMethod,
+        string? scope,
+        DateTime? scheduledAt,
+        string? conversationId = null,
+        string? addressId = null,
+        string? description = null)
+    {
+        return new Order
+        {
+            Id = id,
+            ClientId = clientId,
+            ProfessionalId = professionalId,
+            ServiceId = serviceId,
+            TierId = tierId,
+            Origin = Enums.OrderOrigin.BookingDirect,
+            PriceTotalCents = priceTotalCents,
+            SignalCents = signalCents,
+            BalanceCents = balanceCents,
+            Installments = installments,
+            PaymentMethod = paymentMethod,
+            Scope = scope,
+            ScheduledAt = scheduledAt,
+            ConversationId = conversationId,
+            AddressId = addressId,
+            Description = description,
+            Status = Enums.OrderStatus.AwaitingPayment,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>Factory for creating order from accepted proposal (Tier 2/3).</summary>
+    public static Order CreateFromProposal(
+        string id,
+        string clientId,
+        string professionalId,
+        string serviceId,
+        int tierId,
+        string proposalId,
+        int priceTotalCents,
+        int signalCents,
+        int balanceCents,
+        int installments,
+        string? paymentMethod,
+        string? scope,
+        DateTime? scheduledAt,
+        string? conversationId = null,
+        string? addressId = null)
+    {
+        return new Order
+        {
+            Id = id,
+            ClientId = clientId,
+            ProfessionalId = professionalId,
+            ServiceId = serviceId,
+            TierId = tierId,
+            Origin = Enums.OrderOrigin.ProposalAccepted,
+            ProposalId = proposalId,
+            PriceTotalCents = priceTotalCents,
+            SignalCents = signalCents,
+            BalanceCents = balanceCents,
+            Installments = installments,
+            PaymentMethod = paymentMethod,
+            Scope = scope,
+            ScheduledAt = scheduledAt,
+            ConversationId = conversationId,
+            AddressId = addressId,
+            Status = Enums.OrderStatus.AwaitingPayment,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    // ─── State mutation methods ─────────────────────────────────────────────
+
     public void UpdateStatus(string newStatus) => Status = newStatus;
+
+    public void MarkScheduled()
+    {
+        Status = Enums.OrderStatus.Scheduled;
+        AutoConfirmAt = null;
+    }
+
+    public void MarkInProgress() => Status = Enums.OrderStatus.InProgress;
+
+    public void MarkAwaitingConfirmation(int autoConfirmHours = 72)
+    {
+        Status = Enums.OrderStatus.AwaitingConfirmation;
+        AutoConfirmAt = DateTime.UtcNow.AddHours(autoConfirmHours);
+    }
+
+    public void MarkCompleted()
+    {
+        Status = Enums.OrderStatus.Completed;
+        CompletedAt = DateTime.UtcNow;
+        AutoConfirmAt = null;
+    }
+
+    public void MarkCancelledByClient(string? reason = null)
+    {
+        Status = Enums.OrderStatus.CancelledClient;
+        CancelledAt = DateTime.UtcNow;
+        CancelledBy = Enums.ActorRole.Client;
+        CancellationReason = reason;
+    }
+
+    public void MarkCancelledByProfessional(string? reason = null)
+    {
+        Status = Enums.OrderStatus.CancelledProfessional;
+        CancelledAt = DateTime.UtcNow;
+        CancelledBy = Enums.ActorRole.Professional;
+        CancellationReason = reason;
+    }
+
+    public void MarkDisputed() => Status = Enums.OrderStatus.Disputed;
+
+    public void MarkRefunded()
+    {
+        Status = Enums.OrderStatus.Refunded;
+        CancelledAt ??= DateTime.UtcNow;
+    }
+
+    public void SetConversationId(string conversationId) => ConversationId = conversationId;
+
+    public void SetProposalId(string proposalId) => ProposalId = proposalId;
 }

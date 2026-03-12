@@ -3,6 +3,7 @@ using Application.DTOs;
 using Domain.Entities;
 using FluentValidation;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 
 namespace Api.Extensions;
 
@@ -619,6 +620,10 @@ public static class ApiEndpoints
             await repo.DeleteAsync(professionalId, orderId, ct);
             return Results.Ok(new { ok = true });
         });
+
+        // Phase 1 endpoints
+        app.MapOrderEndpoints();
+        app.MapProposalEndpoints();
 
         return app;
     }

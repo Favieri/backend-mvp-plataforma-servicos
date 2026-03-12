@@ -22,6 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ServiceTier> ServiceTiers => Set<ServiceTier>();
     public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
+    public DbSet<Proposal> Proposals => Set<Proposal>();
+    public DbSet<OrderTimeline> OrderTimelines => Set<OrderTimeline>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

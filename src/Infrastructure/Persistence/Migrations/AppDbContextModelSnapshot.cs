@@ -80,12 +80,81 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("Location").IsRequired(false).HasColumnName("location");
             b.Property<string>("ServiceId").IsRequired().HasColumnName("serviceId");
             b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("aberto");
+            // Phase 1 fields
+            b.Property<string>("ProfessionalId").IsRequired(false).HasColumnName("professionalId");
+            b.Property<int?>("TierId").HasColumnName("tierId");
+            b.Property<string>("Origin").IsRequired(false).HasColumnName("origin");
+            b.Property<string>("ProposalId").IsRequired(false).HasColumnName("proposalId");
+            b.Property<string>("AppointmentId").IsRequired(false).HasColumnName("appointmentId");
+            b.Property<string>("ConversationId").IsRequired(false).HasColumnName("conversationId");
+            b.Property<int?>("PriceTotalCents").HasColumnName("priceTotalCents");
+            b.Property<int?>("SignalCents").HasColumnName("signalCents");
+            b.Property<int?>("BalanceCents").HasColumnName("balanceCents");
+            b.Property<int>("Installments").IsRequired().HasColumnName("installments").HasDefaultValue(1);
+            b.Property<string>("PaymentMethod").IsRequired(false).HasColumnName("paymentMethod");
+            b.Property<string>("AddressId").IsRequired(false).HasColumnName("addressId");
+            b.Property<string>("Scope").IsRequired(false).HasColumnName("scope");
+            b.Property<DateTime?>("ScheduledAt").HasColumnName("scheduledAt");
+            b.Property<DateTime?>("CompletedAt").HasColumnName("completedAt");
+            b.Property<DateTime?>("CancelledAt").HasColumnName("cancelledAt");
+            b.Property<string>("CancelledBy").IsRequired(false).HasColumnName("cancelledBy");
+            b.Property<string>("CancellationReason").IsRequired(false).HasColumnName("cancellationReason");
+            b.Property<DateTime?>("AutoConfirmAt").HasColumnName("autoConfirmAt");
             b.HasKey("Id");
             b.HasIndex("ClientId").HasDatabaseName("IX_Order_clientId");
             b.HasIndex("ClientId", "CreatedAt").HasDatabaseName("IX_Order_clientId_createdAt");
             b.HasIndex("ServiceId").HasDatabaseName("IX_Order_serviceId");
             b.HasIndex("Status").HasDatabaseName("IX_Order_status");
+            b.HasIndex("ProfessionalId").HasDatabaseName("IX_Order_professionalId");
+            b.HasIndex("AutoConfirmAt").HasDatabaseName("IX_Order_autoConfirmAt");
             b.ToTable("Order");
+        });
+
+        modelBuilder.Entity("Domain.Entities.Proposal", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("OrderId").IsRequired(false).HasColumnName("order_id");
+            b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professional_id");
+            b.Property<string>("ClientId").IsRequired().HasColumnName("client_id");
+            b.Property<string>("ServiceId").IsRequired().HasColumnName("service_id");
+            b.Property<string>("ProfessionalServiceId").IsRequired(false).HasColumnName("professional_service_id");
+            b.Property<string>("ConversationId").IsRequired(false).HasColumnName("conversation_id");
+            b.Property<string>("Scope").IsRequired().HasColumnName("scope");
+            b.Property<string>("IncludesDescription").IsRequired(false).HasColumnName("includes_description");
+            b.Property<string>("ExcludesDescription").IsRequired(false).HasColumnName("excludes_description");
+            b.Property<int>("PriceTotalCents").IsRequired().HasColumnName("price_total_cents");
+            b.Property<string>("PriceByStage").IsRequired(false).HasColumnName("price_by_stage").HasColumnType("jsonb");
+            b.Property<string>("DurationEstimate").IsRequired(false).HasColumnName("duration_estimate");
+            b.Property<DateTime?>("SuggestedDatetime").HasColumnName("suggested_datetime");
+            b.Property<int>("VisitFeeCents").IsRequired().HasColumnName("visit_fee_cents").HasDefaultValue(0);
+            b.Property<DateTime>("ValidUntil").IsRequired().HasColumnName("valid_until");
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("draft");
+            b.Property<string>("RejectionReason").IsRequired(false).HasColumnName("rejection_reason");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime>("UpdatedAt").IsRequired().HasColumnName("updated_at");
+            b.HasKey("Id");
+            b.HasIndex("OrderId").HasDatabaseName("IX_proposal_order_id");
+            b.HasIndex("ProfessionalId").HasDatabaseName("IX_proposal_professional_id");
+            b.HasIndex("ClientId").HasDatabaseName("IX_proposal_client_id");
+            b.HasIndex("ConversationId").HasDatabaseName("IX_proposal_conversation_id");
+            b.HasIndex("Status").HasDatabaseName("IX_proposal_status");
+            b.HasIndex("ValidUntil").HasDatabaseName("IX_proposal_valid_until");
+            b.ToTable("proposal");
+        });
+
+        modelBuilder.Entity("Domain.Entities.OrderTimeline", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("OrderId").IsRequired().HasColumnName("order_id");
+            b.Property<string>("EventType").IsRequired().HasColumnName("event_type");
+            b.Property<string>("ActorId").IsRequired(false).HasColumnName("actor_id");
+            b.Property<string>("ActorRole").IsRequired(false).HasColumnName("actor_role");
+            b.Property<string>("Metadata").IsRequired(false).HasColumnName("metadata").HasColumnType("jsonb");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.HasKey("Id");
+            b.HasIndex("OrderId", "CreatedAt").HasDatabaseName("IX_order_timeline_order_id_created_at");
+            b.HasIndex("EventType").HasDatabaseName("IX_order_timeline_event_type");
+            b.ToTable("order_timeline");
         });
 
         modelBuilder.Entity("Domain.Entities.Professional", b =>
