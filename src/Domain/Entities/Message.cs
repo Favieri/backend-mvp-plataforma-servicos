@@ -5,4 +5,8 @@ public sealed record Message(
     string ConversationId,
     string SenderId,
     string Text,
-    DateTime SentAt);
+    DateTime SentAt,
+    // Phase 2: transactional chat
+    string Type = "text",
+    string? Metadata = null,
+    string? ReplyToId = null);

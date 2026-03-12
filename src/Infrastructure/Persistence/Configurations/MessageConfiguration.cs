@@ -18,7 +18,13 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         builder.Property(x => x.Text).HasColumnName("text").IsRequired();
         builder.Property(x => x.SentAt).HasColumnName("sentAt").IsRequired();
 
+        // Phase 2: transactional chat fields
+        builder.Property(x => x.Type).HasColumnName("type").IsRequired().HasDefaultValue("text");
+        builder.Property(x => x.Metadata).HasColumnName("metadata").HasColumnType("jsonb");
+        builder.Property(x => x.ReplyToId).HasColumnName("replyToId");
+
         builder.HasIndex(x => x.ConversationId);
         builder.HasIndex(x => new { x.ConversationId, x.SentAt });
+        builder.HasIndex(x => x.Type);
     }
 }

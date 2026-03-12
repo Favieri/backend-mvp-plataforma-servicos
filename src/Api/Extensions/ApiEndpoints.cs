@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
+using Domain.Enums;
 using FluentValidation;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
@@ -430,13 +431,45 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetMessagesAsync(conversationId, ct));
         });
 
-        app.MapPost("/messages", async (SendMessageRequest body, IConversationRepository repo, IEmailService emailSvc, CancellationToken ct) =>
+        // Phase 2: POST /messages accepts type, metadata, replyToId + anti-leak detection
+        app.MapPost("/messages", async (
+            SendMessageRequest body,
+            IConversationRepository repo,
+            IEmailService emailSvc,
+            IAntiLeakDetectionService antiLeak,
+            CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.SenderId) || string.IsNullOrWhiteSpace(body.Text))
                 return Results.Json(new { error = "conversationId, senderId e text são obrigatórios" }, statusCode: 400);
 
-            var message = await repo.CreateMessageAsync(body.ConversationId, body.SenderId, body.Text.Trim(), ct);
+            var messageType = string.IsNullOrWhiteSpace(body.Type) ? MessageType.Text : body.Type;
+
+            var message = await repo.CreateMessageAsync(
+                body.ConversationId,
+                body.SenderId,
+                body.Text.Trim(),
+                messageType,
+                body.Metadata,
+                body.ReplyToId,
+                ct);
+
             IDictionary<string, object?> msgDict = (IDictionary<string, object?>)(dynamic)message;
+
+            // Phase 2: anti-leak detection — insert a system warning message if contact patterns detected
+            if (messageType == MessageType.Text && antiLeak.HasLeakPattern(body.Text))
+            {
+                _ = repo.CreateMessageAsync(
+                    body.ConversationId,
+                    body.SenderId,
+                    antiLeak.GetWarningText(),
+                    MessageType.System,
+                    null,
+                    null,
+                    ct).ConfigureAwait(false);
+
+                // Flag conversation when leak patterns detected
+                _ = repo.UpdateConversationStatusAsync(body.ConversationId, ConversationStatus.Flagged, ct).ConfigureAwait(false);
+            }
 
             var conv = await repo.GetConversationForReadAsync(body.ConversationId, ct);
             if (conv is not null)
@@ -461,6 +494,90 @@ public static class ApiEndpoints
             return Results.Ok(message);
         });
 
+        // Phase 2: POST /messages/attachment — upload de anexo de chat (multipart/form-data)
+        app.MapPost("/messages/attachment", async (
+            HttpRequest req,
+            IConversationRepository convRepo,
+            IAttachmentStorageRepository storageRepo,
+            IMessageAttachmentRepository attachmentRepo,
+            CancellationToken ct) =>
+        {
+            const long maxSizeBytes = 20 * 1024 * 1024; // 20 MB
+            var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "image/jpeg", "image/png", "image/webp", "image/gif",
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "video/mp4", "video/quicktime"
+            };
+
+            if (!req.HasFormContentType)
+                return Results.Json(new { error = "Content-Type deve ser multipart/form-data." }, statusCode: 400);
+
+            var form = await req.ReadFormAsync(ct);
+            var file = form.Files.GetFile("file");
+            var conversationId = (form["conversationId"].FirstOrDefault() ?? string.Empty).Trim();
+            var senderId = (form["senderId"].FirstOrDefault() ?? string.Empty).Trim();
+            var messageText = (form["text"].FirstOrDefault() ?? string.Empty).Trim();
+            var attachmentType = (form["attachmentType"].FirstOrDefault() ?? "file").Trim();
+
+            if (file is null || file.Length == 0)
+                return Results.Json(new { error = "Arquivo não enviado." }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(conversationId))
+                return Results.Json(new { error = "conversationId é obrigatório." }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(senderId))
+                return Results.Json(new { error = "senderId é obrigatório." }, statusCode: 400);
+            if (file.Length > maxSizeBytes)
+                return Results.Json(new { error = "Arquivo excede 20MB." }, statusCode: 400);
+
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+            if (!allowedTypes.Contains(contentType))
+                return Results.Json(new { error = "Tipo de arquivo não permitido." }, statusCode: 400);
+
+            // Create the message first (with type = "action" and empty text fallback)
+            var text = string.IsNullOrWhiteSpace(messageText) ? $"[Arquivo: {file.FileName}]" : messageText;
+            var message = await convRepo.CreateMessageAsync(conversationId, senderId, text, MessageType.Action, null, null, ct);
+            IDictionary<string, object?> msgDict = (IDictionary<string, object?>)(dynamic)message;
+            var messageId = msgDict["id"]?.ToString()!;
+
+            // Upload file to Supabase Storage
+            await using var fileStream = file.OpenReadStream();
+            var publicUrl = await storageRepo.UploadAsync(messageId, fileStream, contentType, file.FileName ?? "file", ct);
+
+            if (string.IsNullOrWhiteSpace(publicUrl))
+                return Results.Json(new { error = "Falha no upload do arquivo." }, statusCode: 500);
+
+            // Determine if image type for thumbnail (same URL for now — thumbnail can be generated async)
+            var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+            var attachment = new MessageAttachment(
+                Id: Guid.NewGuid().ToString(),
+                MessageId: messageId,
+                Type: attachmentType,
+                Url: publicUrl,
+                ThumbnailUrl: isImage ? publicUrl : null,
+                FileName: file.FileName,
+                SizeBytes: (int)file.Length,
+                CreatedAt: DateTime.UtcNow);
+
+            await attachmentRepo.CreateAsync(attachment, ct);
+
+            return Results.Ok(new
+            {
+                message = msgDict,
+                attachment = new
+                {
+                    id = attachment.Id,
+                    messageId = attachment.MessageId,
+                    type = attachment.Type,
+                    url = attachment.Url,
+                    thumbnailUrl = attachment.ThumbnailUrl,
+                    fileName = attachment.FileName,
+                    sizeBytes = attachment.SizeBytes
+                }
+            });
+        });
+
         app.MapPost("/chat/read", async (MarkReadRequest body, IConversationRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.UserId))
@@ -475,6 +592,36 @@ public static class ApiEndpoints
             else
                 return Results.Json(new { error = "userId não pertence à conversa." }, statusCode: 403);
             return Results.Ok(new { ok = true });
+        });
+
+        // Phase 2: GET /conversations/{id}/actions — transactional actions available in the conversation
+        app.MapGet("/conversations/{id}/actions", async (
+            string id,
+            string requestingUserId,
+            IConversationRepository repo,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(requestingUserId))
+                return Results.Json(new { error = "requestingUserId é obrigatório" }, statusCode: 400);
+            var actions = await repo.GetConversationActionsAsync(id, requestingUserId, ct);
+            return Results.Ok(actions);
+        });
+
+        // Phase 2: PATCH /conversations/{id}/status — update conversation status (active/archived/flagged)
+        app.MapPatch("/conversations/{id}/status", async (
+            string id,
+            UpdateConversationStatusRequest body,
+            IConversationRepository repo,
+            CancellationToken ct) =>
+        {
+            var validStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ConversationStatus.Active, ConversationStatus.Archived, ConversationStatus.Flagged };
+
+            if (!validStatuses.Contains(body.Status))
+                return Results.Json(new { error = $"Status inválido. Use: {string.Join(", ", validStatuses)}" }, statusCode: 400);
+
+            await repo.UpdateConversationStatusAsync(id, body.Status.ToLowerInvariant(), ct);
+            return Results.Ok(new { ok = true, status = body.Status.ToLowerInvariant() });
         });
 
         // ─── Reviews ───────────────────────────────────────────────────────────
