@@ -95,6 +95,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMessageAttachmentRepository, MessageAttachmentRepository>();
         services.AddScoped<IAttachmentStorageRepository, AttachmentStorageRepository>();
 
+        // Phase 3: dispute + expanded reviews
+        services.AddScoped<IDisputeRepository, DisputeRepository>();
+        services.AddHostedService<BackgroundJobs.ProposalExpirationJob>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();

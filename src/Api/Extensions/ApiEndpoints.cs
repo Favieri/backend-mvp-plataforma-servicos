@@ -5,6 +5,7 @@ using Domain.Enums;
 using FluentValidation;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 namespace Api.Extensions;
 
@@ -676,6 +677,61 @@ public static class ApiEndpoints
         app.MapMethods("/reviews/{id}", ["PATCH"], PatchReviewAsync);
         app.MapMethods("/reviews/{id}", ["PATCH"], PatchReviewAsync);
 
+        // ─── Phase 3: Expanded Reviews ─────────────────────────────────────────
+
+        // POST /reviews/expanded — client reviews with categories + photos
+        app.MapPost("/reviews/expanded", async (CreateExpandedReviewRequest body, IReviewRepository repo, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.ClientId))
+                return Results.Json(new { error = "Campos obrigatórios ausentes" }, statusCode: 400);
+            if (body.Rating < 1 || body.Rating > 5)
+                return Results.Json(new { error = "rating deve ser 1..5" }, statusCode: 400);
+            foreach (var cat in new[] { body.PunctualityRating, body.QualityRating, body.CommunicationRating, body.CleanlinessRating })
+                if (cat is < 1 or > 5)
+                    return Results.Json(new { error = "Categorias de nota devem ser 1..5" }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(body.OrderId))
+                return Results.Json(new { error = "orderId é obrigatório" }, statusCode: 400);
+            if (!await repo.OrderBelongsToClientAsync(body.OrderId, body.ClientId, ct))
+                return Results.Json(new { error = "Pedido inválido para este cliente" }, statusCode: 400);
+            if (await repo.OrderAlreadyReviewedAsync(body.OrderId, ct))
+                return Results.Json(new { error = "Este pedido já foi avaliado" }, statusCode: 400);
+
+            var photoUrlsJson = body.PhotoUrls?.Length > 0
+                ? System.Text.Json.JsonSerializer.Serialize(body.PhotoUrls)
+                : null;
+
+            return Results.Ok(await repo.CreateExpandedAsync(
+                body.ProfessionalId, body.ClientId, body.OrderId,
+                body.Rating, body.Comment,
+                body.PunctualityRating, body.QualityRating,
+                body.CommunicationRating, body.CleanlinessRating,
+                photoUrlsJson, isVerified: false, ct));
+        });
+
+        // POST /reviews/professional — professional reviews client
+        app.MapPost("/reviews/professional", async (ProfessionalReviewClientRequest body, IReviewRepository repo, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.ProfessionalId) || string.IsNullOrWhiteSpace(body.OrderId))
+                return Results.Json(new { error = "professionalId e orderId são obrigatórios" }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(body.Review))
+                return Results.Json(new { error = "review é obrigatório" }, statusCode: 400);
+            if (body.Rating is < 1 or > 5)
+                return Results.Json(new { error = "rating deve ser 1..5" }, statusCode: 400);
+            if (!await repo.OrderBelongsToProfessionalAsync(body.OrderId, body.ProfessionalId, ct))
+                return Results.Json(new { error = "Pedido inválido para este profissional" }, statusCode: 400);
+            if (await repo.ProfessionalAlreadyReviewedClientAsync(body.OrderId, ct))
+                return Results.Json(new { error = "Profissional já avaliou este pedido" }, statusCode: 400);
+
+            try
+            {
+                return Results.Ok(await repo.AddProfessionalReviewOfClientAsync(body.OrderId, body.ProfessionalId, body.Review, body.Rating, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Json(new { error = ex.Message }, statusCode: 422);
+            }
+        });
+
         // ─── Portfolio ─────────────────────────────────────────────────────────
         app.MapGet("/portfolio", async (string? professionalId, IPortfolioRepository repo, CancellationToken ct) =>
         {
@@ -771,6 +827,9 @@ public static class ApiEndpoints
         // Phase 1 endpoints
         app.MapOrderEndpoints();
         app.MapProposalEndpoints();
+
+        // Phase 3 endpoints
+        app.MapDisputeEndpoints();
 
         return app;
     }
