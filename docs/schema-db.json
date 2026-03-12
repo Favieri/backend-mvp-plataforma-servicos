@@ -1261,6 +1261,66 @@
                     "type": "timestamp with time zone",
                     "default": "now()",
                     "nullable": false
+                },
+                {
+                    "name": "punctualityRating",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "qualityRating",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "communicationRating",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "cleanlinessRating",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "photoUrls",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professionalReviewOfClient",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professionalRatingOfClient",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "clientVisibleAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professionalVisibleAt",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "isVerified",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": false
                 }
             ],
             "indexes": [
@@ -1269,8 +1329,20 @@
                     "definition": "CREATE INDEX \"IX_Review_clientId_createdAt\" ON public.\"Review\" USING btree (\"clientId\", \"createdAt\")"
                 },
                 {
+                    "name": "IX_Review_clientVisibleAt",
+                    "definition": "CREATE INDEX \"IX_Review_clientVisibleAt\" ON public.\"Review\" USING btree (\"clientVisibleAt\") WHERE (\"clientVisibleAt\" IS NULL)"
+                },
+                {
                     "name": "IX_Review_professionalId",
                     "definition": "CREATE INDEX \"IX_Review_professionalId\" ON public.\"Review\" USING btree (\"professionalId\")"
+                },
+                {
+                    "name": "IX_Review_professionalRatingOfClient",
+                    "definition": "CREATE INDEX \"IX_Review_professionalRatingOfClient\" ON public.\"Review\" USING btree (\"professionalId\", \"professionalRatingOfClient\") WHERE (\"professionalRatingOfClient\" IS NOT NULL)"
+                },
+                {
+                    "name": "IX_Review_professionalVisibleAt",
+                    "definition": "CREATE INDEX \"IX_Review_professionalVisibleAt\" ON public.\"Review\" USING btree (\"professionalVisibleAt\") WHERE (\"professionalVisibleAt\" IS NULL)"
                 },
                 {
                     "name": "Review_clientId_idx",
@@ -1521,6 +1593,152 @@
                 "MigrationId"
             ],
             "foreign_keys": [
+            ]
+        },
+        {
+            "table": "dispute",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "client_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "reason",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "evidence_urls",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professional_response",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "professional_evidence_urls",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "resolution",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "resolved_by",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "refund_amount_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'opened'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "resolved_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_dispute_client_id",
+                    "definition": "CREATE INDEX \"IX_dispute_client_id\" ON public.dispute USING btree (client_id)"
+                },
+                {
+                    "name": "IX_dispute_order_id",
+                    "definition": "CREATE INDEX \"IX_dispute_order_id\" ON public.dispute USING btree (order_id)"
+                },
+                {
+                    "name": "IX_dispute_professional_id",
+                    "definition": "CREATE INDEX \"IX_dispute_professional_id\" ON public.dispute USING btree (professional_id)"
+                },
+                {
+                    "name": "IX_dispute_status",
+                    "definition": "CREATE INDEX \"IX_dispute_status\" ON public.dispute USING btree (status) WHERE (status <> ALL (ARRAY['resolved'::text, 'closed'::text]))"
+                },
+                {
+                    "name": "PK_dispute",
+                    "definition": "CREATE UNIQUE INDEX \"PK_dispute\" ON public.dispute USING btree (id)"
+                },
+                {
+                    "name": "UQ_dispute_order_id",
+                    "definition": "CREATE UNIQUE INDEX \"UQ_dispute_order_id\" ON public.dispute USING btree (order_id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "FK_dispute_client",
+                    "columns": [
+                        "client_id"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "FK_dispute_order",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
             ]
         },
         {
@@ -2671,6 +2889,10 @@
                 {
                     "name": "IX_proposal_valid_until",
                     "definition": "CREATE INDEX \"IX_proposal_valid_until\" ON public.proposal USING btree (valid_until)"
+                },
+                {
+                    "name": "IX_proposal_valid_until_status",
+                    "definition": "CREATE INDEX \"IX_proposal_valid_until_status\" ON public.proposal USING btree (valid_until, status) WHERE (status = 'sent'::text)"
                 },
                 {
                     "name": "PK_proposal",
