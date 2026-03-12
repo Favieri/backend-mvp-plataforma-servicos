@@ -149,3 +149,32 @@ public sealed record ProfessionalReviewClientRequest(
     string OrderId,
     string Review,
     int? Rating);
+
+// ─── Phase 4: Rebook + Recorrência ───────────────────────────────────────────
+
+/// <summary>
+/// Request body for POST /orders/rebook/{orderId}.
+/// Creates a new order copying the original's professional, service, and price.
+/// Optionally enrolls the client in a recurring plan with a discount.
+/// </summary>
+public sealed record RebookOrderRequest(
+    string ClientId,
+    string? ScheduledAt,
+    string? PaymentMethod,
+    int? Installments,
+    string? AddressId,
+    /// <summary>If true, a recurring plan is created automatically.</summary>
+    bool CreateRecurringPlan = false,
+    /// <summary>Billing frequency when CreateRecurringPlan = true. Default: monthly.</summary>
+    string Frequency = "monthly",
+    /// <summary>Recurring discount percentage (0–100). e.g. 10 = 10% off each recurrence.</summary>
+    int DiscountPercent = 0);
+
+/// <summary>Request body for PATCH /recurring-plans/{id}/pause.</summary>
+public sealed record PauseRecurringPlanRequest(string ClientId);
+
+/// <summary>Request body for PATCH /recurring-plans/{id}/resume.</summary>
+public sealed record ResumeRecurringPlanRequest(string ClientId);
+
+/// <summary>Request body for DELETE /recurring-plans/{id}.</summary>
+public sealed record CancelRecurringPlanRequest(string ClientId);

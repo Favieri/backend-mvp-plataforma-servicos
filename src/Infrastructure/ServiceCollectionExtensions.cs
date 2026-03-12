@@ -99,6 +99,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDisputeRepository, DisputeRepository>();
         services.AddHostedService<BackgroundJobs.ProposalExpirationJob>();
 
+        // Phase 4: recurring billing + rebook
+        services.AddScoped<IRecurringPlanRepository, RecurringPlanRepository>();
+        services.AddSingleton<BackgroundJobs.RecurringBillingJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.RecurringBillingJob>());
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();

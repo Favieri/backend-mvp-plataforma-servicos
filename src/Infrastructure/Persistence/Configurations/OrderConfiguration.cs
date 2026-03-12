@@ -42,6 +42,10 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.CancellationReason).HasColumnName("cancellationReason");
         builder.Property(x => x.AutoConfirmAt).HasColumnName("autoConfirmAt");
 
+        // ─── Phase 4: recurring + rebook ────────────────────────────────────
+        builder.Property(x => x.RecurringPlanId).HasColumnName("recurringPlanId");
+        builder.HasIndex(x => x.RecurringPlanId).HasFilter("\"recurringPlanId\" IS NOT NULL");
+
         // ─── Indexes ────────────────────────────────────────────────────────
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.ServiceId);
