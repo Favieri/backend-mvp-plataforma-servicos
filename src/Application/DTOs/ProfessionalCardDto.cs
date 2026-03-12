@@ -12,6 +12,13 @@ public sealed class ProfessionalCardDto
     public string? AvailabilityText { get; init; }
     public IReadOnlyList<ProfessionalServiceDto> Services { get; set; } = [];
     public IReadOnlyList<string> Zones { get; set; } = [];
+
+    // Phase 5: trust metrics + verification
+    public string VerificationStatus { get; init; } = "pending";
+    public IReadOnlyList<string> Badges { get; init; } = [];
+    public double? ResponseRate { get; init; }
+    public int? AvgResponseTimeMinutes { get; init; }
+    public double? CompletionRate { get; init; }
 }
 
 public sealed class ProfessionalServiceDto

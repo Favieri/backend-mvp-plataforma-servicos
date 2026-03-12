@@ -7,8 +7,16 @@ namespace Infrastructure.Repositories;
 
 public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessionalReadRepository
 {
-    public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(
+    public Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(
         string? zoneId, string? serviceId, CancellationToken ct)
+        => GetProfessionalsFilteredAsync(zoneId, serviceId, null, null, ct);
+
+    public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsFilteredAsync(
+        string? zoneId,
+        string? serviceId,
+        string? verificationStatus,
+        double? minRating,
+        CancellationToken ct)
     {
         var query =
             from p in ctx.Professionals.AsNoTracking()
@@ -28,18 +36,33 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                 ctx.ProfessionalServices.Any(ps => ps.ProfessionalId == x.p.Id && ps.ServiceId == serviceId));
         }
 
+        if (!string.IsNullOrWhiteSpace(verificationStatus))
+        {
+            query = query.Where(x => x.p.VerificationStatus == verificationStatus);
+        }
+
+        if (minRating.HasValue)
+        {
+            query = query.Where(x => x.p.Rating.HasValue && x.p.Rating >= minRating.Value);
+        }
+
         var professionals = await query
             .OrderBy(x => x.p.Id)
-            .Select(x => new ProfessionalCardDto
+            .Select(x => new
             {
-                Id = x.p.Id,
-                UserId = x.p.UserId,
+                x.p.Id,
+                x.p.UserId,
                 Name = x.u.Name,
-                AvatarUrl = x.p.AvatarUrl,
-                Rating = x.p.Rating,
-                Active = x.p.Active,
-                CompletedJobsCount = x.p.CompletedJobsCount,
-                AvailabilityText = x.p.AvailabilityText
+                x.p.AvatarUrl,
+                x.p.Rating,
+                x.p.Active,
+                x.p.CompletedJobsCount,
+                x.p.AvailabilityText,
+                x.p.VerificationStatus,
+                x.p.Badges,
+                x.p.ResponseRate,
+                x.p.AvgResponseTimeMinutes,
+                x.p.CompletionRate
             })
             .ToListAsync(ct);
 
@@ -102,6 +125,13 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             Active = p.Active,
             CompletedJobsCount = p.CompletedJobsCount,
             AvailabilityText = p.AvailabilityText,
+            VerificationStatus = p.VerificationStatus ?? "pending",
+            Badges = p.Badges != null
+                ? p.Badges.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                : [],
+            ResponseRate = p.ResponseRate,
+            AvgResponseTimeMinutes = p.AvgResponseTimeMinutes,
+            CompletionRate = p.CompletionRate,
             Services = servicesByProfessional.GetValueOrDefault(p.Id) ?? [],
             Zones = zonesByProfessional.GetValueOrDefault(p.Id) ?? []
         }).ToList();

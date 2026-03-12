@@ -31,6 +31,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     // Phase 4: recurring plans + occurrences
     public DbSet<RecurringPlan> RecurringPlans => Set<RecurringPlan>();
     public DbSet<RecurringOccurrence> RecurringOccurrences => Set<RecurringOccurrence>();
+    // Phase 5: verification + trust metrics
+    public DbSet<ProfessionalVerification> ProfessionalVerifications => Set<ProfessionalVerification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
