@@ -54,21 +54,26 @@ public sealed class ProfessionalRepository(AppDbContext ctx) : IProfessionalRepo
             .OrderByDescending(x => x.p.Active)
             .ThenByDescending(x => x.p.Rating.HasValue ? 1 : 0)
             .ThenByDescending(x => x.p.Rating)
-            .Select(x => new ProfessionalCardDto
+            .Select(x => new
             {
-                Id = x.p.Id,
-                UserId = x.p.UserId,
+                x.p.Id,
+                x.p.UserId,
                 Name = x.u.Name,
-                AvatarUrl = x.p.AvatarUrl,
-                Rating = x.p.Rating,
-                Active = x.p.Active,
-                CompletedJobsCount = x.p.CompletedJobsCount,
-                AvailabilityText = x.p.AvailabilityText
+                x.p.AvatarUrl,
+                x.p.Rating,
+                x.p.Active,
+                x.p.CompletedJobsCount,
+                x.p.AvailabilityText,
+                x.p.VerificationStatus,
+                x.p.Badges,
+                x.p.ResponseRate,
+                x.p.AvgResponseTimeMinutes,
+                x.p.CompletionRate
             })
             .ToListAsync(ct);
 
         if (professionals.Count == 0)
-            return professionals;
+            return [];
 
         var professionalIds = professionals.Select(x => x.Id).Distinct().ToArray();
 
@@ -115,12 +120,25 @@ public sealed class ProfessionalRepository(AppDbContext ctx) : IProfessionalRepo
                 g => (IReadOnlyList<string>)g.Select(z => z.ZoneId).Distinct(StringComparer.Ordinal).ToList(),
                 StringComparer.Ordinal);
 
-        foreach (var p in professionals)
+        return professionals.Select(p => new ProfessionalCardDto
         {
-            p.Services = servicesByProfessional.GetValueOrDefault(p.Id, []);
-            p.Zones = zonesByProfessional.GetValueOrDefault(p.Id, []);
-        }
-
-        return professionals;
+            Id = p.Id,
+            UserId = p.UserId,
+            Name = p.Name,
+            AvatarUrl = p.AvatarUrl,
+            Rating = p.Rating,
+            Active = p.Active,
+            CompletedJobsCount = p.CompletedJobsCount,
+            AvailabilityText = p.AvailabilityText,
+            VerificationStatus = p.VerificationStatus ?? "pending",
+            Badges = p.Badges != null
+                ? p.Badges.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                : [],
+            ResponseRate = p.ResponseRate,
+            AvgResponseTimeMinutes = p.AvgResponseTimeMinutes,
+            CompletionRate = p.CompletionRate,
+            Services = servicesByProfessional.GetValueOrDefault(p.Id, []),
+            Zones = zonesByProfessional.GetValueOrDefault(p.Id, [])
+        }).ToList();
     }
 }

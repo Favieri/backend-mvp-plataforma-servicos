@@ -17,14 +17,23 @@ public static class ApiEndpoints
         app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "v1" }));
 
          //─── Public marketplace(cached) ───────────────────────────────────────
+        // Phase 5: suporta filtros ?verificationStatus=verified&minRating=4.5 além dos filtros base
         app.MapGet("/professionals", async (
-            HttpRequest req, string? zoneId, string? serviceId,
+            HttpRequest req,
+            string? zoneId, string? serviceId,
+            string? verificationStatus, double? minRating,
             IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("HomeEndpoints");
-            var cacheKey = $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
+            var hasExtraFilters = !string.IsNullOrWhiteSpace(verificationStatus) || minRating.HasValue;
+            var cacheKey = hasExtraFilters
+                ? $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:vs={verificationStatus ?? "*"}:mr={minRating}"
+                : $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
             var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
-                () => repo.GetProfessionalsAsync(zoneId, serviceId, ct), logger, ct);
+                () => hasExtraFilters
+                    ? repo.GetProfessionalsFilteredAsync(zoneId, serviceId, verificationStatus, minRating, ct)
+                    : repo.GetProfessionalsAsync(zoneId, serviceId, ct),
+                logger, ct);
             return Results.Ok(professionals);
         });
 
@@ -833,6 +842,9 @@ public static class ApiEndpoints
 
         // Phase 4 endpoints
         app.MapRecurringEndpoints();
+
+        // Phase 5 endpoints
+        app.MapVerificationEndpoints();
 
         return app;
     }

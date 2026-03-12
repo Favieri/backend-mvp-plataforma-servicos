@@ -104,6 +104,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BackgroundJobs.RecurringBillingJob>();
         services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.RecurringBillingJob>());
 
+        // Phase 5: verification + trust metrics
+        services.AddScoped<IProfessionalVerificationRepository, ProfessionalVerificationRepository>();
+        services.AddScoped<ITrustMetricsService, Infrastructure.Services.TrustMetricsService>();
+        services.AddSingleton<BackgroundJobs.TrustMetricsJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.TrustMetricsJob>());
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();
