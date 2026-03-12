@@ -43,3 +43,54 @@ public sealed record CreateBlockRequest(string ProfessionalId, string StartsAt, 
 
 // Order Ignores
 public sealed record CreateOrderIgnoreRequest(string ProfessionalId, string OrderId);
+
+// ─── Phase 1: Order + Proposal ──────────────────────────────────────────────
+
+// Direct booking (Tier 1)
+public sealed record CreateBookingRequest(
+    string ClientId,
+    string ProfessionalId,
+    string ServiceId,
+    int TierId,
+    int PriceTotalCents,
+    int SignalCents,
+    int BalanceCents,
+    int Installments,
+    string? PaymentMethod,
+    string? Scope,
+    string? ScheduledAt,
+    string? ConversationId,
+    string? AddressId,
+    string? Description);
+
+// Order from accepted proposal (Tier 2/3)
+public sealed record CreateFromProposalRequest(
+    string ClientId,
+    int? Installments,
+    string? PaymentMethod,
+    string? AddressId);
+
+// Status transition (with actor)
+public sealed record UpdateOrderStatusRequest(string ActorId, string ActorRole, string NewStatus, string? Reason);
+
+// Proposals
+public sealed record CreateProposalRequest(
+    string ProfessionalId,
+    string ClientId,
+    string ServiceId,
+    string Scope,
+    int PriceTotalCents,
+    string ValidUntil,
+    string? ProfessionalServiceId,
+    string? ConversationId,
+    string? IncludesDescription,
+    string? ExcludesDescription,
+    string? PriceByStage,
+    string? DurationEstimate,
+    string? SuggestedDatetime,
+    int VisitFeeCents);
+
+public sealed record SendProposalRequest(string ProfessionalId);
+public sealed record AcceptProposalRequest(string ClientId, string? PaymentMethod, int? Installments);
+public sealed record RejectProposalRequest(string ClientId, string? Reason);
+public sealed record NegotiateProposalRequest(string ActorId, string ActorRole, string? CounterScope, int? CounterPriceCents);

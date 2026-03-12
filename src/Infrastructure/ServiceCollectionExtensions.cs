@@ -83,6 +83,11 @@ public static class ServiceCollectionExtensions
         // Service catalog (tiers + categories)
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
 
+        // Phase 1: proposals, timeline, payment orchestration
+        services.AddScoped<IProposalRepository, ProposalRepository>();
+        services.AddScoped<IOrderTimelineRepository, OrderTimelineRepository>();
+        services.AddScoped<Application.Services.PaymentOrchestrationService>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();
