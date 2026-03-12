@@ -623,6 +623,12 @@
                     "type": "timestamp without time zone",
                     "default": null,
                     "nullable": true
+                },
+                {
+                    "name": "recurringPlanId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -643,6 +649,10 @@
                     "definition": "CREATE INDEX \"IX_Order_professionalId\" ON public.\"Order\" USING btree (\"professionalId\")"
                 },
                 {
+                    "name": "IX_Order_recurringPlanId",
+                    "definition": "CREATE INDEX \"IX_Order_recurringPlanId\" ON public.\"Order\" USING btree (\"recurringPlanId\") WHERE (\"recurringPlanId\" IS NOT NULL)"
+                },
+                {
                     "name": "IX_Order_serviceId",
                     "definition": "CREATE INDEX \"IX_Order_serviceId\" ON public.\"Order\" USING btree (\"serviceId\")"
                 },
@@ -659,6 +669,16 @@
                 "id"
             ],
             "foreign_keys": [
+                {
+                    "name": "FK_Order_recurringPlan",
+                    "columns": [
+                        "recurringPlanId"
+                    ],
+                    "references_table": "recurring_plan",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
                 {
                     "name": "Order_clientId_fkey",
                     "columns": [
@@ -2903,6 +2923,258 @@
                 "id"
             ],
             "foreign_keys": [
+            ]
+        },
+        {
+            "table": "recurring_occurrence",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "plan_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "occurrence_number",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "scheduled_for",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'pending'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "failure_reason",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_recurring_occurrence_order_id",
+                    "definition": "CREATE INDEX \"IX_recurring_occurrence_order_id\" ON public.recurring_occurrence USING btree (order_id) WHERE (order_id IS NOT NULL)"
+                },
+                {
+                    "name": "IX_recurring_occurrence_plan_id",
+                    "definition": "CREATE INDEX \"IX_recurring_occurrence_plan_id\" ON public.recurring_occurrence USING btree (plan_id, occurrence_number)"
+                },
+                {
+                    "name": "PK_recurring_occurrence",
+                    "definition": "CREATE UNIQUE INDEX \"PK_recurring_occurrence\" ON public.recurring_occurrence USING btree (id)"
+                },
+                {
+                    "name": "UQ_recurring_occurrence_plan_num",
+                    "definition": "CREATE UNIQUE INDEX \"UQ_recurring_occurrence_plan_num\" ON public.recurring_occurrence USING btree (plan_id, occurrence_number)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "FK_recurring_occurrence_order",
+                    "columns": [
+                        "order_id"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "FK_recurring_occurrence_plan",
+                    "columns": [
+                        "plan_id"
+                    ],
+                    "references_table": "recurring_plan",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
+            "table": "recurring_plan",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "client_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "service_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "source_order_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "frequency",
+                    "type": "text",
+                    "default": "'monthly'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "price_total_cents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "discount_percent",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "payment_method",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "scope",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "address_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'active'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "next_billing_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "occurrence_count",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "started_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "paused_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "cancelled_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_recurring_plan_client_id",
+                    "definition": "CREATE INDEX \"IX_recurring_plan_client_id\" ON public.recurring_plan USING btree (client_id)"
+                },
+                {
+                    "name": "IX_recurring_plan_next_billing_at_status",
+                    "definition": "CREATE INDEX \"IX_recurring_plan_next_billing_at_status\" ON public.recurring_plan USING btree (next_billing_at, status) WHERE (status = 'active'::text)"
+                },
+                {
+                    "name": "IX_recurring_plan_professional_id",
+                    "definition": "CREATE INDEX \"IX_recurring_plan_professional_id\" ON public.recurring_plan USING btree (professional_id)"
+                },
+                {
+                    "name": "PK_recurring_plan",
+                    "definition": "CREATE UNIQUE INDEX \"PK_recurring_plan\" ON public.recurring_plan USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "FK_recurring_plan_client",
+                    "columns": [
+                        "client_id"
+                    ],
+                    "references_table": "User",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "FK_recurring_plan_source_order",
+                    "columns": [
+                        "source_order_id"
+                    ],
+                    "references_table": "Order",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
             ]
         }
     ],
