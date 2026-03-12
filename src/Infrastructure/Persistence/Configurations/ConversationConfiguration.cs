@@ -21,9 +21,13 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
         builder.Property(x => x.ClientLastReadAt).HasColumnName("clientLastReadAt");
         builder.Property(x => x.ProfessionalLastReadAt).HasColumnName("professionalLastReadAt");
 
+        // Phase 2: conversation status
+        builder.Property(x => x.Status).HasColumnName("status").IsRequired().HasDefaultValue("active");
+
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.ProfessionalId);
         builder.HasIndex(x => new { x.ClientId, x.ProfessionalId });
         builder.HasIndex(x => x.OrderId).IsUnique();
+        builder.HasIndex(x => x.Status);
     }
 }
