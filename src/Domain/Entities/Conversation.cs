@@ -7,4 +7,6 @@ public sealed record Conversation(
     string ProfessionalId,
     DateTime CreatedAt,
     DateTime? ClientLastReadAt,
-    DateTime? ProfessionalLastReadAt);
+    DateTime? ProfessionalLastReadAt,
+    // Phase 2: conversation state
+    string Status = "active");

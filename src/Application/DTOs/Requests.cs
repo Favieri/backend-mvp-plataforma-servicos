@@ -23,8 +23,24 @@ public sealed record UpdateProfessionalZonesRequest(string ProfessionalId, strin
 
 // Conversations & Messages
 public sealed record CreateConversationRequest(string ClientId, string ProfessionalId, string? OrderId, string? AppointmentId);
-public sealed record SendMessageRequest(string ConversationId, string SenderId, string Text);
+
+// Phase 2: extended message with type, metadata and reply
+public sealed record SendMessageRequest(
+    string ConversationId,
+    string SenderId,
+    string Text,
+    string? Type = null,        // defaults to "text" if null
+    string? Metadata = null,    // JSON string for structured action payloads
+    string? ReplyToId = null);  // FK to Message.id being replied to
+
 public sealed record MarkReadRequest(string ConversationId, string UserId);
+
+// Phase 2: update conversation status
+public sealed record UpdateConversationStatusRequest(string Status);
+
+// Phase 2: transactional chat actions sent as messages
+public sealed record SendProposalMessageRequest(string ConversationId, string SenderId, string ProposalId);
+public sealed record SuggestScheduleRequest(string ConversationId, string SenderId, string SuggestedDatetime, string? Note);
 
 // Reviews
 public sealed record CreateReviewRequest(string ProfessionalId, string ClientId, string? OrderId, string? AppointmentId, int Rating, string? Comment);

@@ -1,4 +1,5 @@
 using Application.Abstractions;
+using Application.Services;
 using Infrastructure.Data;
 using Infrastructure.Email;
 using Infrastructure.Persistence;
@@ -87,6 +88,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProposalRepository, ProposalRepository>();
         services.AddScoped<IOrderTimelineRepository, OrderTimelineRepository>();
         services.AddScoped<IPaymentOrchestrationService, Infrastructure.Services.PaymentOrchestrationService>();
+
+        // Phase 2: chat transactional — anti-leak, contact masking, attachments
+        services.AddSingleton<IAntiLeakDetectionService, AntiLeakDetectionService>();
+        services.AddSingleton<IContactMaskingService, ContactMaskingService>();
+        services.AddScoped<IMessageAttachmentRepository, MessageAttachmentRepository>();
+        services.AddScoped<IAttachmentStorageRepository, AttachmentStorageRepository>();
 
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
