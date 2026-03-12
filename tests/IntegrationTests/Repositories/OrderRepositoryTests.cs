@@ -100,7 +100,6 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         var result = await _repo.GetOrdersAsync(null, null, null, false, CancellationToken.None);
         Assert.True(result[0].CreatedAt >= result[1].CreatedAt);
     }
-}
 
     // ─── Phase 1 Tests ────────────────────────────────────────────────────────
 
@@ -203,3 +202,4 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         var results = await _repo.GetOrdersAwaitingAutoConfirmAsync(DateTime.UtcNow, CancellationToken.None);
         Assert.Contains(results, o => o.Id == order.Id);
     }
+}
