@@ -12,4 +12,32 @@ public interface IReviewRepository
     Task<bool> OrderBelongsToClientAsync(string orderId, string clientId, CancellationToken ct);
     Task<string?> GetProfessionalUserIdAsync(string professionalId, CancellationToken ct);
     Task<IReadOnlyList<object>> GetEligibleOrdersAsync(string clientId, string professionalId, CancellationToken ct);
+
+    // ─── Phase 3: expanded review creation (categories + photos) ────────────
+    Task<object> CreateExpandedAsync(
+        string professionalId,
+        string clientId,
+        string orderId,
+        int rating,
+        string? comment,
+        int? punctualityRating,
+        int? qualityRating,
+        int? communicationRating,
+        int? cleanlinessRating,
+        string? photoUrls,
+        bool isVerified,
+        CancellationToken ct);
+
+    // ─── Phase 3: professional reviews client ────────────────────────────────
+    Task<bool> OrderBelongsToProfessionalAsync(string orderId, string professionalId, CancellationToken ct);
+    Task<bool> ProfessionalAlreadyReviewedClientAsync(string orderId, CancellationToken ct);
+    Task<object> AddProfessionalReviewOfClientAsync(
+        string orderId,
+        string professionalId,
+        string review,
+        int? rating,
+        CancellationToken ct);
+
+    // ─── Phase 3: double-blind visibility unlock ─────────────────────────────
+    Task UnlockDoubleBlindIfReadyAsync(string orderId, CancellationToken ct);
 }

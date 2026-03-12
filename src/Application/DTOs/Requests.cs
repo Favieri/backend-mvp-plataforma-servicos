@@ -110,3 +110,42 @@ public sealed record SendProposalRequest(string ProfessionalId);
 public sealed record AcceptProposalRequest(string ClientId, string? PaymentMethod, int? Installments);
 public sealed record RejectProposalRequest(string ClientId, string? Reason);
 public sealed record NegotiateProposalRequest(string ActorId, string ActorRole, string? CounterScope, int? CounterPriceCents);
+
+// ─── Phase 3: Disputes ───────────────────────────────────────────────────────
+
+public sealed record OpenDisputeRequest(
+    string OrderId,
+    string ClientId,
+    string Reason,
+    string? Description,
+    string[]? EvidenceUrls);    // photo/file URLs already uploaded to storage
+
+public sealed record RespondDisputeRequest(
+    string ProfessionalId,
+    string Response,
+    string[]? EvidenceUrls);
+
+public sealed record ResolveDisputeRequest(
+    string Resolution,
+    string ResolvedBy,          // system | mediator | agreement
+    int? RefundAmountCents);
+
+// ─── Phase 3: Expanded Reviews ───────────────────────────────────────────────
+
+public sealed record CreateExpandedReviewRequest(
+    string ProfessionalId,
+    string ClientId,
+    string OrderId,
+    int Rating,
+    string? Comment,
+    int? PunctualityRating,
+    int? QualityRating,
+    int? CommunicationRating,
+    int? CleanlinessRating,
+    string[]? PhotoUrls);
+
+public sealed record ProfessionalReviewClientRequest(
+    string ProfessionalId,
+    string OrderId,
+    string Review,
+    int? Rating);

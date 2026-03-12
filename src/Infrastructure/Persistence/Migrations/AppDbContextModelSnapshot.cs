@@ -268,6 +268,31 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.ToTable("ProfessionalZone");
         });
 
+        modelBuilder.Entity("Domain.Entities.Dispute", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("OrderId").IsRequired().HasColumnName("order_id");
+            b.Property<string>("ClientId").IsRequired().HasColumnName("client_id");
+            b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professional_id");
+            b.Property<string>("Reason").IsRequired().HasColumnName("reason");
+            b.Property<string>("Description").IsRequired(false).HasColumnName("description");
+            b.Property<string>("EvidenceUrls").IsRequired(false).HasColumnName("evidence_urls").HasColumnType("jsonb");
+            b.Property<string>("ProfessionalResponse").IsRequired(false).HasColumnName("professional_response");
+            b.Property<string>("ProfessionalEvidenceUrls").IsRequired(false).HasColumnName("professional_evidence_urls").HasColumnType("jsonb");
+            b.Property<string>("Resolution").IsRequired(false).HasColumnName("resolution");
+            b.Property<string>("ResolvedBy").IsRequired(false).HasColumnName("resolved_by");
+            b.Property<int?>("RefundAmountCents").HasColumnName("refund_amount_cents");
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("opened");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime?>("ResolvedAt").HasColumnName("resolved_at");
+            b.HasKey("Id");
+            b.HasIndex("OrderId").IsUnique().HasDatabaseName("IX_dispute_order_id");
+            b.HasIndex("ProfessionalId").HasDatabaseName("IX_dispute_professional_id");
+            b.HasIndex("ClientId").HasDatabaseName("IX_dispute_client_id");
+            b.HasIndex("Status").HasDatabaseName("IX_dispute_status");
+            b.ToTable("dispute");
+        });
+
         modelBuilder.Entity("Domain.Entities.Review", b =>
         {
             b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
@@ -277,6 +302,21 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("OrderId").IsRequired().HasColumnName("orderId");
             b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professionalId");
             b.Property<int>("Rating").IsRequired().HasColumnName("rating");
+            // Phase 3: expanded categories
+            b.Property<int?>("PunctualityRating").HasColumnName("punctualityRating");
+            b.Property<int?>("QualityRating").HasColumnName("qualityRating");
+            b.Property<int?>("CommunicationRating").HasColumnName("communicationRating");
+            b.Property<int?>("CleanlinessRating").HasColumnName("cleanlinessRating");
+            // Phase 3: photos
+            b.Property<string>("PhotoUrls").IsRequired(false).HasColumnName("photoUrls").HasColumnType("jsonb");
+            // Phase 3: professional reviews client
+            b.Property<string>("ProfessionalReviewOfClient").IsRequired(false).HasColumnName("professionalReviewOfClient");
+            b.Property<int?>("ProfessionalRatingOfClient").HasColumnName("professionalRatingOfClient");
+            // Phase 3: double-blind
+            b.Property<DateTime?>("ClientVisibleAt").HasColumnName("clientVisibleAt");
+            b.Property<DateTime?>("ProfessionalVisibleAt").HasColumnName("professionalVisibleAt");
+            // Phase 3: verified
+            b.Property<bool>("IsVerified").IsRequired().HasColumnName("isVerified").HasDefaultValue(false);
             b.HasKey("Id");
             b.HasIndex("ClientId", "CreatedAt").HasDatabaseName("IX_Review_clientId_createdAt");
             b.HasIndex("OrderId").IsUnique();

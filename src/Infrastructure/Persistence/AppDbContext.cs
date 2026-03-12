@@ -26,6 +26,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<OrderTimeline> OrderTimelines => Set<OrderTimeline>();
     // Phase 2: chat transactional
     public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+    // Phase 3: dispute + expanded review
+    public DbSet<Dispute> Disputes => Set<Dispute>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
