@@ -52,6 +52,12 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<DbBackpressureMiddleware>();
 app.UseMiddleware<SupabaseAuthMiddleware>();
 
+// CORS e Routing devem vir ANTES do ExceptionHandler para que respostas de erro
+// (500, 404, etc.) incluam os headers CORS. Sem isso, o browser reporta "CORS error"
+// em vez do erro real, dificultando diagnóstico e quebrando o fluxo do front-end.
+app.UseRouting();
+app.UseCors("default");
+
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
     exceptionHandlerApp.Run(async context =>
@@ -68,20 +74,18 @@ app.UseExceptionHandler(exceptionHandlerApp =>
     });
 });
 
-app.UseRouting();
-app.UseCors("default");
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-var apiGroup = app.MapGroup(string.Empty).RequireCors("default");
-apiGroup.MapMarketplaceEndpoints();
-
+// OPTIONS preflight antes do grupo de endpoints para garantir resposta correta ao browser
 app.MapMethods("/{**path}", ["OPTIONS"], () => Results.NoContent())
     .RequireCors("default");
+
+var apiGroup = app.MapGroup(string.Empty).RequireCors("default");
+apiGroup.MapMarketplaceEndpoints();
 
 app.Run();
 

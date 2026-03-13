@@ -21,6 +21,9 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
         var valid = BCrypt.Net.BCrypt.Verify(password, row.Senha);
         if (!valid) return null;
 
+        // Retorna apenas dados do usuário. A geração de JWT é responsabilidade
+        // da camada de API (endpoint /auth em ApiEndpoints.cs) para manter
+        // separação de responsabilidades e evitar dependência de JWT na Infrastructure.
         return new
         {
             id = row.Id,
