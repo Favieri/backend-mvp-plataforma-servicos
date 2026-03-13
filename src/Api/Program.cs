@@ -47,16 +47,15 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// CORS deve rodar cedo no pipeline para garantir headers em respostas geradas
+// por middlewares anteriores aos endpoints (incluindo falhas 500).
+app.UseRouting();
+app.UseCors("default");
+
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<DbBackpressureMiddleware>();
 app.UseMiddleware<SupabaseAuthMiddleware>();
-
-// CORS e Routing devem vir ANTES do ExceptionHandler para que respostas de erro
-// (500, 404, etc.) incluam os headers CORS. Sem isso, o browser reporta "CORS error"
-// em vez do erro real, dificultando diagnóstico e quebrando o fluxo do front-end.
-app.UseRouting();
-app.UseCors("default");
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
