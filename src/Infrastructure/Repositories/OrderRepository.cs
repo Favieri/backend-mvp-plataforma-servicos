@@ -71,6 +71,8 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 
     public async Task<IReadOnlyList<object>> GetMineAsync(string clientId, CancellationToken ct)
     {
+        // Inclui service.name, professional.name, location e totalCents para que o
+        // front-end possa exibir os dados completos na listagem de pedidos.
         var rows = await ctx.Orders
             .AsNoTracking()
             .Where(o => o.ClientId == clientId)
@@ -79,8 +81,25 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             {
                 id = o.Id,
                 status = o.Status,
-                scheduledAt = o.Date,
-                createdAt = o.CreatedAt
+                scheduledAt = o.ScheduledAt ?? o.Date,
+                createdAt = o.CreatedAt,
+                location = o.Location,
+                totalCents = o.PriceTotalCents,
+                service = ctx.Services
+                    .Where(s => s.Id == o.ServiceId)
+                    .Select(s => new { id = s.Id, name = s.Name })
+                    .FirstOrDefault(),
+                professional = o.ProfessionalId != null
+                    ? ctx.Professionals
+                        .Where(p => p.Id == o.ProfessionalId)
+                        .Select(p => new
+                        {
+                            id = p.Id,
+                            avatarUrl = p.AvatarUrl,
+                            name = ctx.Users.Where(u => u.Id == p.UserId).Select(u => u.Name).FirstOrDefault()
+                        })
+                        .FirstOrDefault()
+                    : null
             })
             .ToListAsync(ct);
 

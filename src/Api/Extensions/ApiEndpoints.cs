@@ -5,6 +5,10 @@ using Domain.Enums;
 using FluentValidation;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 
 namespace Api.Extensions;
@@ -100,10 +104,47 @@ public static class ApiEndpoints
             Results.Redirect($"/bootstrap{ctx.Request.QueryString}"));
 
         // ─── Auth ──────────────────────────────────────────────────────────────
-        app.MapPost("/auth", async (LoginRequest body, IAuthRepository db, CancellationToken ct) =>
+        app.MapPost("/auth", async (LoginRequest body, IAuthRepository db, IConfiguration config, CancellationToken ct) =>
         {
-            var user = await db.LoginAsync(body.Email, body.Senha, ct);
-            return user is null ? Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401) : Results.Ok(user);
+            var userObj = await db.LoginAsync(body.Email, body.Senha, ct);
+            if (userObj is null)
+                return Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401);
+
+            // Geração de JWT na camada de API (camada Infrastructure não tem dep. de JWT)
+            // O front-end usa esse token para enviar Authorization: Bearer <token>.
+            // O SupabaseAuthMiddleware valida usando o mesmo SUPABASE_JWT_SECRET.
+            var jwtSecret = config["SUPABASE_JWT_SECRET"];
+            string? token = null;
+            if (!string.IsNullOrWhiteSpace(jwtSecret))
+            {
+                // Serializar o objeto anônimo para extrair campos de forma segura
+                var userJson = JsonSerializer.Serialize(userObj);
+                using var userDoc = JsonDocument.Parse(userJson);
+                var root = userDoc.RootElement;
+                var userId = root.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
+                var email = root.TryGetProperty("email", out var emailEl) ? emailEl.GetString() ?? "" : "";
+                var role = root.TryGetProperty("role", out var roleEl) ? roleEl.GetString() ?? "" : "";
+
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                var claims = new[]
+                {
+                    new Claim(JwtRegisteredClaimNames.Sub, userId),
+                    new Claim(JwtRegisteredClaimNames.Email, email),
+                    new Claim("role", role),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                };
+                var jwtToken = new JwtSecurityToken(
+                    issuer: "jobeasy",
+                    audience: "jobeasy",
+                    claims: claims,
+                    notBefore: DateTime.UtcNow,
+                    expires: DateTime.UtcNow.AddDays(7),
+                    signingCredentials: creds);
+                token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
+            }
+
+            return Results.Ok(new { token, user = userObj });
         });
 
         // ─── Users ─────────────────────────────────────────────────────────────

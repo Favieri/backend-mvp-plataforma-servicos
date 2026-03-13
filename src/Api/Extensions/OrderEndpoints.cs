@@ -3,8 +3,12 @@ using Application.DTOs;
 using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace Api.Extensions;
 
@@ -14,6 +18,62 @@ public static class OrderEndpoints
 
     public static IEndpointRouteBuilder MapOrderEndpoints(this IEndpointRouteBuilder app)
     {
+        // ─── GET /orders/{id} — detalhe enriquecido do pedido ─────────────────
+        // Retorna order + professional (com nome via User) + service + client + timeline.
+        // Endpoint estava ausente: o front-end chamava GET /orders/{id} e recebia 404.
+        app.MapGet("/orders/{id}", async (
+            string id,
+            IOrderRepository orderRepo,
+            IOrderTimelineRepository timeline,
+            AppDbContext ctx,
+            CancellationToken ct) =>
+        {
+            var order = await orderRepo.GetByIdAsync(id, ct);
+            if (order is null)
+                return Results.NotFound(new { error = "Pedido não encontrado" });
+
+            var events = await timeline.GetByOrderIdAsync(id, ct);
+
+            var professional = order.ProfessionalId is not null
+                ? await ctx.Professionals.AsNoTracking()
+                    .Where(p => p.Id == order.ProfessionalId)
+                    .Select(p => new
+                    {
+                        id = p.Id,
+                        userId = p.UserId,
+                        avatarUrl = p.AvatarUrl,
+                        name = ctx.Users.Where(u => u.Id == p.UserId).Select(u => u.Name).FirstOrDefault()
+                    })
+                    .FirstOrDefaultAsync(ct)
+                : null;
+
+            var service = await ctx.Services.AsNoTracking()
+                .Where(s => s.Id == order.ServiceId)
+                .Select(s => new { id = s.Id, name = s.Name })
+                .FirstOrDefaultAsync(ct);
+
+            var client = await ctx.Users.AsNoTracking()
+                .Where(u => u.Id == order.ClientId)
+                .Select(u => new { id = u.Id, name = u.Name })
+                .FirstOrDefaultAsync(ct);
+
+            return Results.Ok(new
+            {
+                id = order.Id,
+                status = order.Status,
+                createdAt = order.CreatedAt,
+                scheduledAt = order.ScheduledAt ?? order.Date,
+                totalCents = order.PriceTotalCents,
+                depositCents = order.SignalCents,
+                notes = order.Description,
+                location = order.Location,
+                professional,
+                client,
+                service,
+                timeline = events
+            });
+        });
+
         // ─── POST /orders/booking — Tier 1 direct booking ─────────────────────
         app.MapPost("/orders/booking", async (
             CreateBookingRequest body,
@@ -175,16 +235,21 @@ public static class OrderEndpoints
         });
 
         // ─── POST /orders/{id}/confirm-completion — cliente confirma conclusão ─
+        // clientId aceito por prioridade: (1) claim Sub do JWT, (2) query param ?clientId=
         app.MapPost("/orders/{id}/confirm-completion", async (
             string id,
-            HttpRequest req,
+            HttpContext context,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             CancellationToken ct) =>
         {
-            var clientId = req.Query["clientId"].FirstOrDefault();
+            // Prioridade: JWT claim > query param (retrocompatibilidade)
+            var clientId = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                        ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                        ?? context.Request.Query["clientId"].FirstOrDefault();
+
             if (string.IsNullOrWhiteSpace(clientId))
-                return Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400);
+                return Results.Json(new { error = "clientId é obrigatório (envie via JWT ou ?clientId=)" }, statusCode: 400);
 
             var order = await orderRepo.GetByIdAsync(id, ct);
             if (order is null)
@@ -207,17 +272,43 @@ public static class OrderEndpoints
         });
 
         // ─── POST /orders/{id}/dispute — abrir disputa ────────────────────────
+        // clientId aceito via JWT, query param ou body JSON.
+        // reason aceito via body JSON (campo "reason") ou query param.
         app.MapPost("/orders/{id}/dispute", async (
             string id,
-            HttpRequest req,
+            HttpContext context,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             CancellationToken ct) =>
         {
-            var clientId = req.Query["clientId"].FirstOrDefault();
-            var reason = req.Query["reason"].FirstOrDefault();
+            // Ler body JSON para clientId e reason (evita binding de tipo privado)
+            string? bodyClientId = null;
+            string? bodyReason = null;
+            if (context.Request.HasJsonContentType())
+            {
+                try
+                {
+                    using var bodyDoc = await System.Text.Json.JsonDocument.ParseAsync(
+                        context.Request.Body, cancellationToken: ct);
+                    var bodyRoot = bodyDoc.RootElement;
+                    if (bodyRoot.TryGetProperty("clientId", out var cEl))
+                        bodyClientId = cEl.GetString();
+                    if (bodyRoot.TryGetProperty("reason", out var rEl))
+                        bodyReason = rEl.GetString();
+                }
+                catch { /* fallback silencioso */ }
+            }
+
+            var clientId = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                        ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                        ?? bodyClientId
+                        ?? context.Request.Query["clientId"].FirstOrDefault();
+
+            var reason = bodyReason
+                      ?? context.Request.Query["reason"].FirstOrDefault();
+
             if (string.IsNullOrWhiteSpace(clientId))
-                return Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400);
+                return Results.Json(new { error = "clientId é obrigatório (envie via JWT, body ou ?clientId=)" }, statusCode: 400);
 
             var order = await orderRepo.GetByIdAsync(id, ct);
             if (order is null)
@@ -235,7 +326,7 @@ public static class OrderEndpoints
                 eventType: "dispute_opened",
                 actorId: clientId,
                 actorRole: ActorRole.Client,
-                metadata: reason is not null ? $"{{\"reason\":\"{reason}\"}}" : null), ct);
+                metadata: reason is not null ? $"{{\"reason\":\"{reason.Replace("\"", "\\\"")}\"}}": null), ct);
 
             return Results.Ok(new { ok = true, status = OrderStatus.Disputed });
         });
