@@ -985,7 +985,7 @@ Atualiza status da conversa.
 ### POST /messages
 Envia mensagem em uma conversa.
 
-**Request Body:**
+**Request Body (JSON object):**
 ```json
 {
   "conversationId": "string",
@@ -997,7 +997,21 @@ Envia mensagem em uma conversa.
 }
 ```
 
+> ✅ Formato recomendado no frontend: enviar um **objeto JSON** (não stringificar o objeto inteiro).
+>
+> Exemplo correto:
+> ```json
+> {"conversationId":"...","senderId":"...","text":"tst"}
+> ```
+>
+> O backend agora também aceita, por compatibilidade, payload duplamente serializado (ex.: `"{\"conversationId\":...}"`).
+
 **Response 200:** `Message` criada.
+
+**Erros esperados:**
+- `400` quando `conversationId`, `senderId` ou `text` não são enviados/parseados corretamente.
+- `503` quando o banco de dados estiver indisponível (falha de conexão/transiente).
+
 
 ---
 
