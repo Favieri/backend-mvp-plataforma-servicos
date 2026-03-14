@@ -6,9 +6,10 @@ using Application.Services;
 using Infrastructure;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Formatting.Json;
+using Npgsql;
 
 // Required for Npgsql timestamp compatibility: maps timestamptz columns to DateTime (not DateTimeOffset)
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -62,14 +63,14 @@ app.UseExceptionHandler(exceptionHandlerApp =>
     exceptionHandlerApp.Run(async context =>
     {
         var error = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-        var problem = new ProblemDetails
-        {
-            Title = "Erro interno",
-            Status = 500,
-            Detail = error?.Message,
-            Instance = context.Request.Path
-        };
-        await Results.Problem(problem.Detail, statusCode: problem.Status, title: problem.Title).ExecuteAsync(context);
+        var isDbConnectivityError = IsDatabaseConnectivityError(error);
+        var statusCode = isDbConnectivityError ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status500InternalServerError;
+        var title = isDbConnectivityError ? "Serviço de banco de dados indisponível" : "Erro interno";
+        var detail = isDbConnectivityError
+            ? "Não foi possível conectar ao banco de dados. Tente novamente em instantes."
+            : error?.Message;
+
+        await Results.Problem(detail, statusCode: statusCode, title: title).ExecuteAsync(context);
     });
 });
 
@@ -119,3 +120,24 @@ static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrig
 }
 
 public partial class Program;
+
+
+static bool IsDatabaseConnectivityError(Exception? ex)
+{
+    if (ex is null)
+    {
+        return false;
+    }
+
+    if (ex is NpgsqlException or TimeoutException)
+    {
+        return true;
+    }
+
+    if (ex is DbUpdateException dbUpdateEx)
+    {
+        return IsDatabaseConnectivityError(dbUpdateEx.InnerException);
+    }
+
+    return IsDatabaseConnectivityError(ex.InnerException);
+}

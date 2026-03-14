@@ -487,12 +487,16 @@ public static class ApiEndpoints
 
         // Phase 2: POST /messages accepts type, metadata, replyToId + anti-leak detection
         app.MapPost("/messages", async (
-            SendMessageRequest body,
+            HttpRequest req,
             IConversationRepository repo,
             IEmailService emailSvc,
             IAntiLeakDetectionService antiLeak,
             CancellationToken ct) =>
         {
+            var body = await ParseSendMessageRequestAsync(req, ct);
+            if (body is null)
+                return Results.Json(new { error = "Body inválido. Envie JSON no formato { conversationId, senderId, text, ... }" }, statusCode: 400);
+
             if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.SenderId) || string.IsNullOrWhiteSpace(body.Text))
                 return Results.Json(new { error = "conversationId, senderId e text são obrigatórios" }, statusCode: 400);
 
@@ -922,6 +926,51 @@ public static class ApiEndpoints
     private static bool ShouldBypassCache(HttpRequest req)
         => req.Headers.TryGetValue("Cache-Control", out var values)
            && values.Any(v => v?.Contains("no-cache", StringComparison.OrdinalIgnoreCase) == true);
+
+    private static async Task<SendMessageRequest?> ParseSendMessageRequestAsync(HttpRequest req, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (req.Body is null)
+            return null;
+
+        if (req.Body.CanSeek)
+            req.Body.Position = 0;
+
+        using var reader = new StreamReader(req.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var payload = await reader.ReadToEndAsync(ct);
+
+        if (req.Body.CanSeek)
+            req.Body.Position = 0;
+
+        if (string.IsNullOrWhiteSpace(payload))
+            return null;
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        try
+        {
+            var direct = JsonSerializer.Deserialize<SendMessageRequest>(payload, jsonOptions);
+            if (direct is not null)
+                return direct;
+        }
+        catch (JsonException)
+        {
+            // Fallback below for double-encoded JSON payloads.
+        }
+
+        try
+        {
+            var innerPayload = JsonSerializer.Deserialize<string>(payload, jsonOptions);
+            if (string.IsNullOrWhiteSpace(innerPayload))
+                return null;
+
+            return JsonSerializer.Deserialize<SendMessageRequest>(innerPayload, jsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static IDictionary<string, object?> ToObjectDictionary(object? value)
     {
