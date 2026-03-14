@@ -775,6 +775,66 @@
                     "type": "boolean",
                     "default": "false",
                     "nullable": true
+                },
+                {
+                    "name": "entityType",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "documentNumber",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "yearsOfExperience",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "specialties",
+                    "type": "text[]",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "bufferMinutes",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "responseRate",
+                    "type": "double precision",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "avgResponseTimeMinutes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "completionRate",
+                    "type": "double precision",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "verificationStatus",
+                    "type": "text",
+                    "default": "'pending'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "badges",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -783,8 +843,24 @@
                     "definition": "CREATE INDEX \"IX_Professional_active_rating\" ON public.\"Professional\" USING btree (active, rating)"
                 },
                 {
+                    "name": "IX_Professional_active_verificationStatus_rating",
+                    "definition": "CREATE INDEX \"IX_Professional_active_verificationStatus_rating\" ON public.\"Professional\" USING btree (active, \"verificationStatus\", rating DESC NULLS LAST) WHERE (active = true)"
+                },
+                {
+                    "name": "IX_Professional_completionRate",
+                    "definition": "CREATE INDEX \"IX_Professional_completionRate\" ON public.\"Professional\" USING btree (\"completionRate\" DESC NULLS LAST) WHERE ((active = true) AND (\"completionRate\" IS NOT NULL))"
+                },
+                {
+                    "name": "IX_Professional_responseRate",
+                    "definition": "CREATE INDEX \"IX_Professional_responseRate\" ON public.\"Professional\" USING btree (\"responseRate\" DESC NULLS LAST) WHERE ((active = true) AND (\"responseRate\" IS NOT NULL))"
+                },
+                {
                     "name": "IX_Professional_userId",
                     "definition": "CREATE INDEX \"IX_Professional_userId\" ON public.\"Professional\" USING btree (\"userId\")"
+                },
+                {
+                    "name": "IX_Professional_verificationStatus",
+                    "definition": "CREATE INDEX \"IX_Professional_verificationStatus\" ON public.\"Professional\" USING btree (\"verificationStatus\")"
                 },
                 {
                     "name": "Professional_pkey",
@@ -1128,6 +1204,54 @@
                     "type": "text",
                     "default": null,
                     "nullable": true
+                },
+                {
+                    "name": "tierId",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "contractMode",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "durationMinutes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "includesDescription",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "excludesDescription",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "materialIncluded",
+                    "type": "boolean",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "visitFeeCents",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "minLeadTimeMinutes",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -1148,6 +1272,16 @@
                 "id"
             ],
             "foreign_keys": [
+                {
+                    "name": "FK_ProfessionalService_tierId",
+                    "columns": [
+                        "tierId"
+                    ],
+                    "references_table": "service_tier",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
                 {
                     "name": "ProfessionalService_professionalId_fkey",
                     "columns": [
@@ -1443,6 +1577,18 @@
                     "type": "timestamp(3) without time zone",
                     "default": "CURRENT_TIMESTAMP",
                     "nullable": false
+                },
+                {
+                    "name": "categoryId",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "tierId",
+                    "type": "integer",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -1455,6 +1601,26 @@
                 "id"
             ],
             "foreign_keys": [
+                {
+                    "name": "FK_Service_categoryId",
+                    "columns": [
+                        "categoryId"
+                    ],
+                    "references_table": "service_category",
+                    "references_columns": [
+                        "id"
+                    ]
+                },
+                {
+                    "name": "FK_Service_tierId",
+                    "columns": [
+                        "tierId"
+                    ],
+                    "references_table": "service_tier",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
             ]
         },
         {
@@ -2762,6 +2928,106 @@
             ]
         },
         {
+            "table": "professional_verification",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "professional_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "document_type",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "document_url",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "status",
+                    "type": "text",
+                    "default": "'submitted'::text",
+                    "nullable": false
+                },
+                {
+                    "name": "notes",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "reviewed_by",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "reviewed_at",
+                    "type": "timestamp without time zone",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "submitted_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_professional_verification_professional_id",
+                    "definition": "CREATE INDEX \"IX_professional_verification_professional_id\" ON public.professional_verification USING btree (professional_id)"
+                },
+                {
+                    "name": "IX_professional_verification_status_submitted_at",
+                    "definition": "CREATE INDEX \"IX_professional_verification_status_submitted_at\" ON public.professional_verification USING btree (status, submitted_at) WHERE (status = ANY (ARRAY['submitted'::text, 'in_review'::text]))"
+                },
+                {
+                    "name": "PK_professional_verification",
+                    "definition": "CREATE UNIQUE INDEX \"PK_professional_verification\" ON public.professional_verification USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+                {
+                    "name": "FK_professional_verification_professional",
+                    "columns": [
+                        "professional_id"
+                    ],
+                    "references_table": "Professional",
+                    "references_columns": [
+                        "id"
+                    ]
+                }
+            ]
+        },
+        {
             "table": "proposal",
             "columns": [
                 {
@@ -3175,6 +3441,130 @@
                         "id"
                     ]
                 }
+            ]
+        },
+        {
+            "table": "service_category",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "icon",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp without time zone",
+                    "default": "now()",
+                    "nullable": false
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_service_category_name",
+                    "definition": "CREATE INDEX \"IX_service_category_name\" ON public.service_category USING btree (name)"
+                },
+                {
+                    "name": "service_category_pkey",
+                    "definition": "CREATE UNIQUE INDEX service_category_pkey ON public.service_category USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "table": "service_tier",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "default": "nextval('service_tier_id_seq'::regclass)",
+                    "nullable": false
+                },
+                {
+                    "name": "name",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "code",
+                    "type": "text",
+                    "default": null,
+                    "nullable": false
+                },
+                {
+                    "name": "allow_booking_direct",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": false
+                },
+                {
+                    "name": "requires_proposal",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": false
+                },
+                {
+                    "name": "requires_chat",
+                    "type": "boolean",
+                    "default": "false",
+                    "nullable": false
+                },
+                {
+                    "name": "allowed_price_formats",
+                    "type": "text[]",
+                    "default": "'{}'::text[]",
+                    "nullable": false
+                },
+                {
+                    "name": "default_signal_percent",
+                    "type": "integer",
+                    "default": "0",
+                    "nullable": false
+                },
+                {
+                    "name": "max_installments",
+                    "type": "integer",
+                    "default": "1",
+                    "nullable": false
+                },
+                {
+                    "name": "cancellation_rules",
+                    "type": "jsonb",
+                    "default": null,
+                    "nullable": true
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "IX_service_tier_code",
+                    "definition": "CREATE UNIQUE INDEX \"IX_service_tier_code\" ON public.service_tier USING btree (code)"
+                },
+                {
+                    "name": "service_tier_pkey",
+                    "definition": "CREATE UNIQUE INDEX service_tier_pkey ON public.service_tier USING btree (id)"
+                }
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
             ]
         }
     ],
