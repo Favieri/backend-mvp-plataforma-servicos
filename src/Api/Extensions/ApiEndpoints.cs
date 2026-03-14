@@ -85,17 +85,19 @@ public static class ApiEndpoints
             var bootstrap = await GetOrCreateCachedAsync(cache, "home:bootstrap", TimeSpan.FromSeconds(45), ShouldBypassCache(req),
                 async () =>
                 {
-                    var t1 = repo.GetProfessionalsAsync(null, null, ct);
-                    var t2 = repo.GetZonesAsync(ct);
-                    var t3 = repo.GetServicesAsync(ct);
-                    var t4 = catalog.GetCategoriesAsync(ct);
-                    var t5 = catalog.GetTiersAsync(ct);
-                    await Task.WhenAll(t1, t2, t3, t4, t5);
-                    var categories = t4.Result.Select(c => new CategoryDto(c.Id, c.Name, c.Icon)).ToList();
-                    var tiers = t5.Result.Select(t => new TierDto(
+                    // IProfessionalReadRepository e IServiceCatalogRepository compartilham o mesmo AppDbContext scoped.
+                    // Executar queries em paralelo aqui dispara concorrência no DbContext (não thread-safe).
+                    var professionals = await repo.GetProfessionalsAsync(null, null, ct);
+                    var zones = await repo.GetZonesAsync(ct);
+                    var services = await repo.GetServicesAsync(ct);
+                    var categoriesRaw = await catalog.GetCategoriesAsync(ct);
+                    var tiersRaw = await catalog.GetTiersAsync(ct);
+
+                    var categories = categoriesRaw.Select(c => new CategoryDto(c.Id, c.Name, c.Icon)).ToList();
+                    var tiers = tiersRaw.Select(t => new TierDto(
                         t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
                         t.AllowedPriceFormats, t.DefaultSignalPercent, t.MaxInstallments)).ToList();
-                    return new HomeBootstrapDto(t1.Result, t2.Result, t3.Result, categories, tiers);
+                    return new HomeBootstrapDto(professionals, zones, services, categories, tiers);
                 }, logger, ct);
             return Results.Ok(bootstrap);
         });
