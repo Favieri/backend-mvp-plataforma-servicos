@@ -7,6 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -368,7 +369,7 @@ public static class ApiEndpoints
             var config = await repo.GetProfessionalSchedulingConfigAsync(professionalId, ct);
             if (config is null) return Results.NotFound(new { error = "Profissional não encontrado" });
 
-            IDictionary<string, object?> c = (IDictionary<string, object?>)(dynamic)config;
+            var c = ToObjectDictionary(config);
             var slotMinutes = c["slotMinutes"] is null ? 60 : Convert.ToInt32(c["slotMinutes"]);
             var leadTimeMinutes = c["leadTimeMinutes"] is null ? 0 : Convert.ToInt32(c["leadTimeMinutes"]);
             var maxAdvanceDays = c["maxAdvanceDays"] is null ? 30 : Convert.ToInt32(c["maxAdvanceDays"]);
@@ -506,7 +507,7 @@ public static class ApiEndpoints
                 body.ReplyToId,
                 ct);
 
-            IDictionary<string, object?> msgDict = (IDictionary<string, object?>)(dynamic)message;
+            var msgDict = ToObjectDictionary(message);
 
             // Phase 2: anti-leak detection — insert a system warning message if contact patterns detected
             if (messageType == MessageType.Text && antiLeak.HasLeakPattern(body.Text))
@@ -527,7 +528,7 @@ public static class ApiEndpoints
             var conv = await repo.GetConversationForReadAsync(body.ConversationId, ct);
             if (conv is not null)
             {
-                IDictionary<string, object?> c = (IDictionary<string, object?>)(dynamic)conv;
+                var c = ToObjectDictionary(conv);
                 var isClient = body.SenderId == c["clientId"]?.ToString();
                 var lastReadAt = isClient ? c["professionalLastReadAt"] : c["clientLastReadAt"];
                 var recipientEmail = isClient ? c["professionalEmail"]?.ToString() : c["clientEmail"]?.ToString();
@@ -591,8 +592,10 @@ public static class ApiEndpoints
             // Create the message first (with type = "action" and empty text fallback)
             var text = string.IsNullOrWhiteSpace(messageText) ? $"[Arquivo: {file.FileName}]" : messageText;
             var message = await convRepo.CreateMessageAsync(conversationId, senderId, text, MessageType.Action, null, null, ct);
-            IDictionary<string, object?> msgDict = (IDictionary<string, object?>)(dynamic)message;
-            var messageId = msgDict["id"]?.ToString()!;
+            var msgDict = ToObjectDictionary(message);
+            var messageId = msgDict["id"]?.ToString();
+            if (string.IsNullOrWhiteSpace(messageId))
+                return Results.Json(new { error = "Falha ao criar mensagem para upload." }, statusCode: 500);
 
             // Upload file to Supabase Storage
             await using var fileStream = file.OpenReadStream();
@@ -637,7 +640,7 @@ public static class ApiEndpoints
                 return Results.Json(new { error = "conversationId e userId são obrigatórios." }, statusCode: 400);
             var conv = await repo.GetConversationForReadAsync(body.ConversationId, ct);
             if (conv is null) return Results.NotFound(new { error = "Conversa não encontrada." });
-            IDictionary<string, object?> c = (IDictionary<string, object?>)(dynamic)conv;
+            var c = ToObjectDictionary(conv);
             if (body.UserId == c["clientId"]?.ToString())
                 await repo.MarkReadAsync(body.ConversationId, isClient: true, ct);
             else if (body.UserId == c["professionalId"]?.ToString())
@@ -897,7 +900,7 @@ public static class ApiEndpoints
     {
         var apptData = await repo.GetAppointmentWithParticipantsAsync(appointmentId, ct);
         if (apptData is null) return;
-        IDictionary<string, object?> d = (IDictionary<string, object?>)(dynamic)apptData;
+        var d = ToObjectDictionary(apptData);
         var when = startsAt.ToString("ddd, dd/MM/yyyy HH:mm");
         var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://app.doezy.com.br";
         var bookingUrl = $"{appBaseUrl}/agenda/{appointmentId}";
@@ -919,6 +922,26 @@ public static class ApiEndpoints
     private static bool ShouldBypassCache(HttpRequest req)
         => req.Headers.TryGetValue("Cache-Control", out var values)
            && values.Any(v => v?.Contains("no-cache", StringComparison.OrdinalIgnoreCase) == true);
+
+    private static IDictionary<string, object?> ToObjectDictionary(object? value)
+    {
+        if (value is null)
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        if (value is IDictionary<string, object?> dictionary)
+            return dictionary;
+
+        if (value is IDictionary<string, object> nonNullableDictionary)
+        {
+            return nonNullableDictionary
+                .ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return value
+            .GetType()
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .ToDictionary(p => p.Name, p => p.GetValue(value), StringComparer.OrdinalIgnoreCase);
+    }
 
     private static async Task<IResult> GetOrSetCachedListAsync<T>(
         HttpContext context, IMemoryCache cache, string keyPrefix, TimeSpan ttl,
