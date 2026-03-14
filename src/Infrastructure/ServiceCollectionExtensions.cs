@@ -26,6 +26,9 @@ public static class ServiceCollectionExtensions
             o.PoolerPort = int.TryParse(config["DB_POOLER_PORT"], out var poolerPort) ? poolerPort : 6543;
         });
 
+        // Legacy Dapper services still used by email dedupe + payment modules.
+        services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
+
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var rawConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
