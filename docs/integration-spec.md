@@ -929,6 +929,9 @@ Inicia negociação / contraproposta (cliente ou profissional).
 
 ## 8. Chat Transacional — Fase 2
 
+> ⚠️ Endpoint válido para marcar leitura é `POST /chat/read` (não existe `/messages/mark-read` nesta API).
+
+
 ### POST /conversations
 Cria uma conversa entre cliente e profissional.
 
@@ -942,7 +945,7 @@ Cria uma conversa entre cliente e profissional.
 }
 ```
 
-**Response 201:** `Conversation` criada.
+**Response 200:** `Conversation` criada (ou existente).
 
 ---
 
@@ -960,22 +963,22 @@ Lista conversas de um usuário.
 
 ---
 
-### GET /conversations/{id}
-Retorna conversa por ID.
+### GET /conversations/{id}/actions?requestingUserId={id}
+Retorna ações transacionais disponíveis na conversa para o usuário solicitante.
 
-**Response 200:** `Conversation`.
+**Response 200:** objeto com flags de ações permitidas (ex.: aceitar proposta, negociar, sugerir horário).
 
 ---
 
-### PUT /conversations/{id}/status
+### PATCH /conversations/{id}/status
 Atualiza status da conversa.
 
 **Request Body:**
 ```json
-{ "status": "active | closed | archived" }
+{ "status": "active | archived | flagged" }
 ```
 
-**Response 200:** `Conversation` atualizada.
+**Response 200:** `{ "ok": true, "status": "active|archived|flagged" }`.
 
 ---
 
@@ -994,7 +997,7 @@ Envia mensagem em uma conversa.
 }
 ```
 
-**Response 201:** `Message` criada.
+**Response 200:** `Message` criada.
 
 ---
 
@@ -1005,7 +1008,7 @@ Lista mensagens de uma conversa.
 
 ---
 
-### POST /messages/mark-read
+### POST /chat/read
 Marca mensagens como lidas.
 
 **Request Body:**
@@ -1020,36 +1023,19 @@ Marca mensagens como lidas.
 
 ---
 
-### POST /messages/proposal
-Envia proposta via mensagem de chat (tipo `proposal`).
+### POST /messages/attachment
+Envia anexo de chat (multipart/form-data).
 
-**Request Body:**
-```json
-{
-  "conversationId": "string",
-  "senderId": "string",
-  "proposalId": "string"
-}
-```
+**Form fields obrigatórios:**
+- `conversationId`
+- `senderId`
+- `file`
 
-**Response 201:** `Message` do tipo `proposal`.
+**Response 200:** objeto com `message` (tipo `attachment`) e `attachment` (metadados/URL).
 
 ---
 
-### POST /messages/schedule-suggestion
-Sugere horário via chat.
-
-**Request Body:**
-```json
-{
-  "conversationId": "string",
-  "senderId": "string",
-  "suggestedDatetime": "2026-03-25T09:00:00Z",
-  "note": "string | null"
-}
-```
-
-**Response 201:** `Message` do tipo `schedule_suggestion`.
+> Para mensagens de proposta e sugestão de horário, use `POST /messages` com `type` (`proposal` ou `schedule_suggestion`) e payload em `metadata`.
 
 ---
 
@@ -1220,7 +1206,7 @@ Cria review verificado (ligado a pedido concluído).
 }
 ```
 
-**Response 201:** `Review` criado.
+**Response 200:** `Review` criado.
 
 ---
 
@@ -1238,7 +1224,7 @@ Retorna review por ID.
 
 ---
 
-### PUT /reviews/{id}
+### PATCH /reviews/{id}
 Atualiza review (pelo cliente).
 
 **Request Body:**
@@ -1253,7 +1239,7 @@ Atualiza review (pelo cliente).
 
 ---
 
-### POST /reviews/professional-review-client
+### POST /reviews/professional
 Profissional avalia o cliente.
 
 **Request Body:**
@@ -1266,7 +1252,7 @@ Profissional avalia o cliente.
 }
 ```
 
-**Response 201:** `Review` de profissional para cliente.
+**Response 200:** `Review` de profissional para cliente.
 
 ---
 
