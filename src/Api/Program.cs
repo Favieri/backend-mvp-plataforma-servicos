@@ -119,6 +119,26 @@ static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrig
     }
 }
 
+static bool IsDatabaseConnectivityError(Exception? ex)
+{
+    if (ex is null)
+    {
+        return false;
+    }
+
+    if (ex is NpgsqlException or TimeoutException)
+    {
+        return true;
+    }
+
+    if (ex is DbUpdateException dbUpdateEx)
+    {
+        return IsDatabaseConnectivityError(dbUpdateEx.InnerException);
+    }
+
+    return IsDatabaseConnectivityError(ex.InnerException);
+}
+
 public partial class Program;
 
 
