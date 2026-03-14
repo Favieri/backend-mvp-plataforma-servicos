@@ -2,6 +2,7 @@ using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -203,7 +204,7 @@ public static class RecurringEndpoints
         // ─── DELETE /recurring-plans/{id} ─────────────────────────────────────
         app.MapDelete("/recurring-plans/{id}", async (
             string id,
-            CancelRecurringPlanRequest body,
+            [FromBody] CancelRecurringPlanRequest body,
             IRecurringPlanRepository recurringRepo,
             CancellationToken ct) =>
         {
