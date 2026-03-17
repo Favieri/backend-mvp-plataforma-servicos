@@ -15,9 +15,20 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
         string? excludeProfessionalId,
         string? professionalId,
         bool filterZones,
+        bool active,
         CancellationToken ct)
     {
         var query = ctx.Orders.AsNoTracking();
+
+        // active=true: retorna somente pedidos atribuídos a este profissional com status não-terminal.
+        // Usado pela tela "Pedidos Ativos" da área do profissional.
+        // Este bloco é mutuamente exclusivo com filterZones (leads) para evitar interferência.
+        if (active && !string.IsNullOrWhiteSpace(professionalId) && !filterZones)
+        {
+            query = query.Where(o => o.ProfessionalId == professionalId);
+            query = query.Where(o => !OrderStatus.Terminal.Contains(o.Status));
+            return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
+        }
 
         if (!string.IsNullOrWhiteSpace(serviceId))
             query = query.Where(o => o.ServiceId == serviceId);
