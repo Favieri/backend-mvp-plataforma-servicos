@@ -317,9 +317,9 @@ public static class ApiEndpoints
         // ─── Orders ────────────────────────────────────────────────────────────
         app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
-            string? professionalId, bool? filterZones, IOrderRepository repo, CancellationToken ct) =>
+            string? professionalId, bool? filterZones, bool? active, IOrderRepository repo, CancellationToken ct) =>
             await GetOrSetCachedListAsync(ctx, cache, "api-orders", TimeSpan.FromSeconds(30),
-                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, token), ct));
+                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, active == true, token), ct));
 
         app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
