@@ -27,6 +27,15 @@ public sealed class ConversationRepository(AppDbContext ctx, IContactMaskingServ
     public async Task<IReadOnlyList<object>> GetByParticipantAsync(
         string? clientId, string? professionalId, CancellationToken ct)
     {
+        // Resolve professionalId: aceita tanto Professional.id quanto user.id,
+        // convertendo sempre para o user.id que é o valor armazenado em Conversation.ProfessionalId.
+        // Isso espelha o comportamento do POST /conversations (ResolveProfessionalUserIdAsync).
+        string? resolvedProfessionalUserId = null;
+        if (!string.IsNullOrWhiteSpace(professionalId))
+        {
+            resolvedProfessionalUserId = await ResolveProfessionalUserIdAsync(professionalId, ct);
+        }
+
         var query =
             from c in ctx.Conversations.AsNoTracking()
             join client in ctx.Users.AsNoTracking() on c.ClientId equals client.Id
@@ -36,8 +45,8 @@ public sealed class ConversationRepository(AppDbContext ctx, IContactMaskingServ
         if (!string.IsNullOrWhiteSpace(clientId))
             query = query.Where(x => x.c.ClientId == clientId);
 
-        if (!string.IsNullOrWhiteSpace(professionalId))
-            query = query.Where(x => x.c.ProfessionalId == professionalId);
+        if (resolvedProfessionalUserId is not null)
+            query = query.Where(x => x.c.ProfessionalId == resolvedProfessionalUserId);
 
         var conversations = await query
             .Select(x => new
