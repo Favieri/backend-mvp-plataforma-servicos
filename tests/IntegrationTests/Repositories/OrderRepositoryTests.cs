@@ -73,7 +73,7 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         await _repo.CreateAsync("client1", "svc1", null, null, null, CancellationToken.None);
         await _repo.CreateAsync("client1", "svc2", null, null, null, CancellationToken.None);
 
-        var result = await _repo.GetOrdersAsync("svc1", null, null, false, CancellationToken.None);
+        var result = await _repo.GetOrdersAsync("svc1", null, null, false, false, CancellationToken.None);
         Assert.All(result, o => Assert.Equal("svc1", o.ServiceId));
     }
 
@@ -97,7 +97,7 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         await Task.Delay(10); // ensure time difference
         await _repo.CreateAsync("client1", "svc1", "second", null, null, CancellationToken.None);
 
-        var result = await _repo.GetOrdersAsync(null, null, null, false, CancellationToken.None);
+        var result = await _repo.GetOrdersAsync(null, null, null, false, true, CancellationToken.None);
         Assert.True(result[0].CreatedAt >= result[1].CreatedAt);
     }
 
