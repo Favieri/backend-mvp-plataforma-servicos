@@ -29,7 +29,6 @@ public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposab
         if (IsSupabaseHost(connectionStringBuilder))
         {
             connectionStringBuilder.SslMode = SslMode.Require;
-            connectionStringBuilder.TrustServerCertificate = true;
         }
 
         if (!environment.IsDevelopment() && ShouldUseSupabasePooler(connectionStringBuilder))

@@ -52,7 +52,6 @@ public static class ServiceCollectionExtensions
             if (NpgsqlConnectionFactory.IsSupabaseHost(csb))
             {
                 csb.SslMode = SslMode.Require;
-                csb.TrustServerCertificate = true;
             }
 
             if (!env.IsDevelopment() && NpgsqlConnectionFactory.ShouldUseSupabasePooler(csb))
