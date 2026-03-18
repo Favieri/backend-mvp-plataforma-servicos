@@ -25,6 +25,13 @@ public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposab
             NoResetOnClose = true
         };
 
+        // Supabase requires SSL on all connections (direct and pooler).
+        if (IsSupabaseHost(connectionStringBuilder))
+        {
+            connectionStringBuilder.SslMode = SslMode.Require;
+            connectionStringBuilder.TrustServerCertificate = true;
+        }
+
         if (!environment.IsDevelopment() && ShouldUseSupabasePooler(connectionStringBuilder))
         {
             connectionStringBuilder.Port = options.Value.PoolerPort;
@@ -44,10 +51,14 @@ public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposab
         await _dataSource.DisposeAsync();
     }
 
-    internal static bool ShouldUseSupabasePooler(NpgsqlConnectionStringBuilder builder)
+    internal static bool IsSupabaseHost(NpgsqlConnectionStringBuilder builder)
     {
         return !string.IsNullOrWhiteSpace(builder.Host)
-               && builder.Host.Contains("supabase", StringComparison.OrdinalIgnoreCase)
-               && builder.Port != 6543;
+               && builder.Host.Contains("supabase", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool ShouldUseSupabasePooler(NpgsqlConnectionStringBuilder builder)
+    {
+        return IsSupabaseHost(builder) && builder.Port != 6543;
     }
 }
