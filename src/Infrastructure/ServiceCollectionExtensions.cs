@@ -47,6 +47,14 @@ public static class ServiceCollectionExtensions
             };
 
             var env = sp.GetRequiredService<IHostEnvironment>();
+
+            // Supabase requires SSL on all connections (direct and pooler).
+            if (NpgsqlConnectionFactory.IsSupabaseHost(csb))
+            {
+                csb.SslMode = SslMode.Require;
+                csb.TrustServerCertificate = true;
+            }
+
             if (!env.IsDevelopment() && NpgsqlConnectionFactory.ShouldUseSupabasePooler(csb))
             {
                 csb.Port = poolerPort;
