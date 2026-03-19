@@ -28,7 +28,7 @@ public sealed class ProposalConfiguration : IEntityTypeConfiguration<Proposal>
         builder.Property(x => x.SuggestedDatetime).HasColumnName("suggested_datetime");
         builder.Property(x => x.VisitFeeCents).HasColumnName("visit_fee_cents").HasDefaultValue(0);
         builder.Property(x => x.ValidUntil).HasColumnName("valid_until").IsRequired();
-        builder.Property(x => x.Status).HasColumnName("status").IsRequired().HasDefaultValue("draft");
+        builder.Property(x => x.Status).HasColumnName("status").IsRequired().HasDefaultValue("draft").ValueGeneratedNever();
         builder.Property(x => x.RejectionReason).HasColumnName("rejection_reason");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
