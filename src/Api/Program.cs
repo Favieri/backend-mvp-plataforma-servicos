@@ -70,6 +70,11 @@ app.UseExceptionHandler(exceptionHandlerApp =>
             ? "Não foi possível conectar ao banco de dados. Tente novamente em instantes."
             : error?.Message;
 
+        if (error is not null)
+        {
+            LogException(context, error, statusCode);
+        }
+
         await Results.Problem(detail, statusCode: statusCode, title: title).ExecuteAsync(context);
     });
 });
@@ -137,6 +142,58 @@ static bool IsDatabaseConnectivityError(Exception? ex)
     }
 
     return IsDatabaseConnectivityError(ex.InnerException);
+}
+
+static void LogException(HttpContext context, Exception error, int statusCode)
+{
+    var correlationId = context.Items[CorrelationIdMiddleware.ItemKey]?.ToString() ?? "unknown";
+    var logger = Log.ForContext("SourceContext", "ExceptionHandler");
+
+    // Extrai cadeia completa de inner exceptions para diagnóstico
+    var innerChain = BuildInnerExceptionChain(error);
+
+    // Extrai SqlState do NpgsqlException (código de erro PostgreSQL)
+    var sqlState = FindNpgsqlSqlState(error);
+
+    logger.Error(
+        error,
+        "UnhandledException {ExceptionType} {ExceptionMessage} CorrelationId={CorrelationId} " +
+        "StatusCode={StatusCode} SqlState={SqlState} InnerExceptionChain={InnerExceptionChain}",
+        error.GetType().FullName,
+        error.Message,
+        correlationId,
+        statusCode,
+        sqlState,
+        innerChain);
+}
+
+static string BuildInnerExceptionChain(Exception? ex)
+{
+    var parts = new System.Text.StringBuilder();
+    var current = ex?.InnerException;
+    var depth = 0;
+    while (current is not null && depth < 10)
+    {
+        if (parts.Length > 0) parts.Append(" → ");
+        parts.Append($"[{current.GetType().Name}] {current.Message}");
+        current = current.InnerException;
+        depth++;
+    }
+    return parts.Length > 0 ? parts.ToString() : "(none)";
+}
+
+static string? FindNpgsqlSqlState(Exception? ex)
+{
+    var current = ex;
+    while (current is not null)
+    {
+        if (current is NpgsqlException npgsqlEx)
+        {
+            return npgsqlEx.SqlState;
+        }
+        current = current.InnerException;
+    }
+    return null;
 }
 
 public partial class Program;

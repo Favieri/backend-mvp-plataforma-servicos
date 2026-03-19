@@ -22,31 +22,35 @@ public static class ServiceCollectionExtensions
             o.ConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
             o.TimeoutSeconds = int.TryParse(config["DB_TIMEOUT_SECONDS"], out var timeout) ? timeout : 15;
             o.CommandTimeoutSeconds = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var commandTimeout) ? commandTimeout : 15;
-            o.MaximumPoolSize = int.TryParse(config["DB_MAX_POOL_SIZE"], out var maxPoolSize) ? maxPoolSize : 30;
+            // Default 5: appropriate for Lambda + Supabase transaction pooler (port 6543).
+            // Each Lambda instance shares this single pool between EF Core and Dapper.
+            // With N concurrent Lambda instances: 5 × N total connections to the pooler.
+            o.MaximumPoolSize = int.TryParse(config["DB_MAX_POOL_SIZE"], out var maxPoolSize) ? maxPoolSize : 5;
             o.PoolerPort = int.TryParse(config["DB_POOLER_PORT"], out var poolerPort) ? poolerPort : 6543;
         });
 
-        // Legacy Dapper services still used by email dedupe + payment modules.
-        services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
-
-        services.AddDbContext<AppDbContext>((sp, options) =>
+        // Single shared NpgsqlDataSource used by both EF Core and Dapper (NpgsqlConnectionFactory).
+        // This ensures one connection pool per Lambda instance instead of two, halving the
+        // number of physical connections to the Supabase pooler.
+        services.AddSingleton(sp =>
         {
-            var rawConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
-            var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
-            var maxPoolSize = int.TryParse(config["DB_MAX_POOL_SIZE"], out var mp) ? mp : 30;
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var rawCs = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
             var timeout = int.TryParse(config["DB_TIMEOUT_SECONDS"], out var t) ? t : 15;
+            var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
+            var maxPoolSize = int.TryParse(config["DB_MAX_POOL_SIZE"], out var mp) ? mp : 5;
             var poolerPort = int.TryParse(config["DB_POOLER_PORT"], out var pp) ? pp : 6543;
 
-            var csb = new NpgsqlConnectionStringBuilder(rawConnectionString)
+            var csb = new NpgsqlConnectionStringBuilder(rawCs)
             {
                 Timeout = timeout,
                 CommandTimeout = commandTimeout,
                 MaxPoolSize = maxPoolSize,
                 Pooling = true,
+                // NoResetOnClose: skip DISCARD ALL on connection return; the Supabase
+                // transaction pooler handles state isolation between transactions itself.
                 NoResetOnClose = true
             };
-
-            var env = sp.GetRequiredService<IHostEnvironment>();
 
             // Supabase requires SSL on all connections (direct and pooler).
             if (NpgsqlConnectionFactory.IsSupabaseHost(csb))
@@ -54,12 +58,27 @@ public static class ServiceCollectionExtensions
                 csb.SslMode = SslMode.Require;
             }
 
+            // In non-development environments, force the transaction pooler port (6543)
+            // when the raw connection string still points to the direct port.
             if (!env.IsDevelopment() && NpgsqlConnectionFactory.ShouldUseSupabasePooler(csb))
             {
                 csb.Port = poolerPort;
             }
 
-            options.UseNpgsql(csb.ConnectionString, npgsql =>
+            return new NpgsqlDataSourceBuilder(csb.ConnectionString).Build();
+        });
+
+        // Dapper services (email dedupe + payment modules) use the shared data source above.
+        services.AddSingleton<IConnectionFactory, NpgsqlConnectionFactory>();
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
+            // Reuse the shared NpgsqlDataSource so EF Core and Dapper share one pool.
+            var dataSource = sp.GetRequiredService<NpgsqlDataSource>();
+            var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
+            var env = sp.GetRequiredService<IHostEnvironment>();
+
+            options.UseNpgsql(dataSource, npgsql =>
             {
                 npgsql.CommandTimeout(commandTimeout);
                 npgsql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
