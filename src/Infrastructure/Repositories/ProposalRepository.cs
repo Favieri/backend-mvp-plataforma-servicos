@@ -19,38 +19,44 @@ public sealed class ProposalRepository(AppDbContext ctx) : IProposalRepository
 
     public async Task<bool> SendAsync(string proposalId, CancellationToken ct)
     {
-        var proposal = await ctx.Proposals.FirstOrDefaultAsync(p => p.Id == proposalId, ct);
-        if (proposal is null) return false;
-        proposal.Send();
-        await ctx.SaveChangesAsync(ct);
-        return true;
+        var rows = await ctx.Proposals
+            .Where(p => p.Id == proposalId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, Domain.Enums.ProposalStatus.Sent)
+                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow), ct);
+        return rows > 0;
     }
 
     public async Task<bool> AcceptAsync(string proposalId, string orderId, CancellationToken ct)
     {
-        var proposal = await ctx.Proposals.FirstOrDefaultAsync(p => p.Id == proposalId, ct);
-        if (proposal is null) return false;
-        proposal.Accept(orderId);
-        await ctx.SaveChangesAsync(ct);
-        return true;
+        var rows = await ctx.Proposals
+            .Where(p => p.Id == proposalId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, Domain.Enums.ProposalStatus.Accepted)
+                .SetProperty(p => p.OrderId, orderId)
+                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow), ct);
+        return rows > 0;
     }
 
     public async Task<bool> RejectAsync(string proposalId, string? reason, CancellationToken ct)
     {
-        var proposal = await ctx.Proposals.FirstOrDefaultAsync(p => p.Id == proposalId, ct);
-        if (proposal is null) return false;
-        proposal.Reject(reason);
-        await ctx.SaveChangesAsync(ct);
-        return true;
+        var rows = await ctx.Proposals
+            .Where(p => p.Id == proposalId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, Domain.Enums.ProposalStatus.Rejected)
+                .SetProperty(p => p.RejectionReason, reason)
+                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow), ct);
+        return rows > 0;
     }
 
     public async Task<bool> StartNegotiationAsync(string proposalId, CancellationToken ct)
     {
-        var proposal = await ctx.Proposals.FirstOrDefaultAsync(p => p.Id == proposalId, ct);
-        if (proposal is null) return false;
-        proposal.StartNegotiation();
-        await ctx.SaveChangesAsync(ct);
-        return true;
+        var rows = await ctx.Proposals
+            .Where(p => p.Id == proposalId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, Domain.Enums.ProposalStatus.Negotiating)
+                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow), ct);
+        return rows > 0;
     }
 
     public async Task<IReadOnlyList<Proposal>> GetByConversationAsync(string conversationId, CancellationToken ct)
