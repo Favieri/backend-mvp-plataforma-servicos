@@ -119,7 +119,8 @@ public sealed class RecurringBillingJob : BackgroundService
                         scheduledAt:      plan.NextBillingAt,
                         addressId:        plan.AddressId,
                         recurringPlanId:  plan.Id,
-                        description:      $"Recorrência #{plan.OccurrenceCount + 1} — plano {plan.Id}");
+                        description:      $"Recorrência #{plan.OccurrenceCount + 1} — plano {plan.Id}",
+                        serviceAddress:   plan.GetServiceAddress());
 
                     ctx.Orders.Add(order);
                     await ctx.SaveChangesAsync(ct);

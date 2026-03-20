@@ -1,3 +1,5 @@
+using Domain.ValueObjects;
+
 namespace Domain.Entities;
 
 /// <summary>
@@ -30,6 +32,16 @@ public class RecurringPlan
     public string? Scope { get; private set; }
     public string? AddressId { get; private set; }
 
+    // ─── Service address snapshot ────────────────────────────────────────────
+    public string? SvcAddrZipCode { get; private set; }
+    public string? SvcAddrStreet { get; private set; }
+    public string? SvcAddrNumber { get; private set; }
+    public string? SvcAddrNeighborhood { get; private set; }
+    public string? SvcAddrCity { get; private set; }
+    public string? SvcAddrState { get; private set; }
+    public string? SvcAddrComplement { get; private set; }
+    public string? SvcAddrReference { get; private set; }
+
     /// <summary>Plan lifecycle: active | paused | cancelled.</summary>
     public string Status { get; private set; } = default!;
 
@@ -49,6 +61,16 @@ public class RecurringPlan
 
     private RecurringPlan() { }
 
+    /// <summary>Returns the service address snapshot as an AddressData, or null if not set.</summary>
+    public AddressData? GetServiceAddress()
+    {
+        if (string.IsNullOrWhiteSpace(SvcAddrZipCode)) return null;
+        return new AddressData(
+            SvcAddrZipCode!, SvcAddrStreet!, SvcAddrNumber!,
+            SvcAddrNeighborhood!, SvcAddrCity!, SvcAddrState!,
+            SvcAddrComplement, SvcAddrReference);
+    }
+
     /// <summary>
     /// Creates a new recurring plan from a completed (or rebooked) order.
     /// </summary>
@@ -63,7 +85,8 @@ public class RecurringPlan
         int discountPercent,
         string? paymentMethod,
         string? scope,
-        string? addressId)
+        string? addressId,
+        AddressData? serviceAddress = null)
     {
         var now = DateTime.UtcNow;
         var intervalDays = Enums.RecurringFrequency.ToDays(frequency);
@@ -81,6 +104,14 @@ public class RecurringPlan
             PaymentMethod   = paymentMethod,
             Scope           = scope,
             AddressId       = addressId,
+            SvcAddrZipCode      = serviceAddress?.ZipCode,
+            SvcAddrStreet       = serviceAddress?.Street,
+            SvcAddrNumber       = serviceAddress?.Number,
+            SvcAddrNeighborhood = serviceAddress?.Neighborhood,
+            SvcAddrCity         = serviceAddress?.City,
+            SvcAddrState        = serviceAddress?.State,
+            SvcAddrComplement   = serviceAddress?.Complement,
+            SvcAddrReference    = serviceAddress?.Reference,
             Status          = Enums.RecurringPlanStatus.Active,
             NextBillingAt   = now.AddDays(intervalDays),
             OccurrenceCount = 0,

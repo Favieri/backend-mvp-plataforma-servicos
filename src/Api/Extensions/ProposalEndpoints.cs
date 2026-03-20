@@ -1,5 +1,6 @@
 using Application.Abstractions;
 using Application.DTOs;
+using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
 
@@ -90,6 +91,7 @@ public static class ProposalEndpoints
             IProposalRepository repo,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
+            IUserRepository userRepo,
             CancellationToken ct) =>
         {
             var proposal = await repo.GetByIdAsync(id, ct);
@@ -101,6 +103,16 @@ public static class ProposalEndpoints
                 return Results.Json(new { error = $"Proposta em status '{proposal.Status}' não pode ser aceita" }, statusCode: 422);
             if (proposal.ValidUntil < DateTime.UtcNow)
                 return Results.Json(new { error = "Proposta expirada" }, statusCode: 422);
+
+            // Resolve service address
+            AddressDto? defaultAddress = null;
+            if (body.UseDefaultAddress)
+                defaultAddress = await userRepo.GetDefaultAddressAsync(body.ClientId, ct);
+
+            var (resolvedAddress, addrError) = AddressResolver.Resolve(
+                body.UseDefaultAddress, body.ServiceAddress, defaultAddress);
+            if (addrError is not null)
+                return Results.Json(new { error = addrError }, statusCode: 422);
 
             var orderId = Guid.NewGuid().ToString();
             var signalCents = (int)(proposal.PriceTotalCents * 0.3);
@@ -120,7 +132,8 @@ public static class ProposalEndpoints
                 paymentMethod: body.PaymentMethod,
                 scope: proposal.Scope,
                 scheduledAt: proposal.SuggestedDatetime,
-                conversationId: proposal.ConversationId);
+                conversationId: proposal.ConversationId,
+                serviceAddress: resolvedAddress);
 
             var created = await orderRepo.CreateFromProposalAsync(order, ct);
             await repo.AcceptAsync(id, orderId, ct);
