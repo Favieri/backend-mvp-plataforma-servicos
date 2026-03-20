@@ -83,7 +83,7 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 
     public async Task<IReadOnlyList<object>> GetMineAsync(string clientId, CancellationToken ct)
     {
-        // Inclui service.name, professional.name, location e totalCents para que o
+        // Inclui service.name, professional.name, location, totalCents e serviceAddress para que o
         // front-end possa exibir os dados completos na listagem de pedidos.
         var rows = await ctx.Orders
             .AsNoTracking()
@@ -97,6 +97,17 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
                 createdAt = o.CreatedAt,
                 location = o.Location,
                 totalCents = o.PriceTotalCents,
+                serviceAddress = o.SvcAddrZipCode != null ? new
+                {
+                    zipCode = o.SvcAddrZipCode,
+                    street = o.SvcAddrStreet,
+                    number = o.SvcAddrNumber,
+                    neighborhood = o.SvcAddrNeighborhood,
+                    city = o.SvcAddrCity,
+                    state = o.SvcAddrState,
+                    complement = o.SvcAddrComplement,
+                    reference = o.SvcAddrReference
+                } : null,
                 service = ctx.Services
                     .Where(s => s.Id == o.ServiceId)
                     .Select(s => new { id = s.Id, name = s.Name })
@@ -215,7 +226,18 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
                 tierId = o.TierId,
                 priceTotalCents = o.PriceTotalCents,
                 scheduledAt = o.ScheduledAt ?? o.Date,
-                createdAt = o.CreatedAt
+                createdAt = o.CreatedAt,
+                serviceAddress = o.SvcAddrZipCode != null ? new
+                {
+                    zipCode = o.SvcAddrZipCode,
+                    street = o.SvcAddrStreet,
+                    number = o.SvcAddrNumber,
+                    neighborhood = o.SvcAddrNeighborhood,
+                    city = o.SvcAddrCity,
+                    state = o.SvcAddrState,
+                    complement = o.SvcAddrComplement,
+                    reference = o.SvcAddrReference
+                } : null
             })
             .ToListAsync(ct);
 

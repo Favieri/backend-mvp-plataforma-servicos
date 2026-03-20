@@ -1,5 +1,18 @@
 namespace Application.DTOs;
 
+// ─── Address ────────────────────────────────────────────────────────────────
+public sealed record AddressDto(
+    string ZipCode,
+    string Street,
+    string Number,
+    string Neighborhood,
+    string City,
+    string State,
+    string? Complement,
+    string? Reference);
+
+public sealed record UpdateDefaultAddressRequest(string UserId, AddressDto Address);
+
 // Auth & Orders (existing)
 public sealed record CreateOrderRequest(string ClientId, string ServiceId, string? Description, string? Location, string? Date);
 public sealed record CompleteOrderRequest(string? ProfessionalId, string? ClientId);
@@ -8,7 +21,7 @@ public sealed record UpdateAppointmentStatusRequest(string Status);
 public sealed record CreateAppointmentRequest(string ProfessionalId, string? ClientId, string? ServiceId, DateTime StartsAt, DateTime EndsAt, string? Location, string? Notes);
 
 // Users
-public sealed record CreateUserRequest(string Name, string Email, string? Phone, string Role, string Senha, string? ZoneId);
+public sealed record CreateUserRequest(string Name, string Email, string? Phone, string Role, string Senha, string? ZoneId, AddressDto? DefaultAddress = null);
 
 // Professionals
 public sealed record CreateProfessionalRequest(string UserId, string? Bio, string[]? Zones, bool? Active);
@@ -76,15 +89,17 @@ public sealed record CreateBookingRequest(
     string? Scope,
     string? ScheduledAt,
     string? ConversationId,
-    string? AddressId,
-    string? Description);
+    bool UseDefaultAddress = false,
+    AddressDto? ServiceAddress = null,
+    string? Description = null);
 
 // Order from accepted proposal (Tier 2/3)
 public sealed record CreateFromProposalRequest(
     string ClientId,
     int? Installments,
     string? PaymentMethod,
-    string? AddressId);
+    bool UseDefaultAddress = false,
+    AddressDto? ServiceAddress = null);
 
 // Status transition (with actor)
 public sealed record UpdateOrderStatusRequest(string ActorId, string ActorRole, string NewStatus, string? Reason);
@@ -107,7 +122,12 @@ public sealed record CreateProposalRequest(
     int VisitFeeCents);
 
 public sealed record SendProposalRequest(string ProfessionalId);
-public sealed record AcceptProposalRequest(string ClientId, string? PaymentMethod, int? Installments);
+public sealed record AcceptProposalRequest(
+    string ClientId,
+    string? PaymentMethod,
+    int? Installments,
+    bool UseDefaultAddress = false,
+    AddressDto? ServiceAddress = null);
 public sealed record RejectProposalRequest(string ClientId, string? Reason);
 public sealed record NegotiateProposalRequest(string ActorId, string ActorRole, string? CounterScope, int? CounterPriceCents);
 
@@ -162,7 +182,8 @@ public sealed record RebookOrderRequest(
     string? ScheduledAt,
     string? PaymentMethod,
     int? Installments,
-    string? AddressId,
+    bool UseDefaultAddress = false,
+    AddressDto? ServiceAddress = null,
     /// <summary>If true, a recurring plan is created automatically.</summary>
     bool CreateRecurringPlan = false,
     /// <summary>Billing frequency when CreateRecurringPlan = true. Default: monthly.</summary>

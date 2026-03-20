@@ -42,6 +42,16 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.CancellationReason).HasColumnName("cancellationReason");
         builder.Property(x => x.AutoConfirmAt).HasColumnName("autoConfirmAt");
 
+        // ─── Service address snapshot ─────────────────────────────────────────
+        builder.Property(x => x.SvcAddrZipCode).HasColumnName("svcAddrZipCode");
+        builder.Property(x => x.SvcAddrStreet).HasColumnName("svcAddrStreet");
+        builder.Property(x => x.SvcAddrNumber).HasColumnName("svcAddrNumber");
+        builder.Property(x => x.SvcAddrNeighborhood).HasColumnName("svcAddrNeighborhood");
+        builder.Property(x => x.SvcAddrCity).HasColumnName("svcAddrCity");
+        builder.Property(x => x.SvcAddrState).HasColumnName("svcAddrState");
+        builder.Property(x => x.SvcAddrComplement).HasColumnName("svcAddrComplement");
+        builder.Property(x => x.SvcAddrReference).HasColumnName("svcAddrReference");
+
         // ─── Phase 4: recurring + rebook ────────────────────────────────────
         builder.Property(x => x.RecurringPlanId).HasColumnName("recurringPlanId");
         builder.HasIndex(x => x.RecurringPlanId).HasFilter("\"recurringPlanId\" IS NOT NULL");

@@ -169,9 +169,46 @@ public static class ApiEndpoints
             if (!string.IsNullOrWhiteSpace(body.ZoneId) && !await repo.ZoneExistsAndActiveAsync(body.ZoneId, ct))
                 return Results.Json(new { error = "zoneId inválido (zona inexistente ou inativa)" }, statusCode: 400);
 
+            // Validate default address if provided
+            if (body.DefaultAddress is not null)
+            {
+                var (addrValid, addrError) = Application.Services.AddressResolver.Validate(body.DefaultAddress);
+                if (!addrValid)
+                    return Results.Json(new { error = addrError }, statusCode: 400);
+            }
+
             var hashed = BCrypt.Net.BCrypt.HashPassword(senha, workFactor: 10);
-            var user = await repo.CreateAsync(name, email, body.Phone?.Trim(), role, hashed, body.ZoneId?.Trim(), ct);
+            var user = await repo.CreateAsync(name, email, body.Phone?.Trim(), role, hashed, body.ZoneId?.Trim(), ct, body.DefaultAddress);
             return Results.Json(user, statusCode: 201);
+        });
+
+        // ─── User default address ───────────────────────────────────────────────
+        app.MapGet("/users/{id}/default-address", async (
+            string id,
+            IUserRepository repo,
+            CancellationToken ct) =>
+        {
+            var address = await repo.GetDefaultAddressAsync(id, ct);
+            return address is null
+                ? Results.NotFound(new { error = "Cliente não possui endereço padrão cadastrado" })
+                : Results.Ok(address);
+        });
+
+        app.MapPut("/users/{id}/default-address", async (
+            string id,
+            Application.DTOs.UpdateDefaultAddressRequest body,
+            IUserRepository repo,
+            CancellationToken ct) =>
+        {
+            if (body.Address is null)
+                return Results.Json(new { error = "address é obrigatório" }, statusCode: 400);
+
+            var (valid, error) = Application.Services.AddressResolver.Validate(body.Address);
+            if (!valid)
+                return Results.Json(new { error }, statusCode: 400);
+
+            await repo.UpdateDefaultAddressAsync(id, body.Address, ct);
+            return Results.Ok(new { ok = true, defaultAddress = body.Address });
         });
 
         // ─── Professionals ─────────────────────────────────────────────────────

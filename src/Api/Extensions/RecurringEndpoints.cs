@@ -1,5 +1,6 @@
 using Application.Abstractions;
 using Application.DTOs;
+using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,7 @@ public static class RecurringEndpoints
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             IRecurringPlanRepository recurringRepo,
+            IUserRepository userRepo,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ClientId))
@@ -53,6 +55,26 @@ public static class RecurringEndpoints
             if (basePrice <= 0)
                 return Results.Json(new { error = "Pedido original sem valor definido" }, statusCode: 422);
 
+            // Resolve service address — if client sends address, use it; otherwise inherit from source order
+            Domain.ValueObjects.AddressData? resolvedAddress = null;
+            if (body.UseDefaultAddress || body.ServiceAddress is not null)
+            {
+                AddressDto? defaultAddress = null;
+                if (body.UseDefaultAddress)
+                    defaultAddress = await userRepo.GetDefaultAddressAsync(body.ClientId, ct);
+
+                var (addr, addrError) = AddressResolver.Resolve(
+                    body.UseDefaultAddress, body.ServiceAddress, defaultAddress);
+                if (addrError is not null)
+                    return Results.Json(new { error = addrError }, statusCode: 422);
+                resolvedAddress = addr;
+            }
+            else
+            {
+                // Inherit from source order
+                resolvedAddress = source.GetServiceAddress();
+            }
+
             // Apply recurring discount if plan will be created
             var effectivePrice = body.CreateRecurringPlan
                 ? basePrice - (basePrice * body.DiscountPercent / 100)
@@ -80,9 +102,9 @@ public static class RecurringEndpoints
                 paymentMethod:   body.PaymentMethod ?? source.PaymentMethod,
                 scope:           source.Scope,
                 scheduledAt:     scheduledAt,
-                addressId:       body.AddressId ?? source.AddressId,
                 recurringPlanId: planId,
-                description:     $"Recontratação do pedido {orderId}");
+                description:     $"Recontratação do pedido {orderId}",
+                serviceAddress:  resolvedAddress);
 
             var created = await orderRepo.CreateBookingAsync(order, ct);
 
@@ -101,7 +123,8 @@ public static class RecurringEndpoints
                     discountPercent:  body.DiscountPercent,
                     paymentMethod:    body.PaymentMethod ?? source.PaymentMethod,
                     scope:            source.Scope,
-                    addressId:        body.AddressId ?? source.AddressId);
+                    addressId:        source.AddressId,
+                    serviceAddress:   resolvedAddress);
 
                 plan = await recurringRepo.CreateAsync(plan, ct);
             }

@@ -3,6 +3,7 @@ using Application.DTOs;
 using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
+using Domain.ValueObjects;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -57,6 +58,8 @@ public static class OrderEndpoints
                 .Select(u => new { id = u.Id, name = u.Name })
                 .FirstOrDefaultAsync(ct);
 
+            var svcAddr = order.GetServiceAddress();
+
             return Results.Ok(new
             {
                 id = order.Id,
@@ -67,6 +70,17 @@ public static class OrderEndpoints
                 depositCents = order.SignalCents,
                 notes = order.Description,
                 location = order.Location,
+                serviceAddress = svcAddr is not null ? new
+                {
+                    zipCode = svcAddr.ZipCode,
+                    street = svcAddr.Street,
+                    number = svcAddr.Number,
+                    neighborhood = svcAddr.Neighborhood,
+                    city = svcAddr.City,
+                    state = svcAddr.State,
+                    complement = svcAddr.Complement,
+                    reference = svcAddr.Reference
+                } : null,
                 professional,
                 client,
                 service,
@@ -80,6 +94,7 @@ public static class OrderEndpoints
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             IServiceCatalogRepository catalog,
+            IUserRepository userRepo,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ClientId))
@@ -99,6 +114,16 @@ public static class OrderEndpoints
             if (!tier.AllowBookingDirect)
                 return Results.Json(new { error = "Este tier não permite booking direto. Use proposta." }, statusCode: 422);
 
+            // Resolve service address
+            AddressDto? defaultAddress = null;
+            if (body.UseDefaultAddress)
+                defaultAddress = await userRepo.GetDefaultAddressAsync(body.ClientId, ct);
+
+            var (resolvedAddress, addrError) = AddressResolver.Resolve(
+                body.UseDefaultAddress, body.ServiceAddress, defaultAddress);
+            if (addrError is not null)
+                return Results.Json(new { error = addrError }, statusCode: 422);
+
             var scheduledAt = DateTime.TryParse(body.ScheduledAt, out var parsed) ? parsed : (DateTime?)null;
             var order = Order.CreateBooking(
                 id: Guid.NewGuid().ToString(),
@@ -114,8 +139,8 @@ public static class OrderEndpoints
                 scope: body.Scope,
                 scheduledAt: scheduledAt,
                 conversationId: body.ConversationId,
-                addressId: body.AddressId,
-                description: body.Description);
+                description: body.Description,
+                serviceAddress: resolvedAddress);
 
             var created = await orderRepo.CreateBookingAsync(order, ct);
 
@@ -137,6 +162,7 @@ public static class OrderEndpoints
             IOrderRepository orderRepo,
             IProposalRepository proposalRepo,
             IOrderTimelineRepository timeline,
+            IUserRepository userRepo,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ClientId))
@@ -151,6 +177,16 @@ public static class OrderEndpoints
                 return Results.Json(new { error = $"Proposta em status '{proposal.Status}' não pode ser aceita" }, statusCode: 422);
             if (proposal.ValidUntil < DateTime.UtcNow)
                 return Results.Json(new { error = "Proposta expirada" }, statusCode: 422);
+
+            // Resolve service address
+            AddressDto? defaultAddress = null;
+            if (body.UseDefaultAddress)
+                defaultAddress = await userRepo.GetDefaultAddressAsync(body.ClientId, ct);
+
+            var (resolvedAddress, addrError) = AddressResolver.Resolve(
+                body.UseDefaultAddress, body.ServiceAddress, defaultAddress);
+            if (addrError is not null)
+                return Results.Json(new { error = addrError }, statusCode: 422);
 
             var orderId = Guid.NewGuid().ToString();
             var signalCents = (int)(proposal.PriceTotalCents * 0.3); // default 30%
@@ -171,7 +207,7 @@ public static class OrderEndpoints
                 scope: proposal.Scope,
                 scheduledAt: proposal.SuggestedDatetime,
                 conversationId: proposal.ConversationId,
-                addressId: body.AddressId);
+                serviceAddress: resolvedAddress);
 
             var created = await orderRepo.CreateFromProposalAsync(order, ct);
             await proposalRepo.AcceptAsync(proposalId, orderId, ct);

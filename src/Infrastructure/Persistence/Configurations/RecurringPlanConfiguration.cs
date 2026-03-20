@@ -23,6 +23,17 @@ public sealed class RecurringPlanConfiguration : IEntityTypeConfiguration<Recurr
         builder.Property(x => x.PaymentMethod).HasColumnName("payment_method");
         builder.Property(x => x.Scope).HasColumnName("scope");
         builder.Property(x => x.AddressId).HasColumnName("address_id");
+
+        // ─── Service address snapshot ─────────────────────────────────────────
+        builder.Property(x => x.SvcAddrZipCode).HasColumnName("svcAddrZipCode");
+        builder.Property(x => x.SvcAddrStreet).HasColumnName("svcAddrStreet");
+        builder.Property(x => x.SvcAddrNumber).HasColumnName("svcAddrNumber");
+        builder.Property(x => x.SvcAddrNeighborhood).HasColumnName("svcAddrNeighborhood");
+        builder.Property(x => x.SvcAddrCity).HasColumnName("svcAddrCity");
+        builder.Property(x => x.SvcAddrState).HasColumnName("svcAddrState");
+        builder.Property(x => x.SvcAddrComplement).HasColumnName("svcAddrComplement");
+        builder.Property(x => x.SvcAddrReference).HasColumnName("svcAddrReference");
+
         builder.Property(x => x.Status).HasColumnName("status").IsRequired();
         builder.Property(x => x.NextBillingAt).HasColumnName("next_billing_at").IsRequired();
         builder.Property(x => x.OccurrenceCount).HasColumnName("occurrence_count").IsRequired().HasDefaultValue(0);
