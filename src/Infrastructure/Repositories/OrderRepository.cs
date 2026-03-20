@@ -25,8 +25,9 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
         // Este bloco é mutuamente exclusivo com filterZones (leads) para evitar interferência.
         if (active && !string.IsNullOrWhiteSpace(professionalId) && !filterZones)
         {
+            var terminalStatuses = OrderStatus.Terminal.ToList();
             query = query.Where(o => o.ProfessionalId == professionalId);
-            query = query.Where(o => !OrderStatus.Terminal.Contains(o.Status));
+            query = query.Where(o => !terminalStatuses.Contains(o.Status));
             return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
         }
 

@@ -491,20 +491,33 @@ public static class ApiEndpoints
             IConversationRepository repo,
             IEmailService emailSvc,
             IAntiLeakDetectionService antiLeak,
+            IProfessionalDetailRepository userRepo,
             CancellationToken ct) =>
         {
             var body = await ParseSendMessageRequestAsync(req, ct);
             if (body is null)
                 return Results.Json(new { error = "Body inválido. Envie JSON no formato { conversationId, senderId, text, ... }" }, statusCode: 400);
 
-            if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.SenderId) || string.IsNullOrWhiteSpace(body.Text))
-                return Results.Json(new { error = "conversationId, senderId e text são obrigatórios" }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(body.ConversationId) || string.IsNullOrWhiteSpace(body.Text))
+                return Results.Json(new { error = "conversationId e text são obrigatórios" }, statusCode: 400);
+
+            // Resolve senderId: prefer JWT sub claim (Supabase Auth UUID) over client-provided value
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value
+                         ?? req.HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var resolvedSenderId = !string.IsNullOrWhiteSpace(jwtUserId) ? jwtUserId : body.SenderId;
+
+            if (string.IsNullOrWhiteSpace(resolvedSenderId))
+                return Results.Json(new { error = "senderId é obrigatório" }, statusCode: 400);
+
+            // Validate sender exists in User table before persisting (prevents FK violation)
+            if (!await userRepo.UserExistsAsync(resolvedSenderId, ct))
+                return Results.Json(new { error = "Remetente inválido: usuário não encontrado" }, statusCode: 422);
 
             var messageType = string.IsNullOrWhiteSpace(body.Type) ? MessageType.Text : body.Type;
 
             var message = await repo.CreateMessageAsync(
                 body.ConversationId,
-                body.SenderId,
+                resolvedSenderId,
                 body.Text.Trim(),
                 messageType,
                 body.Metadata,
@@ -518,7 +531,7 @@ public static class ApiEndpoints
             {
                 _ = repo.CreateMessageAsync(
                     body.ConversationId,
-                    body.SenderId,
+                    resolvedSenderId,
                     antiLeak.GetWarningText(),
                     MessageType.System,
                     null,
@@ -533,7 +546,7 @@ public static class ApiEndpoints
             if (conv is not null)
             {
                 var c = ToObjectDictionary(conv);
-                var isClient = body.SenderId == c["clientId"]?.ToString();
+                var isClient = resolvedSenderId == c["clientId"]?.ToString();
                 var lastReadAt = isClient ? c["professionalLastReadAt"] : c["clientLastReadAt"];
                 var recipientEmail = isClient ? c["professionalEmail"]?.ToString() : c["clientEmail"]?.ToString();
                 var recipientName = isClient ? c["professionalName"]?.ToString() ?? "Usuário" : c["clientName"]?.ToString() ?? "Usuário";

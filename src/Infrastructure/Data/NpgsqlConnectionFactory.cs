@@ -1,6 +1,4 @@
 using System.Data;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Infrastructure.Data;
@@ -10,28 +8,18 @@ public interface IConnectionFactory
     Task<IDbConnection> CreateOpenConnectionAsync(CancellationToken ct);
 }
 
-public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposable
+/// <summary>
+/// Dapper connection factory. Receives the application-wide shared <see cref="NpgsqlDataSource"/>
+/// so that EF Core and Dapper use a single connection pool per process/Lambda instance.
+/// The data source lifetime is managed by the DI container; this class must not dispose it.
+/// </summary>
+public sealed class NpgsqlConnectionFactory : IConnectionFactory
 {
     private readonly NpgsqlDataSource _dataSource;
 
-    public NpgsqlConnectionFactory(IOptions<DatabaseOptions> options, IHostEnvironment environment)
+    public NpgsqlConnectionFactory(NpgsqlDataSource dataSource)
     {
-        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(options.Value.ConnectionString)
-        {
-            Timeout = options.Value.TimeoutSeconds,
-            CommandTimeout = options.Value.CommandTimeoutSeconds,
-            MaxPoolSize = options.Value.MaximumPoolSize,
-            Pooling = true,
-            NoResetOnClose = true
-        };
-
-        if (!environment.IsDevelopment() && ShouldUseSupabasePooler(connectionStringBuilder))
-        {
-            connectionStringBuilder.Port = options.Value.PoolerPort;
-        }
-
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionStringBuilder.ConnectionString);
-        _dataSource = dataSourceBuilder.Build();
+        _dataSource = dataSource;
     }
 
     public async Task<IDbConnection> CreateOpenConnectionAsync(CancellationToken ct)
@@ -39,15 +27,14 @@ public sealed class NpgsqlConnectionFactory : IConnectionFactory, IAsyncDisposab
         return await _dataSource.OpenConnectionAsync(ct);
     }
 
-    public async ValueTask DisposeAsync()
+    internal static bool IsSupabaseHost(NpgsqlConnectionStringBuilder builder)
     {
-        await _dataSource.DisposeAsync();
+        return !string.IsNullOrWhiteSpace(builder.Host)
+               && builder.Host.Contains("supabase", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool ShouldUseSupabasePooler(NpgsqlConnectionStringBuilder builder)
     {
-        return !string.IsNullOrWhiteSpace(builder.Host)
-               && builder.Host.Contains("supabase", StringComparison.OrdinalIgnoreCase)
-               && builder.Port != 6543;
+        return IsSupabaseHost(builder) && builder.Port != 6543;
     }
 }
