@@ -3,6 +3,7 @@ using Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
+using Infrastructure.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -147,6 +148,49 @@ public static class ApiEndpoints
                 token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
             }
 
+            return Results.Ok(new { token, user = userObj });
+        });
+
+        // ─── Social Auth ────────────────────────────────────────────────────────
+        app.MapPost("/auth/google", async (GoogleLoginRequest body, ISocialAuthService socialAuth, IUserRepository repo, IConfiguration config, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.IdToken))
+                return Results.Json(new { error = "idToken é obrigatório" }, statusCode: 400);
+
+            SocialUserInfo info;
+            try
+            {
+                info = await socialAuth.ValidateGoogleTokenAsync(body.IdToken, ct);
+            }
+            catch (SocialAuthException ex)
+            {
+                return Results.Json(new { error = ex.Message }, statusCode: 400);
+            }
+
+            var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
+
+            var token = GenerateJwt(config, userObj);
+            return Results.Ok(new { token, user = userObj });
+        });
+
+        app.MapPost("/auth/facebook", async (FacebookLoginRequest body, ISocialAuthService socialAuth, IUserRepository repo, IConfiguration config, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.AccessToken))
+                return Results.Json(new { error = "accessToken é obrigatório" }, statusCode: 400);
+
+            SocialUserInfo info;
+            try
+            {
+                info = await socialAuth.ValidateFacebookTokenAsync(body.AccessToken, ct);
+            }
+            catch (SocialAuthException ex)
+            {
+                return Results.Json(new { error = ex.Message }, statusCode: 400);
+            }
+
+            var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
+
+            var token = GenerateJwt(config, userObj);
             return Results.Ok(new { token, user = userObj });
         });
 
@@ -971,6 +1015,38 @@ public static class ApiEndpoints
                 d["clientName"]?.ToString() ?? "", d["professionalName"]?.ToString() ?? "",
                 d["serviceName"]?.ToString() ?? "Serviço", when, bookingUrl,
                 dedupeKey: $"{dedupeBase}|cli|{clientEmail}", ct: ct).ConfigureAwait(false);
+    }
+
+    private static string? GenerateJwt(IConfiguration config, object userObj)
+    {
+        var jwtSecret = config["SUPABASE_JWT_SECRET"];
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+            return null;
+
+        var userJson = JsonSerializer.Serialize(userObj);
+        using var userDoc = JsonDocument.Parse(userJson);
+        var root = userDoc.RootElement;
+        var userId = root.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
+        var email = root.TryGetProperty("email", out var emailEl) ? emailEl.GetString() ?? "" : "";
+        var role = root.TryGetProperty("role", out var roleEl) ? roleEl.GetString() ?? "" : "";
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, userId),
+            new Claim(JwtRegisteredClaimNames.Email, email),
+            new Claim("role", role),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        };
+        var jwtToken = new JwtSecurityToken(
+            issuer: "jobeasy",
+            audience: "jobeasy",
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddDays(7),
+            signingCredentials: creds);
+        return new JwtSecurityTokenHandler().WriteToken(jwtToken);
     }
 
     private static bool ShouldBypassCache(HttpRequest req)

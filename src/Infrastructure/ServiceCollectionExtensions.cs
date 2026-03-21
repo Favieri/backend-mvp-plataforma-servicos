@@ -92,6 +92,9 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        // Social auth
+        services.AddScoped<ISocialAuthService, Services.SocialAuthService>();
+
         // Core repositories
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IProfessionalRepository, ProfessionalRepository>();

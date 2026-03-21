@@ -7,4 +7,6 @@ public sealed record User(
     string? Phone,
     string Role,
     string? ZoneId,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string? Provider = null,
+    string? ProviderUserId = null);
