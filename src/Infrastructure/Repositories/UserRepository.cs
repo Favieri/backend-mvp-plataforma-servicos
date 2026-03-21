@@ -102,9 +102,93 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             """, ct);
     }
 
+    public async Task<object> FindOrCreateSocialUserAsync(string provider, string providerUserId, string email, string name, CancellationToken ct)
+    {
+        // 1. Search by provider + providerUserId
+        var existing = await ctx.Database
+            .SqlQuery<SocialUserRow>($"""
+                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
+                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
+                       provider AS "Provider", provider_user_id AS "ProviderUserId"
+                FROM "User"
+                WHERE provider = {provider} AND provider_user_id = {providerUserId}
+                LIMIT 1
+            """)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is not null)
+            return ToUserObject(existing);
+
+        // 2. Search by email
+        var byEmail = await ctx.Database
+            .SqlQuery<SocialUserRow>($"""
+                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
+                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
+                       provider AS "Provider", provider_user_id AS "ProviderUserId"
+                FROM "User"
+                WHERE email = {email}
+                LIMIT 1
+            """)
+            .FirstOrDefaultAsync(ct);
+
+        if (byEmail is not null)
+        {
+            // Link provider to existing user if not already linked
+            if (string.IsNullOrEmpty(byEmail.Provider))
+            {
+                await ctx.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    UPDATE "User"
+                    SET provider = {provider}, provider_user_id = {providerUserId}
+                    WHERE id = {byEmail.Id}
+                    """, ct);
+                byEmail = byEmail with { Provider = provider, ProviderUserId = providerUserId };
+            }
+            return ToUserObject(byEmail);
+        }
+
+        // 3. Create new user
+        var id = Guid.NewGuid().ToString();
+        var now = DateTime.UtcNow;
+
+        await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "User"(id, name, email, phone, role, senha, "zoneId", "createdAt", provider, provider_user_id)
+            VALUES ({id}, {name}, {email}, {(string?)null}, {"cliente"}, {(string?)null}, {(string?)null}, {now}, {provider}, {providerUserId})
+            """, ct);
+
+        return new
+        {
+            id, name, email, phone = (string?)null, role = "cliente",
+            zoneId = (string?)null, createdAt = now,
+            provider, providerUserId,
+            defaultAddress = (object?)null
+        };
+    }
+
+    private static object ToUserObject(SocialUserRow row) => new
+    {
+        id = row.Id, name = row.Name, email = row.Email, phone = row.Phone,
+        role = row.Role, zoneId = row.ZoneId, createdAt = row.CreatedAt,
+        provider = row.Provider, providerUserId = row.ProviderUserId
+    };
+
     // Internal record for raw SQL projection
     private sealed record AddressRow(
         string? ZipCode, string? Street, string? Number,
         string? Neighborhood, string? City, string? State,
         string? Complement, string? Reference);
+
+    private sealed record SocialUserRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+        public string? Phone { get; init; }
+        public string Role { get; init; } = string.Empty;
+        public string? ZoneId { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public string? Provider { get; init; }
+        public string? ProviderUserId { get; init; }
+    }
 }

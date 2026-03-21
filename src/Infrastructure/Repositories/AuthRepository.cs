@@ -11,7 +11,7 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
         // senha is not part of the User domain entity; project it via raw SQL to avoid exposing it elsewhere
         var row = await ctx.Database
             .SqlQueryRaw<AuthRow>(
-                """SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone", role AS "Role", senha AS "Senha", "createdAt" AS "CreatedAt" FROM "User" WHERE email = {0}""",
+                """SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone", role AS "Role", senha AS "Senha", "createdAt" AS "CreatedAt", provider AS "Provider", provider_user_id AS "ProviderUserId" FROM "User" WHERE email = {0}""",
                 email)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
@@ -31,7 +31,9 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
             email = row.Email,
             phone = row.Phone,
             role = row.Role,
-            createdAt = row.CreatedAt
+            createdAt = row.CreatedAt,
+            provider = row.Provider,
+            providerUserId = row.ProviderUserId
         };
     }
 
@@ -44,5 +46,7 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
         public string Role { get; init; } = string.Empty;
         public string Senha { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
+        public string? Provider { get; init; }
+        public string? ProviderUserId { get; init; }
     }
 }

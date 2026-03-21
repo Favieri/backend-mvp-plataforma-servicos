@@ -20,6 +20,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.ZoneId).HasColumnName("zoneId");
         builder.Property(x => x.CreatedAt).HasColumnName("createdAt").IsRequired();
 
+        builder.Property(x => x.Provider).HasColumnName("provider");
+        builder.Property(x => x.ProviderUserId).HasColumnName("provider_user_id");
+
         // senha is stored in the DB but not part of the User domain entity
         // accessed only by AuthRepository via raw projection
         builder.Ignore("Senha");
