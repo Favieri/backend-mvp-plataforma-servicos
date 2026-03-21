@@ -100,6 +100,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("CancelledBy").IsRequired(false).HasColumnName("cancelledBy");
             b.Property<string>("CancellationReason").IsRequired(false).HasColumnName("cancellationReason");
             b.Property<DateTime?>("AutoConfirmAt").HasColumnName("autoConfirmAt");
+            // Service address snapshot
+            b.Property<string>("SvcAddrZipCode").IsRequired(false).HasColumnName("svcAddrZipCode");
+            b.Property<string>("SvcAddrStreet").IsRequired(false).HasColumnName("svcAddrStreet");
+            b.Property<string>("SvcAddrNumber").IsRequired(false).HasColumnName("svcAddrNumber");
+            b.Property<string>("SvcAddrNeighborhood").IsRequired(false).HasColumnName("svcAddrNeighborhood");
+            b.Property<string>("SvcAddrCity").IsRequired(false).HasColumnName("svcAddrCity");
+            b.Property<string>("SvcAddrState").IsRequired(false).HasColumnName("svcAddrState");
+            b.Property<string>("SvcAddrComplement").IsRequired(false).HasColumnName("svcAddrComplement");
+            b.Property<string>("SvcAddrReference").IsRequired(false).HasColumnName("svcAddrReference");
+            // Recurring plan FK
+            b.Property<string>("RecurringPlanId").IsRequired(false).HasColumnName("recurringPlanId");
             b.HasKey("Id");
             b.HasIndex("ClientId").HasDatabaseName("IX_Order_clientId");
             b.HasIndex("ClientId", "CreatedAt").HasDatabaseName("IX_Order_clientId_createdAt");
@@ -107,6 +118,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("Status").HasDatabaseName("IX_Order_status");
             b.HasIndex("ProfessionalId").HasDatabaseName("IX_Order_professionalId");
             b.HasIndex("AutoConfirmAt").HasDatabaseName("IX_Order_autoConfirmAt");
+            b.HasIndex("RecurringPlanId")
+                .HasFilter("\"recurringPlanId\" IS NOT NULL")
+                .HasDatabaseName("IX_Order_recurringPlanId");
             b.ToTable("Order");
         });
 

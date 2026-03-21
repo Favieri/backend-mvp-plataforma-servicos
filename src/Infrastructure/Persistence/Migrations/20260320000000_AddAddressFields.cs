@@ -183,13 +183,13 @@ public partial class AddAddressFields : Migration
         migrationBuilder.DropColumn(name: "svcAddrReference", table: "Order");
 
         // RecurringPlan
-        migrationBuilder.DropColumn(name: "svcAddrZipCode", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrStreet", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrNumber", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrNeighborhood", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrCity", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrState", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrComplement", table: "RecurringPlan");
-        migrationBuilder.DropColumn(name: "svcAddrReference", table: "RecurringPlan");
+        migrationBuilder.DropColumn(name: "svcAddrZipCode", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrStreet", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrNumber", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrNeighborhood", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrCity", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrState", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrComplement", table: "recurring_plan");
+        migrationBuilder.DropColumn(name: "svcAddrReference", table: "recurring_plan");
     }
 }
