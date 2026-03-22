@@ -6,27 +6,21 @@ namespace Infrastructure.Persistence.Migrations;
 
 /// <summary>
 /// Adds provider and provider_user_id columns to User table for social login (Google/Facebook).
+///
+/// IDEMPOTENT: uses IF NOT EXISTS guards so it can be safely re-applied when the schema
+/// was already created outside EF Core.
 /// </summary>
 public partial class AddSocialLoginFields : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<string>(
-            name: "provider",
-            table: "User",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "provider_user_id",
-            table: "User",
-            type: "text",
-            nullable: true);
+        migrationBuilder.Sql(@"ALTER TABLE ""User"" ADD COLUMN IF NOT EXISTS ""provider"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""User"" ADD COLUMN IF NOT EXISTS ""provider_user_id"" text;");
 
         // Unique index on (provider, provider_user_id) where both are not null
         migrationBuilder.Sql(
             """
-            CREATE UNIQUE INDEX "IX_User_provider_providerUserId"
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_User_provider_providerUserId"
             ON "User" (provider, provider_user_id)
             WHERE provider IS NOT NULL AND provider_user_id IS NOT NULL;
             """);

@@ -9,197 +9,87 @@ namespace Infrastructure.Persistence.Migrations;
 /// - Expands "Order" table with transactional model fields (all nullable for retrocompat)
 /// - Creates proposal table
 /// - Creates order_timeline table
+///
+/// IDEMPOTENT: uses IF NOT EXISTS guards so it can be safely re-applied when the schema
+/// was already created outside EF Core (avoids "column already exists" errors on startup).
 /// </summary>
 public partial class Phase1OrderProposalTimeline : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        // ─── Expand "Order" table ────────────────────────────────────────────
-        migrationBuilder.AddColumn<string>(
-            name: "professionalId",
-            table: "Order",
-            type: "text",
-            nullable: true);
+        // ─── Expand "Order" table ─────────────────────────────────────────────
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""professionalId"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""tierId"" integer;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""origin"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""proposalId"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""appointmentId"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""conversationId"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""priceTotalCents"" integer;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""signalCents"" integer;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""balanceCents"" integer;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""installments"" integer NOT NULL DEFAULT 1;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""paymentMethod"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""addressId"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""scope"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""scheduledAt"" timestamp without time zone;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""completedAt"" timestamp without time zone;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""cancelledAt"" timestamp without time zone;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""cancelledBy"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""cancellationReason"" text;");
+        migrationBuilder.Sql(@"ALTER TABLE ""Order"" ADD COLUMN IF NOT EXISTS ""autoConfirmAt"" timestamp without time zone;");
 
-        migrationBuilder.AddColumn<int>(
-            name: "tierId",
-            table: "Order",
-            type: "integer",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "origin",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "proposalId",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "appointmentId",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "conversationId",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<int>(
-            name: "priceTotalCents",
-            table: "Order",
-            type: "integer",
-            nullable: true);
-
-        migrationBuilder.AddColumn<int>(
-            name: "signalCents",
-            table: "Order",
-            type: "integer",
-            nullable: true);
-
-        migrationBuilder.AddColumn<int>(
-            name: "balanceCents",
-            table: "Order",
-            type: "integer",
-            nullable: true);
-
-        migrationBuilder.AddColumn<int>(
-            name: "installments",
-            table: "Order",
-            type: "integer",
-            nullable: false,
-            defaultValue: 1);
-
-        migrationBuilder.AddColumn<string>(
-            name: "paymentMethod",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "addressId",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "scope",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<DateTime>(
-            name: "scheduledAt",
-            table: "Order",
-            type: "timestamp without time zone",
-            nullable: true);
-
-        migrationBuilder.AddColumn<DateTime>(
-            name: "completedAt",
-            table: "Order",
-            type: "timestamp without time zone",
-            nullable: true);
-
-        migrationBuilder.AddColumn<DateTime>(
-            name: "cancelledAt",
-            table: "Order",
-            type: "timestamp without time zone",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "cancelledBy",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<string>(
-            name: "cancellationReason",
-            table: "Order",
-            type: "text",
-            nullable: true);
-
-        migrationBuilder.AddColumn<DateTime>(
-            name: "autoConfirmAt",
-            table: "Order",
-            type: "timestamp without time zone",
-            nullable: true);
-
-        // New indexes for Order
-        migrationBuilder.CreateIndex(
-            name: "IX_Order_professionalId",
-            table: "Order",
-            column: "professionalId");
-
-        migrationBuilder.CreateIndex(
-            name: "IX_Order_autoConfirmAt",
-            table: "Order",
-            column: "autoConfirmAt");
+        // Indexes for Order
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_Order_professionalId"" ON ""Order""(""professionalId"");");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_Order_autoConfirmAt"" ON ""Order""(""autoConfirmAt"") WHERE ""autoConfirmAt"" IS NOT NULL;");
 
         // ─── Create proposal table ────────────────────────────────────────────
-        migrationBuilder.CreateTable(
-            name: "proposal",
-            columns: table => new
-            {
-                id = table.Column<string>(type: "text", nullable: false),
-                order_id = table.Column<string>(type: "text", nullable: true),
-                professional_id = table.Column<string>(type: "text", nullable: false),
-                client_id = table.Column<string>(type: "text", nullable: false),
-                service_id = table.Column<string>(type: "text", nullable: false),
-                professional_service_id = table.Column<string>(type: "text", nullable: true),
-                conversation_id = table.Column<string>(type: "text", nullable: true),
-                scope = table.Column<string>(type: "text", nullable: false),
-                includes_description = table.Column<string>(type: "text", nullable: true),
-                excludes_description = table.Column<string>(type: "text", nullable: true),
-                price_total_cents = table.Column<int>(type: "integer", nullable: false),
-                price_by_stage = table.Column<string>(type: "jsonb", nullable: true),
-                duration_estimate = table.Column<string>(type: "text", nullable: true),
-                suggested_datetime = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
-                visit_fee_cents = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                valid_until = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
-                status = table.Column<string>(type: "text", nullable: false, defaultValue: "draft"),
-                rejection_reason = table.Column<string>(type: "text", nullable: true),
-                created_at = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
-                updated_at = table.Column<DateTime>(type: "timestamp without time zone", nullable: false)
-            },
-            constraints: table => table.PrimaryKey("PK_proposal", x => x.id));
+        migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS proposal (
+    id text NOT NULL,
+    order_id text,
+    professional_id text NOT NULL,
+    client_id text NOT NULL,
+    service_id text NOT NULL,
+    professional_service_id text,
+    conversation_id text,
+    scope text NOT NULL,
+    includes_description text,
+    excludes_description text,
+    price_total_cents integer NOT NULL,
+    price_by_stage jsonb,
+    duration_estimate text,
+    suggested_datetime timestamp without time zone,
+    visit_fee_cents integer NOT NULL DEFAULT 0,
+    valid_until timestamp without time zone NOT NULL,
+    status text NOT NULL DEFAULT 'draft',
+    rejection_reason text,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    CONSTRAINT ""PK_proposal"" PRIMARY KEY (id)
+);");
 
-        migrationBuilder.CreateIndex(name: "IX_proposal_order_id", table: "proposal", column: "order_id");
-        migrationBuilder.CreateIndex(name: "IX_proposal_professional_id", table: "proposal", column: "professional_id");
-        migrationBuilder.CreateIndex(name: "IX_proposal_client_id", table: "proposal", column: "client_id");
-        migrationBuilder.CreateIndex(name: "IX_proposal_conversation_id", table: "proposal", column: "conversation_id");
-        migrationBuilder.CreateIndex(name: "IX_proposal_status", table: "proposal", column: "status");
-        migrationBuilder.CreateIndex(name: "IX_proposal_valid_until", table: "proposal", column: "valid_until");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_order_id"" ON proposal(order_id);");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_professional_id"" ON proposal(professional_id);");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_client_id"" ON proposal(client_id);");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_conversation_id"" ON proposal(conversation_id) WHERE conversation_id IS NOT NULL;");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_status"" ON proposal(status);");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_proposal_valid_until"" ON proposal(valid_until);");
 
         // ─── Create order_timeline table ──────────────────────────────────────
-        migrationBuilder.CreateTable(
-            name: "order_timeline",
-            columns: table => new
-            {
-                id = table.Column<string>(type: "text", nullable: false),
-                order_id = table.Column<string>(type: "text", nullable: false),
-                event_type = table.Column<string>(type: "text", nullable: false),
-                actor_id = table.Column<string>(type: "text", nullable: true),
-                actor_role = table.Column<string>(type: "text", nullable: true),
-                metadata = table.Column<string>(type: "jsonb", nullable: true),
-                created_at = table.Column<DateTime>(type: "timestamp without time zone", nullable: false)
-            },
-            constraints: table => table.PrimaryKey("PK_order_timeline", x => x.id));
+        migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS order_timeline (
+    id text NOT NULL,
+    order_id text NOT NULL,
+    event_type text NOT NULL,
+    actor_id text,
+    actor_role text,
+    metadata jsonb,
+    created_at timestamp without time zone NOT NULL,
+    CONSTRAINT ""PK_order_timeline"" PRIMARY KEY (id)
+);");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_order_timeline_order_id_created_at",
-            table: "order_timeline",
-            columns: ["order_id", "created_at"]);
-
-        migrationBuilder.CreateIndex(
-            name: "IX_order_timeline_event_type",
-            table: "order_timeline",
-            column: "event_type");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_order_timeline_order_id_created_at"" ON order_timeline(order_id, created_at);");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_order_timeline_event_type"" ON order_timeline(event_type);");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

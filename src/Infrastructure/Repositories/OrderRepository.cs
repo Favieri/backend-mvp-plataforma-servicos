@@ -212,12 +212,13 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 
     public async Task<IReadOnlyList<object>> GetMineByRoleAsync(string userId, string role, CancellationToken ct)
     {
-        // When role=professional, userId is the User.Id from the JWT.
-        // Order.ProfessionalId stores Professional.Id (a different UUID).
-        // We resolve User.Id → Professional.Id via an EXISTS subquery.
+        // When role=professional, userId can be either:
+        //   - User.Id (JWT sub claim) — resolved via Professional.UserId
+        //   - Professional.Id (used by some frontend flows)
+        // We support both by checking (pr.UserId == userId OR pr.Id == userId).
         var query = role == "professional"
             ? ctx.Orders.AsNoTracking().Where(o =>
-                ctx.Professionals.Any(pr => pr.UserId == userId && pr.Id == o.ProfessionalId))
+                ctx.Professionals.Any(pr => (pr.UserId == userId || pr.Id == userId) && pr.Id == o.ProfessionalId))
             : ctx.Orders.AsNoTracking().Where(o => o.ClientId == userId);
 
         var rows = await query

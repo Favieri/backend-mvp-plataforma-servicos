@@ -96,10 +96,26 @@ apiGroup.MapMarketplaceEndpoints();
 // Aplica migrations pendentes automaticamente no startup.
 // Garante que colunas como svcAddr* (AddAddressFields) e provider (AddSocialLoginFields)
 // sejam criadas no banco antes de qualquer request ser processado.
+// Todas as migrations são idempotentes (IF NOT EXISTS), mas se alguma falhar por qualquer
+// motivo inesperado, o app continua — o schema já pode estar correto no banco.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    try
+    {
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception migEx)
+    {
+        var migLogger = scope.ServiceProvider
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("MigrationStartup");
+        var sqlState = FindNpgsqlSqlState(migEx);
+        migLogger.LogError(migEx,
+            "MigrateAsync falhou — continuando com schema existente. " +
+            "SqlState={SqlState} Mensagem={Message}",
+            sqlState ?? "n/a", migEx.Message);
+    }
 }
 
 app.Run();
