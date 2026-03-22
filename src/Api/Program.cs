@@ -4,6 +4,7 @@ using Api.Logging;
 using Api.Middleware;
 using Application.Services;
 using Infrastructure;
+using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -91,6 +92,15 @@ app.MapMethods("/{**path}", ["OPTIONS"], () => Results.NoContent())
 
 var apiGroup = app.MapGroup(string.Empty).RequireCors("default");
 apiGroup.MapMarketplaceEndpoints();
+
+// Aplica migrations pendentes automaticamente no startup.
+// Garante que colunas como svcAddr* (AddAddressFields) e provider (AddSocialLoginFields)
+// sejam criadas no banco antes de qualquer request ser processado.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
 
 app.Run();
 

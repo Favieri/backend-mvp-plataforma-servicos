@@ -68,8 +68,12 @@ public sealed class ProposalRepository(AppDbContext ctx) : IProposalRepository
 
     public async Task<IReadOnlyList<object>> GetMineAsync(string userId, string role, CancellationToken ct)
     {
+        // When role=professional, userId is the User.Id from the JWT.
+        // Proposal.ProfessionalId stores Professional.Id (a different UUID).
+        // We resolve User.Id → Professional.Id via an EXISTS subquery.
         var query = role == "professional"
-            ? ctx.Proposals.AsNoTracking().Where(p => p.ProfessionalId == userId)
+            ? ctx.Proposals.AsNoTracking().Where(p =>
+                ctx.Professionals.Any(pr => pr.UserId == userId && pr.Id == p.ProfessionalId))
             : ctx.Proposals.AsNoTracking().Where(p => p.ClientId == userId);
 
         var rows = await query
