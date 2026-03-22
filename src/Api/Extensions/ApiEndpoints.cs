@@ -396,11 +396,13 @@ public static class ApiEndpoints
         });
 
         // ─── Orders ────────────────────────────────────────────────────────────
+        // filterZones e active aceitam "true"/"false" e também "1"/"0" para compatibilidade com frontends
+        // que enviam valores numéricos em query params (ex: filterZones=1).
         app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
-            string? professionalId, bool? filterZones, bool? active, IOrderRepository repo, CancellationToken ct) =>
+            string? professionalId, string? filterZones, string? active, IOrderRepository repo, CancellationToken ct) =>
             await GetOrSetCachedListAsync(ctx, cache, "api-orders", TimeSpan.FromSeconds(30),
-                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, filterZones == true, active == true, token), ct));
+                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, ParseBoolParam(filterZones), ParseBoolParam(active), token), ct));
 
         app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
@@ -1048,6 +1050,9 @@ public static class ApiEndpoints
             signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(jwtToken);
     }
+
+    private static bool ParseBoolParam(string? value)
+        => value == "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 
     private static bool ShouldBypassCache(HttpRequest req)
         => req.Headers.TryGetValue("Cache-Control", out var values)
