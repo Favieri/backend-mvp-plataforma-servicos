@@ -629,6 +629,54 @@
                     "type": "text",
                     "default": null,
                     "nullable": true
+                },
+                {
+                    "name": "svcAddrZipCode",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrStreet",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrNumber",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrNeighborhood",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrCity",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrState",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrComplement",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrReference",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
@@ -1673,9 +1721,73 @@
                     "type": "text",
                     "default": null,
                     "nullable": true
+                },
+                {
+                    "name": "provider",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "provider_user_id",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_zip_code",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_street",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_number",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_neighborhood",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_city",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_state",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_complement",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "addr_reference",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
+                {
+                    "name": "IX_User_provider_providerUserId",
+                    "definition": "CREATE UNIQUE INDEX \"IX_User_provider_providerUserId\" ON public.\"User\" USING btree (provider, provider_user_id) WHERE ((provider IS NOT NULL) AND (provider_user_id IS NOT NULL))"
+                },
                 {
                     "name": "IX_User_zoneId",
                     "definition": "CREATE INDEX \"IX_User_zoneId\" ON public.\"User\" USING btree (\"zoneId\")"
@@ -3397,6 +3509,54 @@
                     "type": "timestamp without time zone",
                     "default": "now()",
                     "nullable": false
+                },
+                {
+                    "name": "svcAddrZipCode",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrStreet",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrNumber",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrNeighborhood",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrCity",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrState",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrComplement",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "svcAddrReference",
+                    "type": "text",
+                    "default": null,
+                    "nullable": true
                 }
             ],
             "indexes": [
