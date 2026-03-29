@@ -101,7 +101,11 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 professionalId = ps.ProfessionalId,
                 nomeServico = ps.NomeServico,
                 preco = ps.Preco,
-                descricao = ps.Descricao
+                descricao = ps.Descricao,
+                tierId = ps.TierId,
+                contractMode = ps.ContractMode,
+                durationMinutes = ps.DurationMinutes,
+                minLeadTimeMinutes = ps.MinLeadTimeMinutes
             })
             .ToListAsync(ct);
 
