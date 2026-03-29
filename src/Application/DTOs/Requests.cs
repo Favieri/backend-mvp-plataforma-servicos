@@ -32,7 +32,16 @@ public sealed record CreateProfessionalRequest(string UserId, string? Bio, strin
 public sealed record UpdateProfessionalRequest(string? Bio, bool? Active, string? AvailabilityText, string? AvatarUrl);
 
 // Professional Services
-public sealed record CreateProfessionalServiceRequest(string ProfessionalId, string ServiceId, string NomeServico, decimal Preco, string? Descricao);
+public sealed record CreateProfessionalServiceRequest(
+    string ProfessionalId,
+    string ServiceId,
+    string NomeServico,
+    decimal Preco,
+    string? Descricao,
+    int? TierId = null,
+    string? ContractMode = null,
+    int? DurationMinutes = null,
+    int? MinLeadTimeMinutes = null);
 public sealed record UpdateProfessionalServiceRequest(string? NomeServico, decimal? Preco, string? Descricao);
 
 // Professional Zones

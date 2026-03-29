@@ -373,6 +373,35 @@ public static class ApiEndpoints
                 return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 400);
             if (!await repo.ServiceExistsAsync(body.ServiceId, ct))
                 return Results.Json(new { error = "Serviço (categoria) não encontrado." }, statusCode: 400);
+
+            // Tier / contractMode validation (only when at least one is provided)
+            if (body.TierId.HasValue || body.ContractMode is not null)
+            {
+                if (!body.TierId.HasValue)
+                    return Results.Json(new { error = "tierId é obrigatório quando contractMode é informado." }, statusCode: 400);
+                if (string.IsNullOrWhiteSpace(body.ContractMode))
+                    return Results.Json(new { error = "contractMode é obrigatório quando tierId é informado." }, statusCode: 400);
+
+                var validModes = new[] { ContractMode.Booking, ContractMode.Proposal };
+                if (!validModes.Contains(body.ContractMode))
+                    return Results.Json(new { error = "contractMode inválido. Valores aceitos: booking, proposal." }, statusCode: 400);
+
+                int[] bookingTiers = [1, 4];
+                int[] proposalTiers = [2, 3];
+
+                if (!bookingTiers.Concat(proposalTiers).Contains(body.TierId.Value))
+                    return Results.Json(new { error = "tierId inválido. Valores aceitos: 1, 2, 3, 4." }, statusCode: 400);
+
+                if (body.ContractMode == ContractMode.Booking && !bookingTiers.Contains(body.TierId.Value))
+                    return Results.Json(new { error = "contractMode 'booking' é incompatível com o tierId informado. Tiers permitidos para booking: 1, 4." }, statusCode: 400);
+
+                if (body.ContractMode == ContractMode.Proposal && !proposalTiers.Contains(body.TierId.Value))
+                    return Results.Json(new { error = "contractMode 'proposal' é incompatível com o tierId informado. Tiers permitidos para proposal: 2, 3." }, statusCode: 400);
+
+                if (body.ContractMode == ContractMode.Booking && (!body.DurationMinutes.HasValue || body.DurationMinutes.Value <= 0))
+                    return Results.Json(new { error = "durationMinutes é obrigatório e deve ser maior que zero para contractMode 'booking'." }, statusCode: 400);
+            }
+
             var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), body.Preco, body.Descricao, ct);
             return Results.Json(created, statusCode: 201);
         });
