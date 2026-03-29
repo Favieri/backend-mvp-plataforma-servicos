@@ -20,6 +20,10 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
                 nomeServico = ps.NomeServico,
                 preco = ps.Preco,
                 descricao = ps.Descricao,
+                tierId = ps.TierId,
+                contractMode = ps.ContractMode,
+                durationMinutes = ps.DurationMinutes,
+                minLeadTimeMinutes = ps.MinLeadTimeMinutes,
                 service = new { id = s.Id, name = s.Name, icon = s.Icon }
             }
         ).FirstOrDefaultAsync(ct);
@@ -48,6 +52,10 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
                 nomeServico = x.ps.NomeServico,
                 preco = x.ps.Preco,
                 descricao = x.ps.Descricao,
+                tierId = x.ps.TierId,
+                contractMode = x.ps.ContractMode,
+                durationMinutes = x.ps.DurationMinutes,
+                minLeadTimeMinutes = x.ps.MinLeadTimeMinutes,
                 service = new { id = x.s.Id, name = x.s.Name, icon = x.s.Icon }
             })
             .ToListAsync(ct);
@@ -60,7 +68,9 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
 
     public async Task<object> CreateAsync(
         string professionalId, string serviceId, string nomeServico,
-        decimal preco, string? descricao, CancellationToken ct)
+        decimal preco, string? descricao,
+        int? tierId, string? contractMode, int? durationMinutes, int? minLeadTimeMinutes,
+        CancellationToken ct)
     {
         var entity = new ProfessionalService(
             Id: Guid.NewGuid().ToString(),
@@ -68,7 +78,11 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
             ServiceId: serviceId,
             NomeServico: nomeServico,
             Preco: (double)preco,
-            Descricao: descricao);
+            Descricao: descricao,
+            TierId: tierId,
+            ContractMode: contractMode,
+            DurationMinutes: durationMinutes,
+            MinLeadTimeMinutes: minLeadTimeMinutes);
 
         ctx.ProfessionalServices.Add(entity);
         await ctx.SaveChangesAsync(ct);
