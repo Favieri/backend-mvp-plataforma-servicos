@@ -83,7 +83,11 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     Name = ps.NomeServico ?? string.Empty,
                     Price = ps.Preco,
                     Description = ps.Descricao,
-                    Icon = s.Icon
+                    Icon = s.Icon,
+                    ps.TierId,
+                    ps.ContractMode,
+                    ps.DurationMinutes,
+                    ps.MinLeadTimeMinutes
                 })
             .ToListAsync(ct);
 
@@ -104,7 +108,11 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     ServiceId = x.ServiceId,
                     Name = x.Name,
                     Price = x.Price,
-                    Description = x.Description
+                    Description = x.Description,
+                    TierId = x.TierId,
+                    ContractMode = x.ContractMode,
+                    DurationMinutes = x.DurationMinutes,
+                    MinLeadTimeMinutes = x.MinLeadTimeMinutes
                 }).ToList(),
                 StringComparer.Ordinal);
 

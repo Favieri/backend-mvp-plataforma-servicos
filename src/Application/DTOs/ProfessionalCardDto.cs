@@ -28,4 +28,8 @@ public sealed class ProfessionalServiceDto
     public string Name { get; init; } = string.Empty;
     public double Price { get; init; }
     public string? Description { get; init; }
+    public int? TierId { get; init; }
+    public string? ContractMode { get; init; }
+    public int? DurationMinutes { get; init; }
+    public int? MinLeadTimeMinutes { get; init; }
 }
