@@ -402,7 +402,7 @@ public static class ApiEndpoints
                     return Results.Json(new { error = "durationMinutes é obrigatório e deve ser maior que zero para contractMode 'booking'." }, statusCode: 400);
             }
 
-            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), body.Preco, body.Descricao, ct);
+            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), body.Preco, body.Descricao, body.TierId, body.ContractMode, body.DurationMinutes, body.MinLeadTimeMinutes, ct);
             return Results.Json(created, statusCode: 201);
         });
 
