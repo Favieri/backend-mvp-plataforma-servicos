@@ -471,12 +471,13 @@ public static class ApiEndpoints
             Results.Ok(await repo.GetByClientAsync(clientId, ct)));
 
         app.MapGet("/appointments/slots", async (
-            string? professionalId, string? date, IAvailabilityRepository repo, CancellationToken ct) =>
+            string? professionalId, string? date, string? day, IAvailabilityRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
+            date ??= day;
             if (string.IsNullOrWhiteSpace(date) || !System.Text.RegularExpressions.Regex.IsMatch(date, @"^\d{4}-\d{2}-\d{2}$"))
-                return Results.Json(new { error = "date deve ser YYYY-MM-DD" }, statusCode: 400);
+                return Results.Json(new { error = "date (ou day) deve ser YYYY-MM-DD" }, statusCode: 400);
 
             var config = await repo.GetProfessionalSchedulingConfigAsync(professionalId, ct);
             if (config is null) return Results.NotFound(new { error = "Profissional não encontrado" });
@@ -489,10 +490,12 @@ public static class ApiEndpoints
             var parts = date.Split('-').Select(int.Parse).ToArray();
             var targetDate = new DateTime(parts[0], parts[1], parts[2], 0, 0, 0, DateTimeKind.Utc);
             var diffDays = (targetDate - DateTime.UtcNow.Date).Days;
-            if (diffDays > maxAdvanceDays) return Results.Ok(Array.Empty<object>());
+            if (diffDays > maxAdvanceDays)
+                return Results.Ok(new { slots = Array.Empty<object>(), slotMinutes, timezone = "America/Sao_Paulo" });
 
             // São Paulo = UTC-3
             const int SpOffsetMin = 180;
+            var spOffset = TimeSpan.FromHours(-3);
             var dayStartUtc = targetDate.AddMinutes(SpOffsetMin); // midnight SP = 03:00Z
             var dayEndUtc = dayStartUtc.AddDays(1).AddMilliseconds(-1);
             var weekday = (int)targetDate.DayOfWeek;
@@ -519,12 +522,16 @@ public static class ApiEndpoints
                     var hasConflict = appointments.Any(a => cursor < a.EndsAt && a.StartsAt < slotEnd)
                                    || blocks.Any(b => cursor < b.EndsAt && b.StartsAt < slotEnd);
 
-                    if (!hasConflict) slots.Add(new { start = cursor, end = slotEnd });
+                    if (!hasConflict)
+                        slots.Add(new {
+                            start = new DateTimeOffset(cursor, TimeSpan.Zero).ToOffset(spOffset).ToString("yyyy-MM-ddTHH:mm:sszzz"),
+                            end   = new DateTimeOffset(slotEnd, TimeSpan.Zero).ToOffset(spOffset).ToString("yyyy-MM-ddTHH:mm:sszzz")
+                        });
                     cursor = slotEnd;
                 }
             }
 
-            return Results.Ok(slots);
+            return Results.Ok(new { slots, slotMinutes, timezone = "America/Sao_Paulo" });
         });
 
         app.MapPost("/appointments", async (
