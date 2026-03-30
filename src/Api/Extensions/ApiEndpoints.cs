@@ -471,7 +471,9 @@ public static class ApiEndpoints
             Results.Ok(await repo.GetByClientAsync(clientId, ct)));
 
         app.MapGet("/appointments/slots", async (
-            string? professionalId, string? date, string? day, IAvailabilityRepository repo, CancellationToken ct) =>
+            string? professionalId, string? date, string? day,
+            string? professionalServiceId,
+            IAvailabilityRepository repo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
@@ -483,7 +485,13 @@ public static class ApiEndpoints
             if (config is null) return Results.NotFound(new { error = "Profissional não encontrado" });
 
             var c = ToObjectDictionary(config);
-            var slotMinutes = c["slotMinutes"] is null ? 60 : Convert.ToInt32(c["slotMinutes"]);
+            // Fallback chain: ProfessionalService.DurationMinutes → Professional.SlotMinutes → 60
+            int? serviceDuration = null;
+            if (!string.IsNullOrWhiteSpace(professionalServiceId))
+                serviceDuration = await repo.GetProfessionalServiceDurationAsync(professionalServiceId, ct);
+            var slotMinutes = (serviceDuration is > 0 ? serviceDuration : null)
+                           ?? (c["slotMinutes"] is null ? null : Convert.ToInt32(c["slotMinutes"]))
+                           ?? 60;
             var leadTimeMinutes = c["leadTimeMinutes"] is null ? 0 : Convert.ToInt32(c["leadTimeMinutes"]);
             var maxAdvanceDays = c["maxAdvanceDays"] is null ? 30 : Convert.ToInt32(c["maxAdvanceDays"]);
 

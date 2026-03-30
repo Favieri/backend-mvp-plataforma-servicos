@@ -13,4 +13,5 @@ public interface IAvailabilityRepository
     Task<IReadOnlyList<ProfessionalAvailability>> GetAvailabilityForDayAsync(string professionalId, int weekday, CancellationToken ct);
     Task<IReadOnlyList<Appointment>> GetAppointmentsForDayAsync(string professionalId, DateTime dayStartUtc, DateTime dayEndUtc, CancellationToken ct);
     Task<IReadOnlyList<ProfessionalBlock>> GetBlocksForDayAsync(string professionalId, DateTime dayStartUtc, DateTime dayEndUtc, CancellationToken ct);
+    Task<int?> GetProfessionalServiceDurationAsync(string professionalServiceId, CancellationToken ct);
 }

@@ -151,4 +151,11 @@ public sealed class AvailabilityRepository(AppDbContext ctx) : IAvailabilityRepo
                 && b.StartsAt < dayEndUtc
                 && b.EndsAt > dayStartUtc)
             .ToListAsync(ct);
+
+    public async Task<int?> GetProfessionalServiceDurationAsync(string professionalServiceId, CancellationToken ct)
+        => await ctx.ProfessionalServices
+            .AsNoTracking()
+            .Where(ps => ps.Id == professionalServiceId)
+            .Select(ps => ps.DurationMinutes)
+            .FirstOrDefaultAsync(ct);
 }

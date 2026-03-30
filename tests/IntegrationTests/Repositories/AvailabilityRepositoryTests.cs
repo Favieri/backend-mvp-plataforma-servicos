@@ -93,4 +93,24 @@ public sealed class AvailabilityRepositoryTests : RepositoryTestBase
         var config = await _repo.GetProfessionalSchedulingConfigAsync("pro1", CancellationToken.None);
         Assert.NotNull(config);
     }
+
+    [Fact]
+    public async Task GetProfessionalServiceDurationAsync_ReturnsDuration_WhenSet()
+    {
+        Ctx.Services.Add(new Service("svc1", "Test", null, DateTime.UtcNow));
+        Ctx.ProfessionalServices.Add(new ProfessionalService(
+            "ps1", "pro1", "svc1", "Teste", 100, null,
+            DurationMinutes: 45));
+        await Ctx.SaveChangesAsync();
+
+        var result = await _repo.GetProfessionalServiceDurationAsync("ps1", CancellationToken.None);
+        Assert.Equal(45, result);
+    }
+
+    [Fact]
+    public async Task GetProfessionalServiceDurationAsync_ReturnsNull_WhenNotFound()
+    {
+        var result = await _repo.GetProfessionalServiceDurationAsync("nonexistent", CancellationToken.None);
+        Assert.Null(result);
+    }
 }
