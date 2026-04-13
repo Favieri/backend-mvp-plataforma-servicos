@@ -36,12 +36,13 @@ public sealed record CreateProfessionalServiceRequest(
     string ProfessionalId,
     string ServiceId,
     string NomeServico,
-    decimal Preco,
+    decimal? Preco,
     string? Descricao,
     int? TierId = null,
     string? ContractMode = null,
     int? DurationMinutes = null,
-    int? MinLeadTimeMinutes = null);
+    int? MinLeadTimeMinutes = null,
+    string? TipoContratacao = null);
 public sealed record UpdateProfessionalServiceRequest(string? NomeServico, decimal? Preco, string? Descricao);
 
 // Professional Zones

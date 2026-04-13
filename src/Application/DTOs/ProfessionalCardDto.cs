@@ -26,10 +26,12 @@ public sealed class ProfessionalServiceDto
     public string Id { get; init; } = string.Empty;
     public string ServiceId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
-    public double Price { get; init; }
+    public double? Price { get; init; }
     public string? Description { get; init; }
     public int? TierId { get; init; }
     public string? ContractMode { get; init; }
     public int? DurationMinutes { get; init; }
     public int? MinLeadTimeMinutes { get; init; }
+    public string? TipoContratacao { get; init; }
+    public string? TipoPrecificacao { get; init; }
 }

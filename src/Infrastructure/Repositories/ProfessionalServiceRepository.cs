@@ -24,6 +24,10 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
                 contractMode = ps.ContractMode,
                 durationMinutes = ps.DurationMinutes,
                 minLeadTimeMinutes = ps.MinLeadTimeMinutes,
+                tipoContratacao = ps.TipoContratacao,
+                tipoPrecificacao = ps.TipoContratacao == Domain.Enums.TipoContratacao.Proposta
+                    ? "SOB_CONSULTA"
+                    : (ps.Preco.HasValue ? "FIXO" : null),
                 service = new { id = s.Id, name = s.Name, icon = s.Icon }
             }
         ).FirstOrDefaultAsync(ct);
@@ -56,6 +60,10 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
                 contractMode = x.ps.ContractMode,
                 durationMinutes = x.ps.DurationMinutes,
                 minLeadTimeMinutes = x.ps.MinLeadTimeMinutes,
+                tipoContratacao = x.ps.TipoContratacao,
+                tipoPrecificacao = x.ps.TipoContratacao == Domain.Enums.TipoContratacao.Proposta
+                    ? "SOB_CONSULTA"
+                    : (x.ps.Preco.HasValue ? "FIXO" : null),
                 service = new { id = x.s.Id, name = x.s.Name, icon = x.s.Icon }
             })
             .ToListAsync(ct);
@@ -68,8 +76,9 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
 
     public async Task<object> CreateAsync(
         string professionalId, string serviceId, string nomeServico,
-        decimal preco, string? descricao,
+        decimal? preco, string? descricao,
         int? tierId, string? contractMode, int? durationMinutes, int? minLeadTimeMinutes,
+        string? tipoContratacao,
         CancellationToken ct)
     {
         var entity = new ProfessionalService(
@@ -77,12 +86,13 @@ public sealed class ProfessionalServiceRepository(AppDbContext ctx) : IProfessio
             ProfessionalId: professionalId,
             ServiceId: serviceId,
             NomeServico: nomeServico,
-            Preco: (double)preco,
+            Preco: preco.HasValue ? (double)preco.Value : (double?)null,
             Descricao: descricao,
             TierId: tierId,
             ContractMode: contractMode,
             DurationMinutes: durationMinutes,
-            MinLeadTimeMinutes: minLeadTimeMinutes);
+            MinLeadTimeMinutes: minLeadTimeMinutes,
+            TipoContratacao: tipoContratacao);
 
         ctx.ProfessionalServices.Add(entity);
         await ctx.SaveChangesAsync(ct);

@@ -99,7 +99,7 @@ public sealed class AvailabilityRepositoryTests : RepositoryTestBase
     {
         Ctx.Services.Add(new Service("svc1", "Test", null, DateTime.UtcNow));
         Ctx.ProfessionalServices.Add(new ProfessionalService(
-            "ps1", "pro1", "svc1", "Teste", 100, null,
+            "ps1", "pro1", "svc1", "Teste", (double?)100, null,
             DurationMinutes: 45));
         await Ctx.SaveChangesAsync();
 
