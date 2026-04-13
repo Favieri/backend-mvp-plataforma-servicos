@@ -41,6 +41,7 @@ public sealed class ProfessionalConfiguration : IEntityTypeConfiguration<Profess
         builder.Property(x => x.BufferMinutes)
             .HasColumnName("bufferMinutes")
             .HasDefaultValue(0);
+        builder.Property(x => x.LogoUrl).HasColumnName("logoUrl");
 
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => new { x.Active, x.Rating });

@@ -22,4 +22,5 @@ public sealed record Professional(
     double? CompletionRate = null,
     string VerificationStatus = "pending",
     string? Badges = null,
-    int BufferMinutes = 0);
+    int BufferMinutes = 0,
+    string? LogoUrl = null);
