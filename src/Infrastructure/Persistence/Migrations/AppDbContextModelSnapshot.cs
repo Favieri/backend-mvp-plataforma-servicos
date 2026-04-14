@@ -195,6 +195,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("VerificationStatus").IsRequired().HasColumnName("verificationStatus").HasDefaultValue("pending");
             b.Property<string>("Badges").IsRequired(false).HasColumnName("badges");
             b.Property<int>("BufferMinutes").IsRequired().HasColumnName("bufferMinutes").HasDefaultValue(0);
+            b.Property<string>("LogoUrl").IsRequired(false).HasColumnName("logoUrl");
             b.HasKey("Id");
             b.HasIndex("Active", "Rating").HasDatabaseName("IX_Professional_active_rating");
             b.HasIndex("UserId").HasDatabaseName("IX_Professional_userId");

@@ -82,7 +82,7 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
             where p.Id == id
             select new
             {
-                p.Id, p.UserId, p.Bio, p.Rating, p.Active, p.AvatarUrl, p.AvailabilityText,
+                p.Id, p.UserId, p.Bio, p.Rating, p.Active, p.AvatarUrl, p.LogoUrl, p.AvailabilityText,
                 p.CompletedJobsCount, p.SlotMinutes, p.LeadTimeMinutes, p.MaxAdvanceDays, p.AllowInstantBooking,
                 UserId2 = u.Id, UserName = u.Name, UserEmail = u.Email, UserPhone = u.Phone,
                 UserRole = u.Role, UserZoneId = u.ZoneId, UserCreatedAt = u.CreatedAt
@@ -147,6 +147,7 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
             rating = row.Rating,
             active = row.Active,
             avatarUrl = row.AvatarUrl,
+            logoUrl = row.LogoUrl,
             availabilityText = row.AvailabilityText,
             completedJobsCount = row.CompletedJobsCount,
             slotMinutes = row.SlotMinutes,
@@ -161,7 +162,7 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
     }
 
     public async Task<object?> UpdateAsync(
-        string id, string? bio, bool? active, string? availabilityText, string? avatarUrl, CancellationToken ct)
+        string id, string? bio, bool? active, string? availabilityText, string? avatarUrl, string? logoUrl, CancellationToken ct)
     {
         var existing = await ctx.Professionals
             .AsNoTracking()
@@ -173,6 +174,7 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
         var newActive = active ?? existing.Active;
         var newAvailabilityText = availabilityText ?? existing.AvailabilityText;
         var newAvatarUrl = avatarUrl ?? existing.AvatarUrl;
+        var newLogoUrl = logoUrl ?? existing.LogoUrl;
 
         await ctx.Professionals
             .Where(p => p.Id == id)
@@ -180,7 +182,8 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 .SetProperty(p => p.Bio, newBio)
                 .SetProperty(p => p.Active, newActive)
                 .SetProperty(p => p.AvailabilityText, newAvailabilityText)
-                .SetProperty(p => p.AvatarUrl, newAvatarUrl), ct);
+                .SetProperty(p => p.AvatarUrl, newAvatarUrl)
+                .SetProperty(p => p.LogoUrl, newLogoUrl), ct);
 
         return await GetByIdAsync(id, ct);
     }
