@@ -96,7 +96,7 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             from pz in ctx.ProfessionalZones.AsNoTracking()
             join z in ctx.Zones.AsNoTracking() on pz.ZoneId equals z.Id
             where professionalIds.Contains(pz.ProfessionalId) && z.Active
-            select new { pz.ProfessionalId, ZoneName = z.Name }
+            select new { pz.ProfessionalId, ZoneId = z.Id, ZoneName = z.Name }
         ).ToListAsync(ct);
 
         var servicesByProfessional = serviceRows
@@ -123,7 +123,7 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             .GroupBy(x => x.ProfessionalId, StringComparer.Ordinal)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<string>)g.Select(x => x.ZoneName).ToList(),
+                g => (IReadOnlyList<ZoneDto>)g.Select(x => new ZoneDto(x.ZoneId, x.ZoneName)).ToList(),
                 StringComparer.Ordinal);
 
         return professionals.Select(p => new ProfessionalCardDto
