@@ -1245,7 +1245,7 @@
                     "name": "preco",
                     "type": "double precision",
                     "default": null,
-                    "nullable": false
+                    "nullable": true
                 },
                 {
                     "name": "descricao",
@@ -1298,6 +1298,12 @@
                 {
                     "name": "minLeadTimeMinutes",
                     "type": "integer",
+                    "default": null,
+                    "nullable": true
+                },
+                {
+                    "name": "tipoContratacao",
+                    "type": "text",
                     "default": null,
                     "nullable": true
                 }
