@@ -29,7 +29,7 @@ public sealed record CreateUserRequest(string Name, string Email, string? Phone,
 
 // Professionals
 public sealed record CreateProfessionalRequest(string UserId, string? Bio, string[]? Zones, bool? Active);
-public sealed record UpdateProfessionalRequest(string? Bio, bool? Active, string? AvailabilityText, string? AvatarUrl, string? LogoUrl);
+public sealed record UpdateProfessionalRequest(string? Bio, bool? Active, string? AvailabilityText, string? AvatarUrl);
 
 // Professional Services
 public sealed record CreateProfessionalServiceRequest(
