@@ -419,10 +419,18 @@ public static class ApiEndpoints
                     return Results.Json(new { error = "precoBase é obrigatório." }, statusCode: 400);
             }
 
-            // For PROPOSTA: force preco to null regardless of what was sent
-            var preco = body.TipoContratacao == TipoContratacao.Proposta ? null : body.Preco;
+            // Derivar tipoContratacao do contractMode legado se não fornecido diretamente
+            var tipoContratacao = body.TipoContratacao
+                ?? body.ContractMode switch {
+                    ContractMode.Booking  => TipoContratacao.ReservaDireta,
+                    ContractMode.Proposal => TipoContratacao.Proposta,
+                    _                     => null
+                };
 
-            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), preco, body.Descricao, body.TierId, body.ContractMode, body.DurationMinutes, body.MinLeadTimeMinutes, body.TipoContratacao, ct);
+            // For PROPOSTA: force preco to null regardless of what was sent
+            var preco = tipoContratacao == TipoContratacao.Proposta ? null : body.Preco;
+
+            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), preco, body.Descricao, body.TierId, body.ContractMode, body.DurationMinutes, body.MinLeadTimeMinutes, tipoContratacao, ct);
             return Results.Json(created, statusCode: 201);
         });
 
