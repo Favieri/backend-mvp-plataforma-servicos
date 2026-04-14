@@ -105,7 +105,11 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 tierId = ps.TierId,
                 contractMode = ps.ContractMode,
                 durationMinutes = ps.DurationMinutes,
-                minLeadTimeMinutes = ps.MinLeadTimeMinutes
+                minLeadTimeMinutes = ps.MinLeadTimeMinutes,
+                tipoContratacao = ps.TipoContratacao,
+                tipoPrecificacao = ps.TipoContratacao == Domain.Enums.TipoContratacao.Proposta
+                    ? "SOB_CONSULTA"
+                    : (ps.Preco.HasValue ? "FIXO" : null)
             })
             .ToListAsync(ct);
 

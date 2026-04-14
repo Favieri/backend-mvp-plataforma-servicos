@@ -413,8 +413,16 @@ public static class ApiEndpoints
             if (!await repo.ServiceExistsAsync(body.ServiceId, ct))
                 return Results.Json(new { error = "Serviço (categoria) não encontrado." }, statusCode: 400);
 
-            // Tier / contractMode validation (only when at least one is provided)
-            if (body.TierId.HasValue || body.ContractMode is not null)
+            // ── Nova validação: tipoContratacao ───────────────────────────────────
+            if (body.TipoContratacao is not null)
+            {
+                var validator = new Application.Validation.CreateProfessionalServiceRequestValidator();
+                var validationResult = await validator.ValidateAsync(body, ct);
+                if (!validationResult.IsValid)
+                    return Results.Json(new { error = validationResult.Errors.First().ErrorMessage }, statusCode: 400);
+            }
+            // ── Compatibilidade retroativa: tierId + contractMode (legado) ─────────
+            else if (body.TierId.HasValue || body.ContractMode is not null)
             {
                 if (!body.TierId.HasValue)
                     return Results.Json(new { error = "tierId é obrigatório quando contractMode é informado." }, statusCode: 400);
@@ -439,9 +447,21 @@ public static class ApiEndpoints
 
                 if (body.ContractMode == ContractMode.Booking && (!body.DurationMinutes.HasValue || body.DurationMinutes.Value <= 0))
                     return Results.Json(new { error = "durationMinutes é obrigatório e deve ser maior que zero para contractMode 'booking'." }, statusCode: 400);
+
+                if (!body.Preco.HasValue || body.Preco.Value <= 0)
+                    return Results.Json(new { error = "precoBase é obrigatório." }, statusCode: 400);
+            }
+            else
+            {
+                // Sem tipoContratacao e sem tierId/contractMode: precoBase obrigatório
+                if (!body.Preco.HasValue || body.Preco.Value <= 0)
+                    return Results.Json(new { error = "precoBase é obrigatório." }, statusCode: 400);
             }
 
-            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), body.Preco, body.Descricao, body.TierId, body.ContractMode, body.DurationMinutes, body.MinLeadTimeMinutes, ct);
+            // For PROPOSTA: force preco to null regardless of what was sent
+            var preco = body.TipoContratacao == TipoContratacao.Proposta ? null : body.Preco;
+
+            var created = await repo.CreateAsync(body.ProfessionalId, body.ServiceId, body.NomeServico.Trim(), preco, body.Descricao, body.TierId, body.ContractMode, body.DurationMinutes, body.MinLeadTimeMinutes, body.TipoContratacao, ct);
             return Results.Json(created, statusCode: 201);
         });
 

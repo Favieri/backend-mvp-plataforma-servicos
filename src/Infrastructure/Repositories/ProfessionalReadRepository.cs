@@ -87,7 +87,8 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     ps.TierId,
                     ps.ContractMode,
                     ps.DurationMinutes,
-                    ps.MinLeadTimeMinutes
+                    ps.MinLeadTimeMinutes,
+                    ps.TipoContratacao
                 })
             .ToListAsync(ct);
 
@@ -112,7 +113,9 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     TierId = x.TierId,
                     ContractMode = x.ContractMode,
                     DurationMinutes = x.DurationMinutes,
-                    MinLeadTimeMinutes = x.MinLeadTimeMinutes
+                    MinLeadTimeMinutes = x.MinLeadTimeMinutes,
+                    TipoContratacao = x.TipoContratacao,
+                    TipoPrecificacao = x.TipoContratacao == Domain.Enums.TipoContratacao.Proposta ? "SOB_CONSULTA" : (x.Price.HasValue ? "FIXO" : null)
                 }).ToList(),
                 StringComparer.Ordinal);
 

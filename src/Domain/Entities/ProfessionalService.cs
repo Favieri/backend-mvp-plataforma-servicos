@@ -5,7 +5,7 @@ public sealed record ProfessionalService(
     string ProfessionalId,
     string ServiceId,
     string NomeServico,
-    double Preco,
+    double? Preco,
     string? Descricao,
     int? TierId = null,
     string? ContractMode = null,
@@ -14,4 +14,5 @@ public sealed record ProfessionalService(
     string? ExcludesDescription = null,
     bool? MaterialIncluded = null,
     int? VisitFeeCents = null,
-    int? MinLeadTimeMinutes = null);
+    int? MinLeadTimeMinutes = null,
+    string? TipoContratacao = null);

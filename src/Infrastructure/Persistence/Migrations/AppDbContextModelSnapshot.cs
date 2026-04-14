@@ -256,7 +256,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
             b.Property<string>("Descricao").IsRequired(false).HasColumnName("descricao");
             b.Property<string>("NomeServico").IsRequired().HasColumnName("nomeServico");
-            b.Property<double>("Preco").IsRequired().HasColumnName("preco");
+            b.Property<double?>("Preco").HasColumnName("preco");
             b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professionalId");
             b.Property<string>("ServiceId").IsRequired().HasColumnName("serviceId");
             b.Property<int?>("TierId").HasColumnName("tierId");
@@ -267,6 +267,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<bool?>("MaterialIncluded").HasColumnName("materialIncluded");
             b.Property<int?>("VisitFeeCents").HasColumnName("visitFeeCents");
             b.Property<int?>("MinLeadTimeMinutes").HasColumnName("minLeadTimeMinutes");
+            b.Property<string>("TipoContratacao").IsRequired(false).HasColumnName("tipoContratacao");
             b.HasKey("Id");
             b.HasIndex("ProfessionalId").HasDatabaseName("IX_ProfessionalService_professionalId");
             b.HasIndex("ServiceId").HasDatabaseName("IX_ProfessionalService_serviceId");
