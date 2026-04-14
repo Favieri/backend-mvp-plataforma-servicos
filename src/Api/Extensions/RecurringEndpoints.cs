@@ -98,7 +98,7 @@ public static class RecurringEndpoints
                 priceTotalCents: effectivePrice,
                 signalCents:     signalCents,
                 balanceCents:    balanceCents,
-                installments:    body.Installments ?? 1,
+                installments:    1,
                 paymentMethod:   body.PaymentMethod ?? source.PaymentMethod,
                 scope:           source.Scope,
                 scheduledAt:     scheduledAt,

@@ -7,9 +7,7 @@ public record TierDto(
     bool AllowBookingDirect,
     bool RequiresProposal,
     bool RequiresChat,
-    string[] AllowedPriceFormats,
-    int DefaultSignalPercent,
-    int MaxInstallments);
+    string[] AllowedPriceFormats);
 
 public record CategoryDto(
     string Id,

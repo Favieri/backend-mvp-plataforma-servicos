@@ -68,7 +68,7 @@ public static class ApiEndpoints
             var tiers = await GetOrCreateCachedAsync(cache, "tiers:all", TimeSpan.FromHours(1), ShouldBypassCache(req),
                 async () => (await catalog.GetTiersAsync(ct)).Select(t => new TierDto(
                     t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
-                    t.AllowedPriceFormats, t.DefaultSignalPercent, t.MaxInstallments)).ToList(),
+                    t.AllowedPriceFormats)).ToList(),
                 logger: null, ct);
             return Results.Ok(tiers);
         });
@@ -98,7 +98,7 @@ public static class ApiEndpoints
                     var categories = categoriesRaw.Select(c => new CategoryDto(c.Id, c.Name, c.Icon)).ToList();
                     var tiers = tiersRaw.Select(t => new TierDto(
                         t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
-                        t.AllowedPriceFormats, t.DefaultSignalPercent, t.MaxInstallments)).ToList();
+                        t.AllowedPriceFormats)).ToList();
                     return new HomeBootstrapDto(professionals, zones, services, categories, tiers);
                 }, logger, ct);
             return Results.Ok(bootstrap);
