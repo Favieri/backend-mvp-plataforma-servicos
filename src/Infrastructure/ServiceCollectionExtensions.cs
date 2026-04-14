@@ -112,7 +112,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
         services.AddScoped<IOrderIgnoreRepository, OrderIgnoreRepository>();
         services.AddScoped<IAvatarStorageRepository, AvatarStorageRepository>();
-        services.AddScoped<ILogoStorageRepository, LogoStorageRepository>();
 
         // Service catalog (tiers + categories)
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
