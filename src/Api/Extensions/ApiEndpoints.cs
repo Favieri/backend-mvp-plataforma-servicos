@@ -354,7 +354,7 @@ public static class ApiEndpoints
             if (string.IsNullOrWhiteSpace(publicUrl))
                 return Results.Json(new { error = "Falha no upload." }, statusCode: 500);
 
-            var updated = await professionalRepo.UpdateAsync(professionalId, bio: null, active: null, availabilityText: null, avatarUrl: publicUrl, ct: ct);
+            var updated = await professionalRepo.UpdateAsync(professionalId, bio: null, active: null, availabilityText: null, avatarUrl: publicUrl, logoUrl: null, ct: ct);
             if (updated is null)
                 return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
 
@@ -548,7 +548,7 @@ public static class ApiEndpoints
             int? serviceDuration = null;
             if (!string.IsNullOrWhiteSpace(professionalServiceId))
                 serviceDuration = await repo.GetProfessionalServiceDurationAsync(professionalServiceId, ct);
-            var slotMinutes = (serviceDuration is > 0 ? serviceDuration : null)
+            var slotMinutes = (serviceDuration is > 0 ? (int?)serviceDuration : null)
                            ?? (c["slotMinutes"] is null ? null : Convert.ToInt32(c["slotMinutes"]))
                            ?? 60;
             var leadTimeMinutes = c["leadTimeMinutes"] is null ? 0 : Convert.ToInt32(c["leadTimeMinutes"]);
