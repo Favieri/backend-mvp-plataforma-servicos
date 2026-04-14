@@ -11,7 +11,7 @@ public sealed class ProfessionalCardDto
     public int? CompletedJobsCount { get; init; }
     public string? AvailabilityText { get; init; }
     public IReadOnlyList<ProfessionalServiceDto> Services { get; set; } = [];
-    public IReadOnlyList<string> Zones { get; set; } = [];
+    public IReadOnlyList<ZoneDto> Zones { get; set; } = [];
 
     // Phase 5: trust metrics + verification
     public string VerificationStatus { get; init; } = "pending";

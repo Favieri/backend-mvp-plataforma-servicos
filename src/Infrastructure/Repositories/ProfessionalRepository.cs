@@ -93,11 +93,13 @@ public sealed class ProfessionalRepository(AppDbContext ctx) : IProfessionalRepo
                 })
             .ToListAsync(ct);
 
-        // Load zones for all professionals in one query
-        var zones = await ctx.ProfessionalZones
-            .AsNoTracking()
-            .Where(pz => professionalIds.Contains(pz.ProfessionalId))
-            .ToListAsync(ct);
+        // Load zones for all professionals in one query (join to include zone name)
+        var zoneRows = await (
+            from pz in ctx.ProfessionalZones.AsNoTracking()
+            join z in ctx.Zones.AsNoTracking() on pz.ZoneId equals z.Id
+            where professionalIds.Contains(pz.ProfessionalId)
+            select new { pz.ProfessionalId, ZoneId = pz.ZoneId, ZoneName = z.Name }
+        ).ToListAsync(ct);
 
         var servicesByProfessional = services
             .GroupBy(s => s.ProfessionalId, StringComparer.Ordinal)
@@ -113,11 +115,11 @@ public sealed class ProfessionalRepository(AppDbContext ctx) : IProfessionalRepo
                 }).ToList(),
                 StringComparer.Ordinal);
 
-        var zonesByProfessional = zones
+        var zonesByProfessional = zoneRows
             .GroupBy(z => z.ProfessionalId, StringComparer.Ordinal)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<string>)g.Select(z => z.ZoneId).Distinct(StringComparer.Ordinal).ToList(),
+                g => (IReadOnlyList<ZoneDto>)g.Select(z => new ZoneDto(z.ZoneId, z.ZoneName)).ToList(),
                 StringComparer.Ordinal);
 
         return professionals.Select(p => new ProfessionalCardDto
