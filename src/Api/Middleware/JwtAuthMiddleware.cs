@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -6,10 +5,10 @@ using System.IdentityModel.Tokens.Jwt;
 namespace Api.Middleware;
 
 /// <summary>
-/// Validates Supabase JWT tokens and populates HttpContext.User.
+/// Validates application HS256 JWTs and populates HttpContext.User.
 /// Coexists with bcrypt manual auth — does not block requests on failure.
 /// </summary>
-public sealed class SupabaseAuthMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<SupabaseAuthMiddleware> logger)
+public sealed class JwtAuthMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<JwtAuthMiddleware> logger)
 {
     private static readonly JwtSecurityTokenHandler _handler = new();
 
@@ -19,7 +18,7 @@ public sealed class SupabaseAuthMiddleware(RequestDelegate next, IConfiguration 
         if (authHeader is not null && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
             var token = authHeader["Bearer ".Length..].Trim();
-            var jwtSecret = configuration["SUPABASE_JWT_SECRET"];
+            var jwtSecret = configuration["JWT_SECRET"];
 
             if (!string.IsNullOrWhiteSpace(jwtSecret))
             {
@@ -47,7 +46,7 @@ public sealed class SupabaseAuthMiddleware(RequestDelegate next, IConfiguration 
             }
             else
             {
-                logger.LogDebug("SUPABASE_JWT_SECRET not configured — JWT validation skipped");
+                logger.LogDebug("JWT_SECRET not configured — JWT validation skipped");
             }
         }
 

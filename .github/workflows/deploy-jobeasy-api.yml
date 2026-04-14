@@ -25,7 +25,11 @@ jobs:
       AWS_REGION: sa-east-1
       STACK_NAME: jobeasy-api
       DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      STORAGE_BUCKET_NAME: ${{ secrets.STORAGE_BUCKET_NAME }}
       MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      FACEBOOK_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
 
     steps:
       - name: Checkout
@@ -42,6 +46,10 @@ jobs:
             echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2
             exit 1
           fi
+          if [ -z "${JWT_SECRET}" ]; then
+            echo "ERROR: configure JWT_SECRET em GitHub Secrets." >&2
+            exit 1
+          fi
 
       - name: Restore / Build / Test
         run: |
@@ -56,7 +64,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy
-          aws-region: ${{ env.AWS_REGION }} 
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Validate SAM template and Makefile
         run: |
@@ -84,12 +92,27 @@ jobs:
 
       - name: SAM Deploy
         run: |
-          PARAM_OVERRIDES=("ParameterKey=DbConnection,ParameterValue=${DB_CONNECTION}")
+          PARAM_OVERRIDES=(
+            "ParameterKey=DbConnection,ParameterValue=${DB_CONNECTION}"
+            "ParameterKey=JwtSecret,ParameterValue=${JWT_SECRET}"
+          )
+
+          if [ -n "${STORAGE_BUCKET_NAME}" ]; then
+            PARAM_OVERRIDES+=("ParameterKey=StorageBucketName,ParameterValue=${STORAGE_BUCKET_NAME}")
+          fi
 
           if [ -n "${MP_ACCESS_TOKEN}" ]; then
             PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
           else
             echo "INFO: MP_ACCESS_TOKEN não configurado; usando valor default do template." >&2
+          fi
+
+          if [ -n "${GOOGLE_CLIENT_ID}" ]; then
+            PARAM_OVERRIDES+=("ParameterKey=GoogleClientId,ParameterValue=${GOOGLE_CLIENT_ID}")
+          fi
+
+          if [ -n "${FACEBOOK_APP_ID}" ]; then
+            PARAM_OVERRIDES+=("ParameterKey=FacebookAppId,ParameterValue=${FACEBOOK_APP_ID}")
           fi
 
           sam deploy \

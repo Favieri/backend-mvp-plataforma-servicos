@@ -20,6 +20,10 @@ Globals:
         SMTP_PASS: !Ref SmtpPass
         EMAIL_FROM: !Ref EmailFrom
         APP_BASE_URL: !Ref AppBaseUrl
+        JWT_SECRET: !Ref JwtSecret
+        STORAGE_BUCKET_NAME: !Ref StorageBucketName
+        GOOGLE_CLIENT_ID: !Ref GoogleClientId
+        FACEBOOK_APP_ID: !Ref FacebookAppId
 
 Parameters:
   DbConnection:
@@ -52,6 +56,19 @@ Parameters:
   AppBaseUrl:
     Type: String
     Default: 'https://app.doezy.com.br'
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+  StorageBucketName:
+    Type: String
+    Default: 'jobeasy-storage-prod'
+  GoogleClientId:
+    Type: String
+    Default: ''
+  FacebookAppId:
+    Type: String
+    Default: ''
 
 Resources:
   JobeasyHttpApi:
@@ -73,10 +90,12 @@ Resources:
             Method: ANY
       Policies:
         - AWSLambdaBasicExecutionRole
+        - S3CrudPolicy:
+            BucketName: !Ref StorageBucketName
     Metadata:
       BuildMethod: makefile
 
 Outputs:
   ApiUrl:
-    Description: HTTP API endpoint URL 
+    Description: HTTP API endpoint URL
     Value: !Sub 'https://${JobeasyHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
