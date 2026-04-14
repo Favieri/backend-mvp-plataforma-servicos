@@ -1,51 +1,50 @@
+using Amazon.S3;
+using Amazon.S3.Model;
 using Application.Abstractions;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 
 namespace Infrastructure.Repositories;
 
 public sealed class AvatarStorageRepository(
-    IHttpClientFactory httpClientFactory,
+    IAmazonS3 s3,
     ILogger<AvatarStorageRepository> logger) : IAvatarStorageRepository
 {
-    private const string Bucket = "avatars";
-
-    public async Task<string?> UploadProfessionalAvatarAsync(string professionalId, Stream fileStream, string contentType, CancellationToken ct)
+    public async Task<string?> UploadProfessionalAvatarAsync(
+        string professionalId, Stream fileStream, string contentType, CancellationToken ct)
     {
-        var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_URL")?.TrimEnd('/');
-        var serviceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY");
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey))
+        var bucketName = Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME");
+        if (string.IsNullOrWhiteSpace(bucketName))
         {
-            logger.LogError("Supabase environment variables are missing.");
+            logger.LogError("STORAGE_BUCKET_NAME não configurado.");
             return null;
         }
 
         var extension = contentType.Split('/').LastOrDefault() ?? "jpg";
-        var key = $"professional_{professionalId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}.{extension}";
-        var uploadUrl = $"{supabaseUrl}/storage/v1/object/{Bucket}/{Uri.EscapeDataString(key)}";
-        var publicUrl = $"{supabaseUrl}/storage/v1/object/public/{Bucket}/{key}";
+        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        var key = $"avatars/professional_{professionalId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{suffix}.{extension}";
 
-        using var streamContent = new StreamContent(fileStream);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, uploadUrl)
+        var request = new PutObjectRequest
         {
-            Content = streamContent
+            BucketName = bucketName,
+            Key = key,
+            InputStream = fileStream,
+            ContentType = contentType,
+            CannedACL = S3CannedACL.PublicRead,
+            AutoCloseStream = false,
         };
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceRoleKey);
-        requestMessage.Headers.Add("apikey", serviceRoleKey);
-        requestMessage.Headers.Add("x-upsert", "true");
 
-        var client = httpClientFactory.CreateClient();
-        using var response = await client.SendAsync(requestMessage, ct);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            logger.LogError("Supabase upload failed. Status={StatusCode}; Body={Body}", (int)response.StatusCode, body);
+            await s3.PutObjectAsync(request, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "S3 avatar upload failed. Key={Key}", key);
             return null;
         }
 
-        return publicUrl;
+        var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+        return $"https://{bucketName}.s3.{region}.amazonaws.com/{key}";
     }
 }

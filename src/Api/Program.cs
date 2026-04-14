@@ -17,6 +17,16 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Fail-fast: required secrets must be present at startup
+var missingVars = new List<string>();
+if (string.IsNullOrWhiteSpace(builder.Configuration["JWT_SECRET"]))
+    missingVars.Add("JWT_SECRET");
+if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME")))
+    missingVars.Add("STORAGE_BUCKET_NAME");
+if (missingVars.Count > 0)
+    throw new InvalidOperationException(
+        $"Required environment variables are missing: {string.Join(", ", missingVars)}");
+
 builder.Logging.ClearProviders();
 builder.Services.AddHttpContextAccessor();
 
@@ -57,7 +67,7 @@ app.UseCors("default");
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<DbBackpressureMiddleware>();
-app.UseMiddleware<SupabaseAuthMiddleware>();
+app.UseMiddleware<JwtAuthMiddleware>();
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {

@@ -1,16 +1,15 @@
+using Amazon.S3;
+using Amazon.S3.Model;
 using Application.Abstractions;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 
 namespace Infrastructure.Repositories;
 
 public sealed class AttachmentStorageRepository(
-    IHttpClientFactory httpClientFactory,
+    IAmazonS3 s3,
     ILogger<AttachmentStorageRepository> logger) : IAttachmentStorageRepository
 {
-    private const string Bucket = "chat-attachments";
-
     public async Task<string?> UploadAsync(
         string messageId,
         Stream fileStream,
@@ -18,12 +17,10 @@ public sealed class AttachmentStorageRepository(
         string originalFileName,
         CancellationToken ct)
     {
-        var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_URL")?.TrimEnd('/');
-        var serviceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY");
-
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey))
+        var bucketName = Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME");
+        if (string.IsNullOrWhiteSpace(bucketName))
         {
-            logger.LogError("Supabase environment variables are missing.");
+            logger.LogError("STORAGE_BUCKET_NAME não configurado.");
             return null;
         }
 
@@ -31,34 +28,36 @@ public sealed class AttachmentStorageRepository(
         if (string.IsNullOrWhiteSpace(extension))
             extension = contentType.Split('/').LastOrDefault() ?? "bin";
 
-        var randomSuffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
-        var key = $"messages/{messageId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{randomSuffix}.{extension}";
-        var uploadUrl = $"{supabaseUrl}/storage/v1/object/{Bucket}/{Uri.EscapeDataString(key)}";
-        var publicUrl = $"{supabaseUrl}/storage/v1/object/public/{Bucket}/{key}";
+        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        var key = $"attachments/messages/{messageId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{suffix}.{extension}";
 
-        using var streamContent = new StreamContent(fileStream);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, uploadUrl)
+        try
         {
-            Content = streamContent
-        };
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceRoleKey);
-        requestMessage.Headers.Add("apikey", serviceRoleKey);
-        requestMessage.Headers.Add("x-upsert", "true");
+            var putRequest = new PutObjectRequest
+            {
+                BucketName = bucketName,
+                Key = key,
+                InputStream = fileStream,
+                ContentType = contentType,
+                AutoCloseStream = false,
+            };
 
-        var client = httpClientFactory.CreateClient();
-        using var response = await client.SendAsync(requestMessage, ct);
-
-        if (!response.IsSuccessStatusCode)
+            await s3.PutObjectAsync(putRequest, ct);
+        }
+        catch (Exception ex)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            logger.LogError(
-                "Supabase attachment upload failed. Status={StatusCode}; Body={Body}",
-                (int)response.StatusCode, body);
+            logger.LogError(ex, "S3 attachment upload failed. Key={Key}", key);
             return null;
         }
 
-        return publicUrl;
+        var urlRequest = new GetPreSignedUrlRequest
+        {
+            BucketName = bucketName,
+            Key = key,
+            Verb = HttpVerb.GET,
+            Expires = DateTime.UtcNow.AddDays(7),
+        };
+
+        return s3.GetPreSignedURL(urlRequest);
     }
 }

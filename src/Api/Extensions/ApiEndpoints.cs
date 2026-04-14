@@ -116,8 +116,8 @@ public static class ApiEndpoints
 
             // Geração de JWT na camada de API (camada Infrastructure não tem dep. de JWT)
             // O front-end usa esse token para enviar Authorization: Bearer <token>.
-            // O SupabaseAuthMiddleware valida usando o mesmo SUPABASE_JWT_SECRET.
-            var jwtSecret = config["SUPABASE_JWT_SECRET"];
+            // O JwtAuthMiddleware valida usando o mesmo JWT_SECRET.
+            var jwtSecret = config["JWT_SECRET"];
             string? token = null;
             if (!string.IsNullOrWhiteSpace(jwtSecret))
             {
@@ -1093,7 +1093,7 @@ public static class ApiEndpoints
 
     private static string? GenerateJwt(IConfiguration config, object userObj)
     {
-        var jwtSecret = config["SUPABASE_JWT_SECRET"];
+        var jwtSecret = config["JWT_SECRET"];
         if (string.IsNullOrWhiteSpace(jwtSecret))
             return null;
 
