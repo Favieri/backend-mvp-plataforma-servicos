@@ -106,6 +106,10 @@ public static class OrderEndpoints
             if (body.PriceTotalCents <= 0)
                 return Results.Json(new { error = "priceTotalCents deve ser positivo" }, statusCode: 400);
 
+            // Signal and installments are platform-fixed: 30% signal, 1 installment
+            var signalCents  = (int)(body.PriceTotalCents * 0.3);
+            var balanceCents = body.PriceTotalCents - signalCents;
+
             // Validate tier allows direct booking
             var tiers = await catalog.GetTiersAsync(ct);
             var tier = tiers.FirstOrDefault(t => t.Id == body.TierId);
@@ -132,9 +136,9 @@ public static class OrderEndpoints
                 serviceId: body.ServiceId,
                 tierId: body.TierId,
                 priceTotalCents: body.PriceTotalCents,
-                signalCents: body.SignalCents,
-                balanceCents: body.BalanceCents,
-                installments: body.Installments > 0 ? body.Installments : 1,
+                signalCents: signalCents,
+                balanceCents: balanceCents,
+                installments: 1,
                 paymentMethod: body.PaymentMethod,
                 scope: body.Scope,
                 scheduledAt: scheduledAt,
@@ -202,7 +206,7 @@ public static class OrderEndpoints
                 priceTotalCents: proposal.PriceTotalCents,
                 signalCents: signalCents,
                 balanceCents: balanceCents,
-                installments: body.Installments ?? 1,
+                installments: 1,
                 paymentMethod: body.PaymentMethod,
                 scope: proposal.Scope,
                 scheduledAt: proposal.SuggestedDatetime,

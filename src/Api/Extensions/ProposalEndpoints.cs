@@ -128,7 +128,7 @@ public static class ProposalEndpoints
                 priceTotalCents: proposal.PriceTotalCents,
                 signalCents: signalCents,
                 balanceCents: balanceCents,
-                installments: body.Installments ?? 1,
+                installments: 1,
                 paymentMethod: body.PaymentMethod,
                 scope: proposal.Scope,
                 scheduledAt: proposal.SuggestedDatetime,

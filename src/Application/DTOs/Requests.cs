@@ -96,9 +96,6 @@ public sealed record CreateBookingRequest(
     string ServiceId,
     int TierId,
     int PriceTotalCents,
-    int SignalCents,
-    int BalanceCents,
-    int Installments,
     string? PaymentMethod,
     string? Scope,
     string? ScheduledAt,
@@ -110,7 +107,6 @@ public sealed record CreateBookingRequest(
 // Order from accepted proposal (Tier 2/3)
 public sealed record CreateFromProposalRequest(
     string ClientId,
-    int? Installments,
     string? PaymentMethod,
     bool UseDefaultAddress = false,
     AddressDto? ServiceAddress = null);
@@ -139,7 +135,6 @@ public sealed record SendProposalRequest(string ProfessionalId);
 public sealed record AcceptProposalRequest(
     string ClientId,
     string? PaymentMethod,
-    int? Installments,
     bool UseDefaultAddress = false,
     AddressDto? ServiceAddress = null);
 public sealed record RejectProposalRequest(string ClientId, string? Reason);
@@ -195,7 +190,6 @@ public sealed record RebookOrderRequest(
     string ClientId,
     string? ScheduledAt,
     string? PaymentMethod,
-    int? Installments,
     bool UseDefaultAddress = false,
     AddressDto? ServiceAddress = null,
     /// <summary>If true, a recurring plan is created automatically.</summary>
