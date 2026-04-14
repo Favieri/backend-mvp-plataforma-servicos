@@ -549,7 +549,7 @@ public static class ApiEndpoints
             if (!string.IsNullOrWhiteSpace(professionalServiceId))
                 serviceDuration = await repo.GetProfessionalServiceDurationAsync(professionalServiceId, ct);
             var slotMinutes = (serviceDuration is > 0 ? (int?)serviceDuration : null)
-                           ?? (c["slotMinutes"] is null ? null : Convert.ToInt32(c["slotMinutes"]))
+                           ?? (c["slotMinutes"] is null ? (int?)null : Convert.ToInt32(c["slotMinutes"]))
                            ?? 60;
             var leadTimeMinutes = c["leadTimeMinutes"] is null ? 0 : Convert.ToInt32(c["leadTimeMinutes"]);
             var maxAdvanceDays = c["maxAdvanceDays"] is null ? 30 : Convert.ToInt32(c["maxAdvanceDays"]);
