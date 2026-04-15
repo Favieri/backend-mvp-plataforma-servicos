@@ -710,7 +710,7 @@ public static class ApiEndpoints
                 var recentlyActive = lastReadAt is DateTime lra && (DateTime.UtcNow - lra).TotalMilliseconds <= 120_000;
                 if (!recentlyActive && !string.IsNullOrWhiteSpace(recipientEmail))
                 {
-                    var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://app.doezy.com.br";
+                    var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
                     _ = emailSvc.SendChatMessageAsync(recipientEmail, recipientName, senderName,
                         body.Text.Trim(), $"{appBaseUrl}/chat/{body.ConversationId}",
                         body.ConversationId, windowMinutes: 10, ct).ConfigureAwait(false);
@@ -1074,7 +1074,7 @@ public static class ApiEndpoints
         if (apptData is null) return;
         var d = ToObjectDictionary(apptData);
         var when = startsAt.ToString("ddd, dd/MM/yyyy HH:mm");
-        var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://app.doezy.com.br";
+        var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
         var bookingUrl = $"{appBaseUrl}/agenda/{appointmentId}";
         var dedupeBase = $"booking.confirmed|{appointmentId}";
         var proEmail = d["professionalEmail"]?.ToString();
