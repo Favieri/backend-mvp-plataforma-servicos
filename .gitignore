@@ -1,0 +1,45 @@
+# ── Visual Studio ───────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# ── Build outputs ───────────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# ── .NET / NuGet ────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+packages/
+
+# ── Publicação / SAM ────────────────────────────────────────────────
+publish/
+.aws-sam/
+
+# ── Secrets / Ambiente ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+appsettings.local.json
+appsettings.*.local.json
+
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ────────────────────────────────────────────────────────────
+*.log
