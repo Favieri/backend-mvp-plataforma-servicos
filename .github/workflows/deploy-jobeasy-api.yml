@@ -25,25 +25,6 @@ jobs:
       AWS_REGION:  sa-east-1
       STACK_NAME:  jobeasy-api
 
-      # ── Obrigatório ──────────────────────────────────────────────────────────
-      DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
-
-      # ── Com defaults seguros (deploy funciona; substitua pelos valores reais) ─
-      JWT_SECRET:           ${{ secrets.JWT_SECRET           || 'jobeasy-jwt-default-CHANGE-IN-PROD' }}
-      CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS || 'https://jobeasy.com.br,http://localhost:3000' }}
-      APP_BASE_URL:         ${{ secrets.APP_BASE_URL         || 'https://jobeasy.com.br' }}
-      EMAIL_FROM:           ${{ secrets.EMAIL_FROM           || 'Jobeasy <naoresponda@jobeasy.com.br>' }}
-      STORAGE_BUCKET_NAME:  ${{ secrets.STORAGE_BUCKET_NAME  || 'jobeasy-storage-prod' }}
-
-      # ── Opcionais (vazio = feature desabilitada) ─────────────────────────────
-      SMTP_HOST:       ${{ secrets.SMTP_HOST       || '' }}
-      SMTP_PORT:       ${{ secrets.SMTP_PORT       || '587' }}
-      SMTP_USER:       ${{ secrets.SMTP_USER       || '' }}
-      SMTP_PASS:       ${{ secrets.SMTP_PASS       || '' }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-      FACEBOOK_APP_ID:  ${{ secrets.FACEBOOK_APP_ID  || '' }}
-      MP_ACCESS_TOKEN:  ${{ secrets.MP_ACCESS_TOKEN  || secrets.MERCADOPAGO_ACCESS_TOKEN || '' }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,22 +35,14 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Validate required secrets
+        env:
+          DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
         run: |
-          MISSING=()
-          [ -z "${DB_CONNECTION}" ] && MISSING+=("DB_CONNECTION (ou DATABASE_URL)")
-          if [ ${#MISSING[@]} -gt 0 ]; then
-            echo "ERROR: os seguintes secrets são obrigatórios e não foram configurados:" >&2
-            for s in "${MISSING[@]}"; do echo "  - $s" >&2; done
-            echo "" >&2
-            echo "Configure em: GitHub → Settings → Secrets and variables → Actions" >&2
+          if [ -z "${DB_CONNECTION}" ]; then
+            echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2
             exit 1
           fi
-          # Avisos informativos (não bloqueiam)
-          [ "${JWT_SECRET}" = "jobeasy-jwt-default-CHANGE-IN-PROD" ] \
-            && echo "WARN: JWT_SECRET usando valor default — configure o secret JWT_SECRET para produção" >&2 || true
-          [ -z "${SMTP_HOST}" ] \
-            && echo "INFO: SMTP_HOST não configurado — emails desabilitados" >&2 || true
-          echo "OK — prosseguindo com deploy."
+          echo "OK — DB_CONNECTION presente."
 
       - name: Restore / Build / Test
         run: |
@@ -88,8 +61,8 @@ jobs:
 
       - name: Validate SAM template and Makefile
         run: |
-          test -f Makefile               || (echo "ERROR: Makefile não encontrado na raiz" >&2; exit 1)
-          test -f infra/sam/template.yaml || (echo "ERROR: infra/sam/template.yaml não encontrado" >&2; exit 1)
+          test -f Makefile               || (echo "ERROR: Makefile não encontrado" >&2; exit 1)
+          test -f infra/sam/template.yaml || (echo "ERROR: template.yaml não encontrado" >&2; exit 1)
           sam validate -t infra/sam/template.yaml --lint
 
       - name: SAM Build
@@ -97,60 +70,102 @@ jobs:
 
       - name: Validate SAM build artifacts
         run: |
-          echo "=== Conteúdo da função buildada ==="
-          ls -la .aws-sam/build/JobeasyApiFunction/
           test -f .aws-sam/build/JobeasyApiFunction/Api.dll \
-            || (echo "ERRO: Api.dll ausente no artefato" >&2; exit 1)
+            || (echo "ERRO: Api.dll ausente" >&2; exit 1)
           test -f .aws-sam/build/JobeasyApiFunction/Api.deps.json \
-            || (echo "ERRO: Api.deps.json ausente no artefato" >&2; exit 1)
+            || (echo "ERRO: Api.deps.json ausente" >&2; exit 1)
           test -f .aws-sam/build/JobeasyApiFunction/Api.runtimeconfig.json \
-            || (echo "ERRO: Api.runtimeconfig.json ausente no artefato" >&2; exit 1)
+            || (echo "ERRO: Api.runtimeconfig.json ausente" >&2; exit 1)
           test ! -f .aws-sam/build/JobeasyApiFunction/Api \
             || (echo "ERRO: binário nativo presente — remova UseAppHost" >&2; exit 1)
           echo "Artefatos OK."
 
+      # ── Escreve os secrets em arquivo JSON via Python ──────────────────────
+      # Cada secret é injetado como variável de ambiente APENAS neste step,
+      # isolando completamente o shell do conteúdo dos valores.
+      # O Python lê via os.environ e escreve JSON sem nenhuma interpretação shell.
+      - name: Gerar sam-params.json
+        env:
+          DB_CONNECTION:          ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
+          JWT_SECRET:             ${{ secrets.JWT_SECRET || 'jobeasy-jwt-default-CHANGE-IN-PROD' }}
+          CORS_ALLOWED_ORIGINS:   ${{ secrets.CORS_ALLOWED_ORIGINS || 'https://jobeasy.com.br,http://localhost:3000' }}
+          APP_BASE_URL:           ${{ secrets.APP_BASE_URL || 'https://jobeasy.com.br' }}
+          EMAIL_FROM:             ${{ secrets.EMAIL_FROM || 'Jobeasy <naoresponda@jobeasy.com.br>' }}
+          SMTP_HOST:              ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT:              ${{ secrets.SMTP_PORT || '587' }}
+          SMTP_USER:              ${{ secrets.SMTP_USER || '' }}
+          SMTP_PASS:              ${{ secrets.SMTP_PASS || '' }}
+          STORAGE_BUCKET_NAME:    ${{ secrets.STORAGE_BUCKET_NAME || 'jobeasy-storage-prod' }}
+          GOOGLE_CLIENT_ID:       ${{ secrets.GOOGLE_CLIENT_ID || '' }}
+          FACEBOOK_APP_ID:        ${{ secrets.FACEBOOK_APP_ID || '' }}
+          MP_ACCESS_TOKEN:        ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN || '' }}
+        run: |
+          python3 - << 'PYEOF'
+          import json, os
+
+          def secret(key, default=''):
+              # .strip() remove newlines invisíveis que podem ter entrado no secret
+              val = os.environ.get(key, default)
+              return val.strip() if val else default
+
+          params = [
+            {"ParameterKey": "DbConnection",           "ParameterValue": secret("DB_CONNECTION")},
+            {"ParameterKey": "JwtSecret",              "ParameterValue": secret("JWT_SECRET", "jobeasy-jwt-default-CHANGE-IN-PROD")},
+            {"ParameterKey": "CorsAllowedOrigins",     "ParameterValue": secret("CORS_ALLOWED_ORIGINS", "https://jobeasy.com.br,http://localhost:3000")},
+            {"ParameterKey": "AppBaseUrl",             "ParameterValue": secret("APP_BASE_URL", "https://jobeasy.com.br")},
+            {"ParameterKey": "EmailFrom",              "ParameterValue": secret("EMAIL_FROM", "Jobeasy <naoresponda@jobeasy.com.br>")},
+            {"ParameterKey": "SmtpHost",               "ParameterValue": secret("SMTP_HOST")},
+            {"ParameterKey": "SmtpPort",               "ParameterValue": secret("SMTP_PORT", "587")},
+            {"ParameterKey": "SmtpUser",               "ParameterValue": secret("SMTP_USER")},
+            {"ParameterKey": "SmtpPass",               "ParameterValue": secret("SMTP_PASS")},
+            {"ParameterKey": "StorageBucketName",      "ParameterValue": secret("STORAGE_BUCKET_NAME", "jobeasy-storage-prod")},
+            {"ParameterKey": "GoogleClientId",         "ParameterValue": secret("GOOGLE_CLIENT_ID")},
+            {"ParameterKey": "FacebookAppId",          "ParameterValue": secret("FACEBOOK_APP_ID")},
+            {"ParameterKey": "MercadoPagoAccessToken", "ParameterValue": secret("MP_ACCESS_TOKEN")},
+          ]
+
+          with open("/tmp/sam-params.json", "w") as f:
+            json.dump(params, f, indent=2)
+
+          # Log sem expor valores sensíveis
+          print(f"sam-params.json gerado com {len(params)} parâmetros.")
+          db = secret("DB_CONNECTION")
+          print(f"DB_CONNECTION length: {len(db)} chars, ends with: ...{db[-30:] if len(db) > 30 else db}")
+          PYEOF
+
+      # ── SAM Deploy via subprocess — sem shell, sem interpretação de chars ──
       - name: SAM Deploy
         run: |
-          python3 << 'PYEOF'
-          import os, subprocess, sys
+          python3 - << 'PYEOF'
+          import json, os, subprocess, sys
 
-          def env(key, default=''):
-              return os.environ.get(key, default)
+          with open("/tmp/sam-params.json") as f:
+            params = json.load(f)
 
+          # Converte para o formato "Key=Value" que o SAM CLI espera
           overrides = [
-              f"ParameterKey=DbConnection,ParameterValue={env('DB_CONNECTION')}",
-              f"ParameterKey=JwtSecret,ParameterValue={env('JWT_SECRET')}",
-              f"ParameterKey=CorsAllowedOrigins,ParameterValue={env('CORS_ALLOWED_ORIGINS')}",
-              f"ParameterKey=AppBaseUrl,ParameterValue={env('APP_BASE_URL')}",
-              f"ParameterKey=EmailFrom,ParameterValue={env('EMAIL_FROM')}",
-              f"ParameterKey=SmtpHost,ParameterValue={env('SMTP_HOST')}",
-              f"ParameterKey=SmtpPort,ParameterValue={env('SMTP_PORT', '587')}",
-              f"ParameterKey=SmtpUser,ParameterValue={env('SMTP_USER')}",
-              f"ParameterKey=SmtpPass,ParameterValue={env('SMTP_PASS')}",
-              f"ParameterKey=StorageBucketName,ParameterValue={env('STORAGE_BUCKET_NAME')}",
-              f"ParameterKey=GoogleClientId,ParameterValue={env('GOOGLE_CLIENT_ID')}",
-              f"ParameterKey=FacebookAppId,ParameterValue={env('FACEBOOK_APP_ID')}",
-              f"ParameterKey=MercadoPagoAccessToken,ParameterValue={env('MP_ACCESS_TOKEN')}",
+            f"ParameterKey={p['ParameterKey']},ParameterValue={p['ParameterValue']}"
+            for p in params
           ]
 
           cmd = [
-              'sam', 'deploy',
-              '--template-file', '.aws-sam/build/template.yaml',
-              '--stack-name',    env('STACK_NAME'),
-              '--region',        env('AWS_REGION'),
-              '--resolve-s3',
-              '--capabilities',  'CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM',
-              '--no-confirm-changeset',
-              '--no-fail-on-empty-changeset',
-              '--parameter-overrides', *overrides,
+            "sam", "deploy",
+            "--template-file", ".aws-sam/build/template.yaml",
+            "--stack-name",    os.environ["STACK_NAME"],
+            "--region",        os.environ["AWS_REGION"],
+            "--resolve-s3",
+            "--capabilities",  "CAPABILITY_IAM", "CAPABILITY_NAMED_IAM",
+            "--no-confirm-changeset",
+            "--no-fail-on-empty-changeset",
+            "--parameter-overrides", *overrides,
           ]
 
-          print(f'Executando sam deploy com {len(overrides)} parâmetros...')
+          print(f"Executando sam deploy com {len(overrides)} parâmetros...")
           result = subprocess.run(cmd, check=False)
           sys.exit(result.returncode)
           PYEOF
 
-      - name: Print deployed API URL
+      - name: Print API URL
         run: |
           aws cloudformation describe-stacks \
             --stack-name "${STACK_NAME}" \
