@@ -109,46 +109,46 @@ jobs:
             || (echo "ERRO: binário nativo presente — remova UseAppHost" >&2; exit 1)
           echo "Artefatos OK."
 
-      - name: Gerar arquivo de parâmetros SAM
-        run: |
-          # Usa arquivo JSON para evitar que caracteres especiais (;  &  |  @)
-          # nos valores dos secrets sejam interpretados pelo shell.
-          python3 -c "
-          import json, os
-          params = [
-            {'ParameterKey': 'DbConnection',           'ParameterValue': os.environ['DB_CONNECTION']},
-            {'ParameterKey': 'JwtSecret',              'ParameterValue': os.environ['JWT_SECRET']},
-            {'ParameterKey': 'CorsAllowedOrigins',     'ParameterValue': os.environ['CORS_ALLOWED_ORIGINS']},
-            {'ParameterKey': 'AppBaseUrl',             'ParameterValue': os.environ['APP_BASE_URL']},
-            {'ParameterKey': 'EmailFrom',              'ParameterValue': os.environ['EMAIL_FROM']},
-            {'ParameterKey': 'SmtpHost',               'ParameterValue': os.environ['SMTP_HOST']},
-            {'ParameterKey': 'SmtpPort',               'ParameterValue': os.environ['SMTP_PORT']},
-            {'ParameterKey': 'SmtpUser',               'ParameterValue': os.environ['SMTP_USER']},
-            {'ParameterKey': 'SmtpPass',               'ParameterValue': os.environ['SMTP_PASS']},
-            {'ParameterKey': 'StorageBucketName',      'ParameterValue': os.environ['STORAGE_BUCKET_NAME']},
-            {'ParameterKey': 'GoogleClientId',         'ParameterValue': os.environ['GOOGLE_CLIENT_ID']},
-            {'ParameterKey': 'FacebookAppId',          'ParameterValue': os.environ['FACEBOOK_APP_ID']},
-            {'ParameterKey': 'MercadoPagoAccessToken', 'ParameterValue': os.environ['MP_ACCESS_TOKEN']},
-          ]
-          with open('/tmp/sam-params.json', 'w') as f:
-            json.dump(params, f)
-          print(f'Arquivo gerado com {len(params)} parâmetros.')
-          "
-
       - name: SAM Deploy
         run: |
-          # IMPORTANTE: todos os parâmetros são sempre passados explicitamente.
-          # Parâmetros não passados ficam congelados no valor do deploy anterior (comportamento CloudFormation).
-          # Por isso NÃO usar lógica condicional aqui — passar sempre, mesmo que vazio.
-          sam deploy \
-            --template-file .aws-sam/build/template.yaml \
-            --stack-name "${STACK_NAME}" \
-            --region "${AWS_REGION}" \
-            --resolve-s3 \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-            --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --parameter-overrides file:///tmp/sam-params.json
+          python3 << 'PYEOF'
+          import os, subprocess, sys
+
+          def env(key, default=''):
+              return os.environ.get(key, default)
+
+          overrides = [
+              f"ParameterKey=DbConnection,ParameterValue={env('DB_CONNECTION')}",
+              f"ParameterKey=JwtSecret,ParameterValue={env('JWT_SECRET')}",
+              f"ParameterKey=CorsAllowedOrigins,ParameterValue={env('CORS_ALLOWED_ORIGINS')}",
+              f"ParameterKey=AppBaseUrl,ParameterValue={env('APP_BASE_URL')}",
+              f"ParameterKey=EmailFrom,ParameterValue={env('EMAIL_FROM')}",
+              f"ParameterKey=SmtpHost,ParameterValue={env('SMTP_HOST')}",
+              f"ParameterKey=SmtpPort,ParameterValue={env('SMTP_PORT', '587')}",
+              f"ParameterKey=SmtpUser,ParameterValue={env('SMTP_USER')}",
+              f"ParameterKey=SmtpPass,ParameterValue={env('SMTP_PASS')}",
+              f"ParameterKey=StorageBucketName,ParameterValue={env('STORAGE_BUCKET_NAME')}",
+              f"ParameterKey=GoogleClientId,ParameterValue={env('GOOGLE_CLIENT_ID')}",
+              f"ParameterKey=FacebookAppId,ParameterValue={env('FACEBOOK_APP_ID')}",
+              f"ParameterKey=MercadoPagoAccessToken,ParameterValue={env('MP_ACCESS_TOKEN')}",
+          ]
+
+          cmd = [
+              'sam', 'deploy',
+              '--template-file', '.aws-sam/build/template.yaml',
+              '--stack-name',    env('STACK_NAME'),
+              '--region',        env('AWS_REGION'),
+              '--resolve-s3',
+              '--capabilities',  'CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM',
+              '--no-confirm-changeset',
+              '--no-fail-on-empty-changeset',
+              '--parameter-overrides', *overrides,
+          ]
+
+          print(f'Executando sam deploy com {len(overrides)} parâmetros...')
+          result = subprocess.run(cmd, check=False)
+          sys.exit(result.returncode)
+          PYEOF
 
       - name: Print deployed API URL
         run: |
