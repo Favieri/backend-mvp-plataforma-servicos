@@ -42,8 +42,8 @@ Parameters:
   JwtSecret:
     Type: String
     NoEcho: true
-    Default: ''
-    Description: "Secret para assinar/validar JWTs da aplicação"
+    Default: 'jobeasy-jwt-default-CHANGE-IN-PROD'
+    Description: "Secret JWT — substituir por valor seguro em produção via GitHub Secret JWT_SECRET"
   # ── Storage ────────────────────────────────────────────────────────────────
   StorageBucketName:
     Type: String
