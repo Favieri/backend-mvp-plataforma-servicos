@@ -2,7 +2,7 @@ namespace Infrastructure.Email;
 
 internal static class EmailTemplates
 {
-    private static string AppBaseUrl => Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://app.doezy.com.br";
+    private static string AppBaseUrl => Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
 
     private static string BaseLayout(string title, string preview, string contentHtml)
     {
@@ -30,10 +30,10 @@ internal static class EmailTemplates
 <body>
   <div class="preheader">{{Escape(preview)}}</div>
   <div class="container">
-    <div style="margin:8px 0 16px" class="brand">Doezy</div>
+    <div style="margin:8px 0 16px" class="brand">Jobeasy</div>
     <div class="card">{{contentHtml}}</div>
     <div class="footer">
-      &copy; {{DateTime.UtcNow.Year}} Doezy — Este é um e-mail transacional.
+      &copy; {{DateTime.UtcNow.Year}} Jobeasy — Este é um e-mail transacional.
       Gerencie suas notificações em {{AppBaseUrl}}/configuracoes/notificacoes
     </div>
   </div>

@@ -15,10 +15,10 @@ namespace Infrastructure.Email;
 public sealed class SmtpEmailService(IConnectionFactory factory, ILogger<SmtpEmailService> logger) : IEmailService
 {
     private static readonly string DefaultFrom =
-        Environment.GetEnvironmentVariable("EMAIL_FROM") ?? "Doezy <naoresponda@doezy.com.br>";
+        Environment.GetEnvironmentVariable("EMAIL_FROM") ?? "Jobeasy <naoresponda@jobeasy.com.br>";
 
     private static readonly string AppBaseUrl =
-        Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://app.doezy.com.br";
+        Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
 
     private static readonly bool EmailEnabled =
         Environment.GetEnvironmentVariable("EMAIL_ENABLED") is null or "true";

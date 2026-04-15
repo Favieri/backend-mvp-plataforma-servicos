@@ -10,64 +10,58 @@ Globals:
     Environment:
       Variables:
         ASPNETCORE_ENVIRONMENT: Production
-        DB_CONNECTION: !Ref DbConnection
-        DB_TIMEOUT_SECONDS: !Ref DbTimeoutSeconds
-        CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
-        SMTP_HOST: !Ref SmtpHost
-        SMTP_PORT: !Ref SmtpPort
-        SMTP_USER: !Ref SmtpUser
-        SMTP_PASS: !Ref SmtpPass
-        EMAIL_FROM: !Ref EmailFrom
-        APP_BASE_URL: !Ref AppBaseUrl
-        JWT_SECRET: !Ref JwtSecret
-        STORAGE_BUCKET_NAME: !Ref StorageBucketName
-        GOOGLE_CLIENT_ID: !Ref GoogleClientId
-        FACEBOOK_APP_ID: !Ref FacebookAppId
+        DB_CONNECTION:          !Ref DbConnection
+        DB_TIMEOUT_SECONDS:     !Ref DbTimeoutSeconds
+        JWT_SECRET:             !Ref JwtSecret
+        CORS_ALLOWED_ORIGINS:   !Ref CorsAllowedOrigins
+        APP_BASE_URL:           !Ref AppBaseUrl
+        EMAIL_FROM:             !Ref EmailFrom
+        SMTP_HOST:              !Ref SmtpHost
+        SMTP_PORT:              !Ref SmtpPort
+        SMTP_USER:              !Ref SmtpUser
+        SMTP_PASS:              !Ref SmtpPass
+        STORAGE_BUCKET_NAME:    !Ref StorageBucketName
+        GOOGLE_CLIENT_ID:       !Ref GoogleClientId
+        FACEBOOK_APP_ID:        !Ref FacebookAppId
 
 Parameters:
-  # ── Banco ──────────────────────────────────────────────────────────────────
+  # ── Banco (obrigatório) ─────────────────────────────────────────────────────
   DbConnection:
     Type: String
     NoEcho: true
-    Description: "String de conexão PostgreSQL (Supabase pooler)"
+    Description: "String de conexão PostgreSQL"
   DbTimeoutSeconds:
     Type: String
     Default: '15'
-  # ── CORS ───────────────────────────────────────────────────────────────────
-  CorsAllowedOrigins:
-    Type: String
-    Default: '*'
-    Description: "Origens permitidas (ex: https://jobeasy.com.br,http://localhost:3000)"
-  # ── Autenticação ───────────────────────────────────────────────────────────
+
+  # ── Autenticação ────────────────────────────────────────────────────────────
   JwtSecret:
     Type: String
     NoEcho: true
     Default: 'jobeasy-jwt-default-CHANGE-IN-PROD'
-    Description: "Secret JWT — substituir por valor seguro em produção via GitHub Secret JWT_SECRET"
-  # ── Storage ────────────────────────────────────────────────────────────────
-  StorageBucketName:
+    Description: "Secret HMAC-SHA256 para assinar JWTs — configurar JWT_SECRET no GitHub Secrets"
+
+  # ── CORS ────────────────────────────────────────────────────────────────────
+  CorsAllowedOrigins:
     Type: String
-    Default: 'jobeasy-storage-prod'
-    Description: "Nome do bucket S3 para avatars e anexos"
-  # ── Social Auth ────────────────────────────────────────────────────────────
-  GoogleClientId:
+    Default: 'https://jobeasy.com.br,http://localhost:3000'
+    Description: "Origens CORS permitidas (vírgula-separadas ou *)"
+
+  # ── App ─────────────────────────────────────────────────────────────────────
+  AppBaseUrl:
     Type: String
-    Default: ''
-    Description: "Google OAuth Client ID (opcional)"
-  FacebookAppId:
+    Default: 'https://jobeasy.com.br'
+    Description: "URL base do frontend (usada em links de email)"
+
+  # ── Email ───────────────────────────────────────────────────────────────────
+  EmailFrom:
     Type: String
-    Default: ''
-    Description: "Facebook App ID (opcional)"
-  # ── Mercado Pago ───────────────────────────────────────────────────────────
-  MercadoPagoAccessToken:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: "Token de acesso do Mercado Pago (opcional no deploy)"
-  # ── SMTP ───────────────────────────────────────────────────────────────────
+    Default: 'Jobeasy <naoresponda@jobeasy.com.br>'
+    Description: "Remetente padrão de emails transacionais"
   SmtpHost:
     Type: String
     Default: ''
+    Description: "Host SMTP (vazio = emails desabilitados)"
   SmtpPort:
     Type: String
     Default: '587'
@@ -79,12 +73,29 @@ Parameters:
     Type: String
     Default: ''
     NoEcho: true
-  EmailFrom:
+
+  # ── Storage S3 ──────────────────────────────────────────────────────────────
+  StorageBucketName:
     Type: String
-    Default: 'Jobeasy <naoresponda@jobeasy.com.br>'
-  AppBaseUrl:
+    Default: 'jobeasy-storage-prod'
+    Description: "Nome do bucket S3 para avatars e anexos"
+
+  # ── Social Auth ─────────────────────────────────────────────────────────────
+  GoogleClientId:
     Type: String
-    Default: 'https://jobeasy.com.br'
+    Default: ''
+    Description: "Google OAuth Client ID (vazio = login Google desabilitado)"
+  FacebookAppId:
+    Type: String
+    Default: ''
+    Description: "Facebook App ID (vazio = login Facebook desabilitado)"
+
+  # ── Mercado Pago ────────────────────────────────────────────────────────────
+  MercadoPagoAccessToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Token Mercado Pago (vazio = pagamentos desabilitados)"
 
 Resources:
   JobeasyHttpApi:
@@ -99,6 +110,7 @@ Resources:
       Handler: Api
       Environment:
         Variables:
+          # Mercado Pago fora de Globals pois usa chave com __ (seção aninhada ASP.NET)
           MERCADOPAGO__ACCESSTOKEN: !Ref MercadoPagoAccessToken
       Events:
         ProxyEvent:
@@ -118,6 +130,6 @@ Outputs:
   ApiUrl:
     Description: HTTP API endpoint URL
     Value: !Sub 'https://${JobeasyHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
-  StorageBucketName:
-    Description: Nome do bucket S3 de storage
+  StorageBucketNameOutput:
+    Description: Bucket S3 de storage
     Value: !Ref StorageBucketName
