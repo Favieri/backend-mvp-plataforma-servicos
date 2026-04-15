@@ -13,7 +13,6 @@ Globals:
         DB_CONNECTION: !Ref DbConnection
         DB_TIMEOUT_SECONDS: !Ref DbTimeoutSeconds
         CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
-        # TODO: CREDENTIALS - preencher credenciais SMTP
         SMTP_HOST: !Ref SmtpHost
         SMTP_PORT: !Ref SmtpPort
         SMTP_USER: !Ref SmtpUser
@@ -26,16 +25,46 @@ Globals:
         FACEBOOK_APP_ID: !Ref FacebookAppId
 
 Parameters:
+  # ── Banco ──────────────────────────────────────────────────────────────────
   DbConnection:
     Type: String
     NoEcho: true
+    Description: "String de conexão PostgreSQL (Supabase pooler)"
   DbTimeoutSeconds:
     Type: String
     Default: '15'
+  # ── CORS ───────────────────────────────────────────────────────────────────
   CorsAllowedOrigins:
     Type: String
     Default: '*'
-  # TODO: CREDENTIALS - preencher credenciais SMTP antes do deploy
+    Description: "Origens permitidas (ex: https://jobeasy.com.br,http://localhost:3000)"
+  # ── Autenticação ───────────────────────────────────────────────────────────
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Secret para assinar/validar JWTs da aplicação"
+  # ── Storage ────────────────────────────────────────────────────────────────
+  StorageBucketName:
+    Type: String
+    Default: 'jobeasy-storage-prod'
+    Description: "Nome do bucket S3 para avatars e anexos"
+  # ── Social Auth ────────────────────────────────────────────────────────────
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: "Google OAuth Client ID (opcional)"
+  FacebookAppId:
+    Type: String
+    Default: ''
+    Description: "Facebook App ID (opcional)"
+  # ── Mercado Pago ───────────────────────────────────────────────────────────
+  MercadoPagoAccessToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Token de acesso do Mercado Pago (opcional no deploy)"
+  # ── SMTP ───────────────────────────────────────────────────────────────────
   SmtpHost:
     Type: String
     Default: ''
@@ -52,23 +81,10 @@ Parameters:
     NoEcho: true
   EmailFrom:
     Type: String
-    Default: 'Doezy <naoresponda@doezy.com.br>'
+    Default: 'Jobeasy <naoresponda@jobeasy.com.br>'
   AppBaseUrl:
     Type: String
-    Default: 'https://app.doezy.com.br'
-  JwtSecret:
-    Type: String
-    NoEcho: true
-    Default: ''
-  StorageBucketName:
-    Type: String
-    Default: 'jobeasy-storage-prod'
-  GoogleClientId:
-    Type: String
-    Default: ''
-  FacebookAppId:
-    Type: String
-    Default: ''
+    Default: 'https://jobeasy.com.br'
 
 Resources:
   JobeasyHttpApi:
@@ -81,6 +97,9 @@ Resources:
     Properties:
       CodeUri: ../../
       Handler: Api
+      Environment:
+        Variables:
+          MERCADOPAGO__ACCESSTOKEN: !Ref MercadoPagoAccessToken
       Events:
         ProxyEvent:
           Type: HttpApi
@@ -99,3 +118,6 @@ Outputs:
   ApiUrl:
     Description: HTTP API endpoint URL
     Value: !Sub 'https://${JobeasyHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  StorageBucketName:
+    Description: Nome do bucket S3 de storage
+    Value: !Ref StorageBucketName

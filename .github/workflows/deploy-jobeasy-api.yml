@@ -28,8 +28,12 @@ jobs:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       STORAGE_BUCKET_NAME: ${{ secrets.STORAGE_BUCKET_NAME }}
       MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      FACEBOOK_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+      GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+      FACEBOOK_APP_ID:      ${{ secrets.FACEBOOK_APP_ID }}
+      CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+      SMTP_HOST:            ${{ secrets.SMTP_HOST }}
+      SMTP_USER:            ${{ secrets.SMTP_USER }}
+      SMTP_PASS:            ${{ secrets.SMTP_PASS }}
 
     steps:
       - name: Checkout
@@ -42,14 +46,17 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          if [ -z "${DB_CONNECTION}" ]; then
-            echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2
+          MISSING=()
+          [ -z "${DB_CONNECTION}" ] && MISSING+=("DB_CONNECTION (ou DATABASE_URL)")
+          [ -z "${JWT_SECRET}" ]    && MISSING+=("JWT_SECRET")
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "ERROR: os seguintes secrets são obrigatórios e não foram configurados:" >&2
+            for s in "${MISSING[@]}"; do echo "  - $s" >&2; done
+            echo "" >&2
+            echo "Configure em: GitHub repo → Settings → Secrets and variables → Actions → New repository secret" >&2
             exit 1
           fi
-          if [ -z "${JWT_SECRET}" ]; then
-            echo "ERROR: configure JWT_SECRET em GitHub Secrets." >&2
-            exit 1
-          fi
+          echo "Secrets obrigatórios presentes. OK."
 
       - name: Restore / Build / Test
         run: |
@@ -97,23 +104,16 @@ jobs:
             "ParameterKey=JwtSecret,ParameterValue=${JWT_SECRET}"
           )
 
-          if [ -n "${STORAGE_BUCKET_NAME}" ]; then
-            PARAM_OVERRIDES+=("ParameterKey=StorageBucketName,ParameterValue=${STORAGE_BUCKET_NAME}")
-          fi
+          [ -n "${STORAGE_BUCKET_NAME}" ]  && PARAM_OVERRIDES+=("ParameterKey=StorageBucketName,ParameterValue=${STORAGE_BUCKET_NAME}")
+          [ -n "${MP_ACCESS_TOKEN}" ]      && PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
+          [ -n "${GOOGLE_CLIENT_ID}" ]     && PARAM_OVERRIDES+=("ParameterKey=GoogleClientId,ParameterValue=${GOOGLE_CLIENT_ID}")
+          [ -n "${FACEBOOK_APP_ID}" ]      && PARAM_OVERRIDES+=("ParameterKey=FacebookAppId,ParameterValue=${FACEBOOK_APP_ID}")
+          [ -n "${CORS_ALLOWED_ORIGINS}" ] && PARAM_OVERRIDES+=("ParameterKey=CorsAllowedOrigins,ParameterValue=${CORS_ALLOWED_ORIGINS}")
+          [ -n "${SMTP_HOST}" ]            && PARAM_OVERRIDES+=("ParameterKey=SmtpHost,ParameterValue=${SMTP_HOST}")
+          [ -n "${SMTP_USER}" ]            && PARAM_OVERRIDES+=("ParameterKey=SmtpUser,ParameterValue=${SMTP_USER}")
+          [ -n "${SMTP_PASS}" ]            && PARAM_OVERRIDES+=("ParameterKey=SmtpPass,ParameterValue=${SMTP_PASS}")
 
-          if [ -n "${MP_ACCESS_TOKEN}" ]; then
-            PARAM_OVERRIDES+=("ParameterKey=MercadoPagoAccessToken,ParameterValue=${MP_ACCESS_TOKEN}")
-          else
-            echo "INFO: MP_ACCESS_TOKEN não configurado; usando valor default do template." >&2
-          fi
-
-          if [ -n "${GOOGLE_CLIENT_ID}" ]; then
-            PARAM_OVERRIDES+=("ParameterKey=GoogleClientId,ParameterValue=${GOOGLE_CLIENT_ID}")
-          fi
-
-          if [ -n "${FACEBOOK_APP_ID}" ]; then
-            PARAM_OVERRIDES+=("ParameterKey=FacebookAppId,ParameterValue=${FACEBOOK_APP_ID}")
-          fi
+          echo "Parâmetros a passar ao CloudFormation: ${#PARAM_OVERRIDES[@]}"
 
           sam deploy \
             --template-file .aws-sam/build/template.yaml \
@@ -124,3 +124,11 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides "${PARAM_OVERRIDES[@]}"
+
+      - name: Print API URL
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --region "${AWS_REGION}" \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text

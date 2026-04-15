@@ -202,12 +202,30 @@ Se o `sam build` falhar com **"Missing required parameter: --framework"**, o bui
 ## Secrets do GitHub Actions (deploy AWS)
 
 Para o workflow de deploy funcionar, configure estes secrets no repositório:
+`GitHub repo → Settings → Secrets and variables → Actions → New repository secret`
 
-- `DB_CONNECTION` *(fallback: `DATABASE_URL`)*
-- `MP_ACCESS_TOKEN` *(fallback: `MERCADOPAGO_ACCESS_TOKEN`)* **(opcional no deploy)**
+### Secrets Obrigatórios (deploy falha sem eles)
 
-> O workflow exige `DB_CONNECTION` (ou `DATABASE_URL`).
-> Se token do Mercado Pago não estiver definido, o deploy continua usando o valor default do template SAM.
+| Secret Name | Descrição | Exemplo |
+|---|---|---|
+| `DB_CONNECTION` | String de conexão PostgreSQL | `Host=aws-1-sa-east-1.pooler.supabase.com;Port=6543;...` |
+| `JWT_SECRET` | Secret para assinar JWTs da aplicação | String aleatória segura (min 32 chars) |
+
+### Secrets Opcionais (deploy continua sem eles, usando defaults)
+
+| Secret Name | Descrição | Default se ausente |
+|---|---|---|
+| `MP_ACCESS_TOKEN` | Token Mercado Pago | `''` (pagamentos desabilitados) |
+| `STORAGE_BUCKET_NAME` | Nome do bucket S3 | `jobeasy-storage-prod` |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `''` (login Google desabilitado) |
+| `FACEBOOK_APP_ID` | Facebook App ID | `''` (login Facebook desabilitado) |
+| `CORS_ALLOWED_ORIGINS` | Origens CORS permitidas | `*` |
+| `SMTP_HOST` | Host SMTP para emails | `''` (emails desabilitados) |
+| `SMTP_USER` | Usuário SMTP | `''` |
+| `SMTP_PASS` | Senha SMTP | `''` |
+
+> **Fallbacks aceitos:** `DATABASE_URL` é aceito como alternativa a `DB_CONNECTION`;
+> `MERCADOPAGO_ACCESS_TOKEN` como alternativa a `MP_ACCESS_TOKEN`.
 
 
 Se a Lambda falhar com **"Api.dll or binary /var/task/Api not found"**, verifique se o `sam build` está usando `BuildMethod: makefile` e se o alvo `build-JobeasyApiFunction` do `Makefile` (na raiz) publica para `$(ARTIFACTS_DIR)` (sem subpastas).
