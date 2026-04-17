@@ -7,13 +7,17 @@ using System.Security.Cryptography;
 namespace Infrastructure.Repositories;
 
 public sealed class AvatarStorageRepository(
-    IAmazonS3 s3,
     ILogger<AvatarStorageRepository> logger) : IAvatarStorageRepository
 {
     public async Task<string?> UploadProfessionalAvatarAsync(
-        string professionalId, Stream fileStream, string contentType, CancellationToken ct)
+        string professionalId,
+        Stream fileStream,
+        string contentType,
+        CancellationToken ct)
     {
         var bucketName = Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME");
+        var region     = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+
         if (string.IsNullOrWhiteSpace(bucketName))
         {
             logger.LogError("STORAGE_BUCKET_NAME não configurado.");
@@ -21,30 +25,44 @@ public sealed class AvatarStorageRepository(
         }
 
         var extension = contentType.Split('/').LastOrDefault() ?? "jpg";
-        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
-        var key = $"avatars/professional_{professionalId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{suffix}.{extension}";
+        var randomHex = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        var key       = $"avatars/professional_{professionalId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{randomHex}.{extension}";
 
-        var request = new PutObjectRequest
-        {
-            BucketName = bucketName,
-            Key = key,
-            InputStream = fileStream,
-            ContentType = contentType,
-            CannedACL = S3CannedACL.PublicRead,
-            AutoCloseStream = false,
-        };
+        logger.LogInformation("S3 upload iniciado. Bucket={Bucket} Region={Region} Key={Key}",
+            bucketName, region, key);
 
         try
         {
-            await s3.PutObjectAsync(request, ct);
+            // AmazonS3Config com ServiceURL explícita elimina ambiguidade de região
+            var config = new AmazonS3Config
+            {
+                ServiceURL     = $"https://s3.{region}.amazonaws.com",
+                ForcePathStyle = false
+            };
+
+            using var s3 = new AmazonS3Client(config);
+
+            var request = new PutObjectRequest
+            {
+                BucketName  = bucketName,
+                Key         = key,
+                InputStream = fileStream,
+                ContentType = contentType,
+            };
+
+            var response = await s3.PutObjectAsync(request, ct);
+
+            logger.LogInformation("S3 upload concluído. HttpStatus={Status}", (int)response.HttpStatusCode);
+
+            var publicUrl = $"https://{bucketName}.s3.{region}.amazonaws.com/{key}";
+            return publicUrl;
         }
-        catch (Exception ex)
+        catch (AmazonS3Exception ex)
         {
-            logger.LogError(ex, "S3 avatar upload failed. Key={Key}", key);
+            logger.LogError(ex,
+                "S3 upload falhou. Bucket={Bucket} Region={Region} Key={Key} ErrorCode={Code}",
+                bucketName, region, key, ex.ErrorCode);
             return null;
         }
-
-        var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
-        return $"https://{bucketName}.s3.{region}.amazonaws.com/{key}";
     }
 }

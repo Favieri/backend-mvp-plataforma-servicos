@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 namespace Infrastructure.Repositories;
 
 public sealed class AttachmentStorageRepository(
-    IAmazonS3 s3,
     ILogger<AttachmentStorageRepository> logger) : IAttachmentStorageRepository
 {
     public async Task<string?> UploadAsync(
@@ -18,6 +17,8 @@ public sealed class AttachmentStorageRepository(
         CancellationToken ct)
     {
         var bucketName = Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME");
+        var region     = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+
         if (string.IsNullOrWhiteSpace(bucketName))
         {
             logger.LogError("STORAGE_BUCKET_NAME não configurado.");
@@ -28,36 +29,45 @@ public sealed class AttachmentStorageRepository(
         if (string.IsNullOrWhiteSpace(extension))
             extension = contentType.Split('/').LastOrDefault() ?? "bin";
 
-        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
-        var key = $"attachments/messages/{messageId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{suffix}.{extension}";
+        var randomHex = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        var key       = $"attachments/messages/{messageId}/{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{randomHex}.{extension}";
+
+        logger.LogInformation("S3 attachment upload iniciado. Bucket={Bucket} Region={Region} Key={Key}",
+            bucketName, region, key);
 
         try
         {
-            var putRequest = new PutObjectRequest
+            var config = new AmazonS3Config
             {
-                BucketName = bucketName,
-                Key = key,
-                InputStream = fileStream,
-                ContentType = contentType,
-                AutoCloseStream = false,
+                ServiceURL     = $"https://s3.{region}.amazonaws.com",
+                ForcePathStyle = false
             };
 
-            await s3.PutObjectAsync(putRequest, ct);
+            using var s3 = new AmazonS3Client(config);
+
+            var request = new PutObjectRequest
+            {
+                BucketName  = bucketName,
+                Key         = key,
+                InputStream = fileStream,
+                ContentType = contentType,
+            };
+
+            var response = await s3.PutObjectAsync(request, ct);
+
+            logger.LogInformation("S3 attachment upload concluído. HttpStatus={Status}", (int)response.HttpStatusCode);
+
+            // Attachments são privados — URL não é pública
+            // Para acesso futuro, gerar pre-signed URL no endpoint de download
+            var internalUrl = $"https://{bucketName}.s3.{region}.amazonaws.com/{key}";
+            return internalUrl;
         }
-        catch (Exception ex)
+        catch (AmazonS3Exception ex)
         {
-            logger.LogError(ex, "S3 attachment upload failed. Key={Key}", key);
+            logger.LogError(ex,
+                "S3 attachment upload falhou. Bucket={Bucket} Region={Region} Key={Key} ErrorCode={Code}",
+                bucketName, region, key, ex.ErrorCode);
             return null;
         }
-
-        var urlRequest = new GetPreSignedUrlRequest
-        {
-            BucketName = bucketName,
-            Key = key,
-            Verb = HttpVerb.GET,
-            Expires = DateTime.UtcNow.AddDays(7),
-        };
-
-        return s3.GetPreSignedURL(urlRequest);
     }
 }
