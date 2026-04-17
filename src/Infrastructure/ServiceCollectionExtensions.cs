@@ -1,4 +1,3 @@
-using Amazon.S3;
 using Application.Abstractions;
 using Application.Services;
 using Infrastructure.Data;
@@ -18,12 +17,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.AddHttpClient();
-        services.AddSingleton<IAmazonS3>(_ =>
-        {
-            var regionName = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
-            var region = Amazon.RegionEndpoint.GetBySystemName(regionName);
-            return new AmazonS3Client(region);
-        });
         services.Configure<DatabaseOptions>(o =>
         {
             o.ConnectionString = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
