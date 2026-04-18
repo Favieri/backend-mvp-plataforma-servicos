@@ -29,35 +29,37 @@ public sealed class AvailabilityRepository(AppDbContext ctx) : IAvailabilityRepo
     }
 
     public async Task SaveAllAsync(
-        string professionalId,
-        IReadOnlyList<(int Weekday, int StartMinutes, int EndMinutes, bool Active)> rows,
-        CancellationToken ct)
+    string professionalId,
+    IReadOnlyList<(int Weekday, int StartMinutes, int EndMinutes, bool Active)> rows,
+    CancellationToken ct)
     {
-        await using var tx = await ctx.Database.BeginTransactionAsync(ct);
-
-        // Delete existing rows first
-        await ctx.ProfessionalAvailabilities
-            .Where(a => a.ProfessionalId == professionalId)
-            .ExecuteDeleteAsync(ct);
-
-        // Insert new rows
-        var entities = rows
-            .Select(r => new ProfessionalAvailability(
-                Id: Guid.NewGuid().ToString(),
-                ProfessionalId: professionalId,
-                Weekday: r.Weekday % 7,
-                StartMinutes: r.StartMinutes,
-                EndMinutes: r.EndMinutes,
-                Active: r.Active))
-            .ToList();
-
-        if (entities.Count > 0)
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await ctx.ProfessionalAvailabilities.AddRangeAsync(entities, ct);
-            await ctx.SaveChangesAsync(ct);
-        }
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-        await tx.CommitAsync(ct);
+            await ctx.ProfessionalAvailabilities
+                .Where(a => a.ProfessionalId == professionalId)
+                .ExecuteDeleteAsync(ct);
+
+            var entities = rows
+                .Select(r => new ProfessionalAvailability(
+                    Id: Guid.NewGuid().ToString(),
+                    ProfessionalId: professionalId,
+                    Weekday: r.Weekday % 7,
+                    StartMinutes: r.StartMinutes,
+                    EndMinutes: r.EndMinutes,
+                    Active: r.Active))
+                .ToList();
+
+            if (entities.Count > 0)
+            {
+                await ctx.ProfessionalAvailabilities.AddRangeAsync(entities, ct);
+                await ctx.SaveChangesAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task<IReadOnlyList<object>> GetBlocksAsync(
