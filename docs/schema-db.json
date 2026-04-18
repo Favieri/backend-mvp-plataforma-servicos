@@ -1245,7 +1245,7 @@
                     "name": "preco",
                     "type": "double precision",
                     "default": null,
-                    "nullable": true
+                    "nullable": false
                 },
                 {
                     "name": "descricao",
