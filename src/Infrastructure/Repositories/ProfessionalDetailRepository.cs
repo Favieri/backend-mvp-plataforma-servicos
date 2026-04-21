@@ -104,6 +104,13 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 descricao = ps.Descricao,
                 tierId = ps.TierId,
                 contractMode = ps.ContractMode,
+                contractModeResolved = ps.ContractMode != null
+                    ? ps.ContractMode
+                    : ps.TipoContratacao == Domain.Enums.TipoContratacao.ReservaDireta
+                        ? "booking"
+                        : ps.TipoContratacao == Domain.Enums.TipoContratacao.Proposta
+                            ? "proposal"
+                            : "booking",
                 durationMinutes = ps.DurationMinutes,
                 minLeadTimeMinutes = ps.MinLeadTimeMinutes,
                 tipoContratacao = ps.TipoContratacao,

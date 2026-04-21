@@ -8,14 +8,15 @@ namespace Infrastructure.Repositories;
 public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessionalReadRepository
 {
     public Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(
-        string? zoneId, string? serviceId, CancellationToken ct)
-        => GetProfessionalsFilteredAsync(zoneId, serviceId, null, null, ct);
+        string? zoneId, string? serviceId, string? professionalId, CancellationToken ct)
+        => GetProfessionalsFilteredAsync(zoneId, serviceId, null, null, professionalId, ct);
 
     public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsFilteredAsync(
         string? zoneId,
         string? serviceId,
         string? verificationStatus,
         double? minRating,
+        string? professionalId,
         CancellationToken ct)
     {
         var query =
@@ -44,6 +45,11 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
         if (minRating.HasValue)
         {
             query = query.Where(x => x.p.Rating.HasValue && x.p.Rating >= minRating.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(professionalId))
+        {
+            query = query.Where(x => x.p.Id == professionalId);
         }
 
         var professionals = await query
@@ -112,6 +118,11 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     Description = x.Description,
                     TierId = x.TierId,
                     ContractMode = x.ContractMode,
+                    ContractModeResolved = x.ContractMode != null
+                        ? x.ContractMode
+                        : x.TipoContratacao == Domain.Enums.TipoContratacao.ReservaDireta ? "booking"
+                        : x.TipoContratacao == Domain.Enums.TipoContratacao.Proposta ? "proposal"
+                        : "booking",
                     DurationMinutes = x.DurationMinutes,
                     MinLeadTimeMinutes = x.MinLeadTimeMinutes,
                     TipoContratacao = x.TipoContratacao,
