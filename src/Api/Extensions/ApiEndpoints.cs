@@ -458,8 +458,11 @@ public static class ApiEndpoints
         app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
             string? professionalId, string? filterZones, string? active, IOrderRepository repo, CancellationToken ct) =>
-            await GetOrSetCachedListAsync(ctx, cache, "api-orders", TimeSpan.FromSeconds(30),
-                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, ParseBoolParam(filterZones), ParseBoolParam(active), token), ct));
+        {
+            var cacheKey = $"orders:svc={serviceId ?? "*"}:excl={excludeProfessionalId ?? "*"}:pro={professionalId ?? "*"}:fz={filterZones ?? "0"}:act={active ?? "0"}";
+            return await GetOrSetCachedListAsync(ctx, cache, cacheKey, TimeSpan.FromSeconds(30),
+                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, ParseBoolParam(filterZones), ParseBoolParam(active), token), ct);
+        });
 
         app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
         {
