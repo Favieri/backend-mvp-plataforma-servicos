@@ -110,6 +110,11 @@ public static class ApiEndpoints
         // ─── Auth ──────────────────────────────────────────────────────────────
         app.MapPost("/auth", async (LoginRequest body, IAuthRepository db, IConfiguration config, CancellationToken ct) =>
         {
+            if (string.IsNullOrWhiteSpace(body.Email))
+                return Results.Json(new { error = "email é obrigatório." }, statusCode: 400);
+            if (string.IsNullOrWhiteSpace(body.Senha))
+                return Results.Json(new { error = "senha é obrigatória." }, statusCode: 400);
+
             var userObj = await db.LoginAsync(body.Email, body.Senha, ct);
             if (userObj is null)
                 return Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401);
