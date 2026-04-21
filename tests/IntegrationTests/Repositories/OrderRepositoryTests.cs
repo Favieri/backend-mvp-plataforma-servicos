@@ -78,6 +78,32 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
     }
 
     [Fact]
+    public async Task GetOrdersAsync_LeadsPath_ExcludesAssignedOrders()
+    {
+        await _repo.CreateAsync("client1", "svc1", "open order", null, null, CancellationToken.None);
+
+        var taken = Order.CreateBooking(
+            id: Guid.NewGuid().ToString(),
+            clientId: "client1",
+            professionalId: "pro-already-assigned",
+            serviceId: "svc1",
+            tierId: 1,
+            priceTotalCents: 10000,
+            signalCents: 0,
+            balanceCents: 10000,
+            installments: 1,
+            paymentMethod: "pix",
+            scope: "test",
+            scheduledAt: DateTime.UtcNow.AddDays(1));
+        await _repo.CreateBookingAsync(taken, CancellationToken.None);
+
+        var leads = await _repo.GetOrdersAsync(null, null, null, false, false, CancellationToken.None);
+
+        Assert.DoesNotContain(leads, o => o.Id == taken.Id);
+        Assert.Contains(leads, o => o.Description == "open order");
+    }
+
+    [Fact]
     public async Task GetMineAsync_ReturnsOnlyClientOrders()
     {
         Ctx.Users.Add(new User("client2", "Other", "other@test.com", null, "CLIENT", null, DateTime.UtcNow));

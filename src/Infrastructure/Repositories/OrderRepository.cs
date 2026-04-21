@@ -31,6 +31,8 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
         }
 
+        query = query.Where(o => o.ProfessionalId == null);
+
         if (!string.IsNullOrWhiteSpace(serviceId))
             query = query.Where(o => o.ServiceId == serviceId);
 
