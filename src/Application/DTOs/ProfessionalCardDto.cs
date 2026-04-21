@@ -30,6 +30,7 @@ public sealed class ProfessionalServiceDto
     public string? Description { get; init; }
     public int? TierId { get; init; }
     public string? ContractMode { get; init; }
+    public string ContractModeResolved { get; init; } = "booking";
     public int? DurationMinutes { get; init; }
     public int? MinLeadTimeMinutes { get; init; }
     public string? TipoContratacao { get; init; }

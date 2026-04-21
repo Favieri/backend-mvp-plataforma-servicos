@@ -28,17 +28,18 @@ public static class ApiEndpoints
             HttpRequest req,
             string? zoneId, string? serviceId,
             string? verificationStatus, double? minRating,
+            string? professionalId,
             IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("HomeEndpoints");
             var hasExtraFilters = !string.IsNullOrWhiteSpace(verificationStatus) || minRating.HasValue;
             var cacheKey = hasExtraFilters
-                ? $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:vs={verificationStatus ?? "*"}:mr={minRating}"
-                : $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}";
+                ? $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:vs={verificationStatus ?? "*"}:mr={minRating}:pro={professionalId ?? "*"}"
+                : $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:pro={professionalId ?? "*"}";
             var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
                 () => hasExtraFilters
-                    ? repo.GetProfessionalsFilteredAsync(zoneId, serviceId, verificationStatus, minRating, ct)
-                    : repo.GetProfessionalsAsync(zoneId, serviceId, ct),
+                    ? repo.GetProfessionalsFilteredAsync(zoneId, serviceId, verificationStatus, minRating, professionalId, ct)
+                    : repo.GetProfessionalsAsync(zoneId, serviceId, professionalId, ct),
                 logger, ct);
             return Results.Ok(professionals);
         });

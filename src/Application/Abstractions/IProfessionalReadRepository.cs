@@ -4,7 +4,7 @@ namespace Application.Abstractions;
 
 public interface IProfessionalReadRepository
 {
-    Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(string? zoneId, string? serviceId, CancellationToken ct);
+    Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(string? zoneId, string? serviceId, string? professionalId, CancellationToken ct);
 
     /// <summary>Phase 5: suporta filtros de verificationStatus e minRating além dos filtros base.</summary>
     Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsFilteredAsync(
@@ -12,6 +12,7 @@ public interface IProfessionalReadRepository
         string? serviceId,
         string? verificationStatus,
         double? minRating,
+        string? professionalId,
         CancellationToken ct);
 
     Task<IReadOnlyList<ZoneDto>> GetZonesAsync(CancellationToken ct);
