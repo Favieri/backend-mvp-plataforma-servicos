@@ -90,7 +90,7 @@ public static class ApiEndpoints
                 {
                     // IProfessionalReadRepository e IServiceCatalogRepository compartilham o mesmo AppDbContext scoped.
                     // Executar queries em paralelo aqui dispara concorrência no DbContext (não thread-safe).
-                    var professionals = await repo.GetProfessionalsAsync(null, null, ct);
+                    var professionals = await repo.GetProfessionalsAsync(null, null, null, ct);
                     var zones = await repo.GetZonesAsync(ct);
                     var services = await repo.GetServicesAsync(ct);
                     var categoriesRaw = await catalog.GetCategoriesAsync(ct);
