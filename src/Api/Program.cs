@@ -50,6 +50,16 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddMemoryCache();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("mp-callback", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 10;
+        o.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
 
 var corsAllowedOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"];
 builder.Services.AddCors(options =>
@@ -63,6 +73,7 @@ var app = builder.Build();
 // por middlewares anteriores aos endpoints (incluindo falhas 500).
 app.UseRouting();
 app.UseCors("default");
+app.UseRateLimiter();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -102,6 +113,7 @@ app.MapMethods("/{**path}", ["OPTIONS"], () => Results.NoContent())
 
 var apiGroup = app.MapGroup(string.Empty).RequireCors("default");
 apiGroup.MapMarketplaceEndpoints();
+apiGroup.MapMpOAuthEndpoints();
 
 // Aplica migrations pendentes automaticamente no startup.
 // Garante que colunas como svcAddr* (AddAddressFields) e provider (AddSocialLoginFields)
