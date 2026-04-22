@@ -142,6 +142,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BackgroundJobs.TrustMetricsJob>();
         services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.TrustMetricsJob>());
 
+        // MP-01 / MP-02: Mercado Pago OAuth
+        services.AddScoped<IProfessionalMpAccountRepository, ProfessionalMpAccountRepository>();
+        services.AddScoped<IMpOAuthService, Infrastructure.Services.MpOAuthService>();
+        services.AddSingleton<BackgroundJobs.MpTokenRefreshJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.MpTokenRefreshJob>());
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();

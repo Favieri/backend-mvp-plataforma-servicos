@@ -195,6 +195,8 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("VerificationStatus").IsRequired().HasColumnName("verificationStatus").HasDefaultValue("pending");
             b.Property<string>("Badges").IsRequired(false).HasColumnName("badges");
             b.Property<int>("BufferMinutes").IsRequired().HasColumnName("bufferMinutes").HasDefaultValue(0);
+            b.Property<bool>("MpConnected").IsRequired().HasColumnName("mp_connected").HasDefaultValue(false);
+            b.Property<DateTime?>("MpConnectedAt").HasColumnName("mp_connected_at");
             b.HasKey("Id");
             b.HasIndex("Active", "Rating").HasDatabaseName("IX_Professional_active_rating");
             b.HasIndex("UserId").HasDatabaseName("IX_Professional_userId");
@@ -404,6 +406,26 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.HasKey("Id");
             b.HasIndex("Name").IsUnique();
             b.ToTable("Zone");
+        });
+
+        modelBuilder.Entity("Domain.Entities.ProfessionalMpAccount", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professional_id");
+            b.Property<long>("MpUserId").IsRequired().HasColumnName("mp_user_id");
+            b.Property<string>("MpAccessToken").IsRequired().HasColumnName("mp_access_token");
+            b.Property<string>("MpRefreshToken").IsRequired().HasColumnName("mp_refresh_token");
+            b.Property<DateTime>("MpTokenExpiresAt").IsRequired().HasColumnName("mp_token_expires_at");
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("active");
+            b.Property<bool>("LiveMode").IsRequired().HasColumnName("live_mode");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime>("UpdatedAt").IsRequired().HasColumnName("updated_at");
+            b.HasKey("Id");
+            b.HasIndex("ProfessionalId").IsUnique()
+                .HasDatabaseName("IX_professional_mp_account_professional_id");
+            b.HasIndex("Status", "MpTokenExpiresAt")
+                .HasDatabaseName("IX_professional_mp_account_status_expires");
+            b.ToTable("professional_mp_account");
         });
 #pragma warning restore 612, 618
     }

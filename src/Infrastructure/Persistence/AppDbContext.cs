@@ -33,6 +33,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RecurringOccurrence> RecurringOccurrences => Set<RecurringOccurrence>();
     // Phase 5: verification + trust metrics
     public DbSet<ProfessionalVerification> ProfessionalVerifications => Set<ProfessionalVerification>();
+    // MP-01 / MP-02: Mercado Pago OAuth
+    public DbSet<ProfessionalMpAccount> ProfessionalMpAccounts => Set<ProfessionalMpAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

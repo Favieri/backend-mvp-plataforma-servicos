@@ -1073,6 +1073,9 @@ public static class ApiEndpoints
         // Phase 5 endpoints
         app.MapVerificationEndpoints();
 
+        // MP-02: Mercado Pago OAuth
+        app.MapMpOAuthEndpoints();
+
         return app;
     }
 
