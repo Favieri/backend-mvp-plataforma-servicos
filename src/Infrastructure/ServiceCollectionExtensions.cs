@@ -142,6 +142,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BackgroundJobs.TrustMetricsJob>();
         services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.TrustMetricsJob>());
 
+        // MP OAuth (PRD-MP-02)
+        services.AddHttpClient("mercadopago", c =>
+        {
+            c.BaseAddress = new Uri("https://api.mercadopago.com");
+            c.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<IProfessionalMpAccountRepository, ProfessionalMpAccountRepository>();
+        services.AddScoped<IMpOAuthService, Infrastructure.Services.MpOAuthService>();
+        services.AddHostedService<BackgroundJobs.MpTokenRefreshJob>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();
