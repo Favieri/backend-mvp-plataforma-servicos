@@ -111,6 +111,12 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("SvcAddrReference").IsRequired(false).HasColumnName("svcAddrReference");
             // Recurring plan FK
             b.Property<string>("RecurringPlanId").IsRequired(false).HasColumnName("recurringPlanId");
+            // MP Integration
+            b.Property<decimal>("PlatformFeePercent").IsRequired().HasColumnName("platformFeePercent").HasColumnType("numeric(5,2)").HasDefaultValue(10.00m);
+            b.Property<int>("PlatformFeeCents").IsRequired().HasColumnName("platformFeeCents").HasDefaultValue(0);
+            b.Property<int>("GatewayFeeCents").IsRequired().HasColumnName("gatewayFeeCents").HasDefaultValue(0);
+            b.Property<string>("PaymentStatus").IsRequired(false).HasColumnName("paymentStatus").HasDefaultValue("unpaid");
+            b.Property<string>("MpPreferenceId").IsRequired(false).HasColumnName("mpPreferenceId");
             b.HasKey("Id");
             b.HasIndex("ClientId").HasDatabaseName("IX_Order_clientId");
             b.HasIndex("ClientId", "CreatedAt").HasDatabaseName("IX_Order_clientId_createdAt");
@@ -121,6 +127,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("RecurringPlanId")
                 .HasFilter("\"recurringPlanId\" IS NOT NULL")
                 .HasDatabaseName("IX_Order_recurringPlanId");
+            b.HasIndex("MpPreferenceId")
+                .HasFilter("\"mpPreferenceId\" IS NOT NULL")
+                .HasDatabaseName("IX_Order_mpPreferenceId");
             b.ToTable("Order");
         });
 
@@ -195,9 +204,15 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("VerificationStatus").IsRequired().HasColumnName("verificationStatus").HasDefaultValue("pending");
             b.Property<string>("Badges").IsRequired(false).HasColumnName("badges");
             b.Property<int>("BufferMinutes").IsRequired().HasColumnName("bufferMinutes").HasDefaultValue(0);
+            // MP Integration
+            b.Property<bool>("MpConnected").IsRequired().HasColumnName("mpConnected").HasDefaultValue(false);
+            b.Property<DateTime?>("MpConnectedAt").HasColumnName("mpConnectedAt");
             b.HasKey("Id");
             b.HasIndex("Active", "Rating").HasDatabaseName("IX_Professional_active_rating");
             b.HasIndex("UserId").HasDatabaseName("IX_Professional_userId");
+            b.HasIndex("MpConnected")
+                .HasFilter("\"mpConnected\" = true")
+                .HasDatabaseName("IX_Professional_mpConnected");
             b.ToTable("Professional");
         });
 
@@ -306,6 +321,47 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("ClientId").HasDatabaseName("IX_dispute_client_id");
             b.HasIndex("Status").HasDatabaseName("IX_dispute_status");
             b.ToTable("dispute");
+        });
+
+        modelBuilder.Entity("Domain.Entities.ProfessionalMpAccount", b =>
+        {
+            b.Property<Guid>("Id").HasColumnName("id").HasColumnType("uuid");
+            b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professional_id");
+            b.Property<string>("MpUserId").IsRequired().HasColumnName("mp_user_id");
+            b.Property<string>("MpAccessToken").IsRequired().HasColumnName("mp_access_token");
+            b.Property<string>("MpRefreshToken").IsRequired().HasColumnName("mp_refresh_token");
+            b.Property<DateTime>("MpTokenExpiresAt").IsRequired().HasColumnName("mp_token_expires_at");
+            b.Property<string>("MpScope").IsRequired(false).HasColumnName("mp_scope");
+            b.Property<bool>("MpLiveMode").IsRequired().HasColumnName("mp_live_mode").HasDefaultValue(false);
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("active");
+            b.Property<DateTime>("ConnectedAt").IsRequired().HasColumnName("connected_at");
+            b.Property<DateTime?>("LastRefreshedAt").HasColumnName("last_refreshed_at");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime>("UpdatedAt").IsRequired().HasColumnName("updated_at");
+            b.HasKey("Id");
+            b.HasIndex("ProfessionalId").IsUnique().HasDatabaseName("IX_professional_mp_account_professional_id");
+            b.HasIndex("MpTokenExpiresAt", "Status")
+                .HasFilter("status = 'active'")
+                .HasDatabaseName("IX_professional_mp_account_expires_status");
+            b.ToTable("professional_mp_account");
+        });
+
+        modelBuilder.Entity("Domain.Entities.WebhookEvent", b =>
+        {
+            b.Property<string>("Provider").IsRequired().HasColumnName("provider");
+            b.Property<string>("EventId").IsRequired().HasColumnName("event_id");
+            b.Property<string>("Topic").IsRequired().HasColumnName("topic");
+            b.Property<string>("Action").IsRequired(false).HasColumnName("action");
+            b.Property<string>("RawPayload").IsRequired().HasColumnName("raw_payload");
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("received");
+            b.Property<string>("ErrorMessage").IsRequired(false).HasColumnName("error_message");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime?>("ProcessedAt").HasColumnName("processed_at");
+            b.HasKey("Provider", "EventId");
+            b.HasIndex("Status", "CreatedAt")
+                .HasFilter("status IN ('failed', 'received')")
+                .HasDatabaseName("IX_webhook_events_status_created");
+            b.ToTable("webhook_events");
         });
 
         modelBuilder.Entity("Domain.Entities.Review", b =>
