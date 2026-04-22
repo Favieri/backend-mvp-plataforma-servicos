@@ -436,6 +436,28 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.ToTable("service_category");
         });
 
+        modelBuilder.Entity("Domain.Entities.Payment", b =>
+        {
+            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("OrderId").IsRequired().HasColumnName("order_id");
+            b.Property<string>("Gateway").IsRequired().HasColumnName("gateway");
+            b.Property<string>("GatewayRef").IsRequired(false).HasColumnName("gateway_ref");
+            b.Property<string>("Method").IsRequired().HasColumnName("method").HasDefaultValue("unknown");
+            b.Property<int>("AmountCents").IsRequired().HasColumnName("amount_cents");
+            b.Property<int>("PlatformFeeCents").IsRequired().HasColumnName("platform_fee_cents").HasDefaultValue(0);
+            b.Property<int>("GatewayFeeCents").IsRequired().HasColumnName("gateway_fee_cents").HasDefaultValue(0);
+            b.Property<string>("Status").IsRequired().HasColumnName("status").HasDefaultValue("pending");
+            b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("created_at");
+            b.Property<DateTime?>("PaidAt").HasColumnName("paid_at");
+            b.Property<string>("PixCode").IsRequired(false).HasColumnName("pix_code");
+            b.Property<string>("PixQrCodeBase64").IsRequired(false).HasColumnName("pix_qr_code_base64");
+            b.Property<DateTime?>("PixExpiresAt").HasColumnName("pix_expires_at");
+            b.HasKey("Id");
+            b.HasIndex("OrderId").HasDatabaseName("idx_payment_order_id");
+            b.HasIndex("OrderId", "Status").HasDatabaseName("idx_payment_order_status").HasFilter("status = 'pending'");
+            b.ToTable("payment");
+        });
+
         modelBuilder.Entity("Domain.Entities.User", b =>
         {
             b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
