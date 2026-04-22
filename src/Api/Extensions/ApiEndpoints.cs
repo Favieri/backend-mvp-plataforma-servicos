@@ -1073,6 +1073,9 @@ public static class ApiEndpoints
         // Phase 5 endpoints
         app.MapVerificationEndpoints();
 
+        // MP Payment (PRD-MP-03)
+        app.MapPaymentEndpoints();
+
         return app;
     }
 
