@@ -42,7 +42,13 @@ public sealed class ProfessionalConfiguration : IEntityTypeConfiguration<Profess
             .HasColumnName("bufferMinutes")
             .HasDefaultValue(0);
 
+        // ─── MP Integration ──────────────────────────────────────────────────
+        builder.Property(x => x.MpConnected).HasColumnName("mpConnected").IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.MpConnectedAt).HasColumnName("mpConnectedAt");
+
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => new { x.Active, x.Rating });
+        // Partial index: fast lookup for professionals eligible to receive MP payments
+        builder.HasIndex(x => x.MpConnected).HasFilter("\"mpConnected\" = true");
     }
 }

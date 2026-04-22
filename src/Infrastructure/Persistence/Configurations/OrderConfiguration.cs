@@ -56,6 +56,15 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.RecurringPlanId).HasColumnName("recurringPlanId");
         builder.HasIndex(x => x.RecurringPlanId).HasFilter("\"recurringPlanId\" IS NOT NULL");
 
+        // ─── MP Integration ──────────────────────────────────────────────────
+        builder.Property(x => x.PlatformFeePercent).HasColumnName("platformFeePercent").HasColumnType("numeric(5,2)").HasDefaultValue(10.00m);
+        builder.Property(x => x.PlatformFeeCents).HasColumnName("platformFeeCents").HasDefaultValue(0);
+        builder.Property(x => x.GatewayFeeCents).HasColumnName("gatewayFeeCents").HasDefaultValue(0);
+        builder.Property(x => x.PaymentStatus).HasColumnName("paymentStatus").HasDefaultValue("unpaid");
+        builder.Property(x => x.MpPreferenceId).HasColumnName("mpPreferenceId");
+        // Supports webhook → order correlation by preferenceId
+        builder.HasIndex(x => x.MpPreferenceId).HasFilter("\"mpPreferenceId\" IS NOT NULL");
+
         // ─── Indexes ────────────────────────────────────────────────────────
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.ServiceId);

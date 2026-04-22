@@ -33,6 +33,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RecurringOccurrence> RecurringOccurrences => Set<RecurringOccurrence>();
     // Phase 5: verification + trust metrics
     public DbSet<ProfessionalVerification> ProfessionalVerifications => Set<ProfessionalVerification>();
+    // MP Integration
+    public DbSet<ProfessionalMpAccount> ProfessionalMpAccounts => Set<ProfessionalMpAccount>();
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
