@@ -1079,6 +1079,9 @@ public static class ApiEndpoints
         // MP Webhook (PRD-MP-04)
         app.MapWebhookEndpoints();
 
+        // Wallet (PRD-MP-05)
+        app.MapWalletEndpoints();
+
         return app;
     }
 

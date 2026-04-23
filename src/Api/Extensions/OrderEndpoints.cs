@@ -281,6 +281,8 @@ public static class OrderEndpoints
             HttpContext context,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
+            IPaymentRepository paymentRepo,
+            ILedgerRepository ledgerRepo,
             CancellationToken ct) =>
         {
             // Prioridade: JWT claim > query param (retrocompatibilidade)
@@ -307,6 +309,25 @@ public static class OrderEndpoints
                 eventType: "completion_confirmed_by_client",
                 actorId: clientId,
                 actorRole: ActorRole.Client), ct);
+
+            // Release earning to professional ledger
+            if (order.ProfessionalId is not null)
+            {
+                var payment = await paymentRepo.GetByOrderIdAsync(id, ct);
+                if (payment is not null)
+                {
+                    var earningCents = payment.AmountCents - payment.PlatformFeeCents - payment.GatewayFeeCents;
+                    if (earningCents > 0)
+                    {
+                        await ledgerRepo.AddAsync(LedgerEntry.Create(
+                            type: "earning_released",
+                            orderId: id,
+                            paymentId: payment.Id,
+                            professionalId: order.ProfessionalId,
+                            amountCents: earningCents), ct);
+                    }
+                }
+            }
 
             return Results.Ok(new { ok = true, status = OrderStatus.Completed });
         });
