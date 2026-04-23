@@ -23,6 +23,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(x => x.Status).HasColumnName("status").IsRequired().HasDefaultValue("pending");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.PaidAt).HasColumnName("paid_at");
+        builder.Property(x => x.MpPaymentId).HasColumnName("mp_payment_id");
         builder.Property(x => x.PixCode).HasColumnName("pix_code");
         builder.Property(x => x.PixQrCodeBase64).HasColumnName("pix_qr_code_base64");
         builder.Property(x => x.PixExpiresAt).HasColumnName("pix_expires_at");

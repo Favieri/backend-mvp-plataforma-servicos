@@ -143,6 +143,13 @@ public sealed class MercadoPagoService : IMercadoPagoService
         var result = await response.Content.ReadFromJsonAsync<MpPaymentApiResponse>(ct);
         if (result is null) return null;
 
+        var gatewayFeeCents = result.FeeDetails?
+            .Where(f => string.Equals(f.Type, "mercadopago_fee", StringComparison.OrdinalIgnoreCase))
+            .Sum(f => (int)Math.Round(f.Amount * 100));
+
+        var pixCode = result.PointOfInteraction?.TransactionData?.QrCode;
+        var pixQrBase64 = result.PointOfInteraction?.TransactionData?.QrCodeBase64;
+
         return new MpPaymentDetails(
             MpPaymentId: result.Id.ToString(),
             Status: result.Status ?? "unknown",
@@ -151,7 +158,14 @@ public sealed class MercadoPagoService : IMercadoPagoService
             DateApproved: result.DateApproved,
             TransactionNetAmountCents: result.TransactionNetAmount.HasValue
                 ? (int)Math.Round(result.TransactionNetAmount.Value * 100)
-                : null
+                : null,
+            StatusDetail: result.StatusDetail,
+            ExternalReference: result.ExternalReference,
+            MarketplaceFeeCents: (int)Math.Round(result.MarketplaceFee * 100),
+            MpGatewayFeeCents: gatewayFeeCents,
+            PixCode: pixCode,
+            PixQrCodeBase64: pixQrBase64,
+            PixExpiresAt: result.DateOfExpiration
         );
     }
 
@@ -233,8 +247,14 @@ public sealed class MercadoPagoService : IMercadoPagoService
         [JsonPropertyName("status")]
         public string? Status { get; init; }
 
+        [JsonPropertyName("status_detail")]
+        public string? StatusDetail { get; init; }
+
         [JsonPropertyName("payment_type_id")]
         public string? PaymentTypeId { get; init; }
+
+        [JsonPropertyName("external_reference")]
+        public string? ExternalReference { get; init; }
 
         [JsonPropertyName("transaction_amount")]
         public double TransactionAmount { get; init; }
@@ -242,8 +262,44 @@ public sealed class MercadoPagoService : IMercadoPagoService
         [JsonPropertyName("transaction_net_amount")]
         public double? TransactionNetAmount { get; init; }
 
+        [JsonPropertyName("marketplace_fee")]
+        public double MarketplaceFee { get; init; }
+
+        [JsonPropertyName("fee_details")]
+        public MpFeeDetail[]? FeeDetails { get; init; }
+
         [JsonPropertyName("date_approved")]
         public DateTime? DateApproved { get; init; }
+
+        [JsonPropertyName("date_of_expiration")]
+        public DateTime? DateOfExpiration { get; init; }
+
+        [JsonPropertyName("point_of_interaction")]
+        public MpPointOfInteraction? PointOfInteraction { get; init; }
+    }
+
+    private sealed class MpFeeDetail
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; init; }
+
+        [JsonPropertyName("amount")]
+        public double Amount { get; init; }
+    }
+
+    private sealed class MpPointOfInteraction
+    {
+        [JsonPropertyName("transaction_data")]
+        public MpTransactionData? TransactionData { get; init; }
+    }
+
+    private sealed class MpTransactionData
+    {
+        [JsonPropertyName("qr_code")]
+        public string? QrCode { get; init; }
+
+        [JsonPropertyName("qr_code_base64")]
+        public string? QrCodeBase64 { get; init; }
     }
 }
 

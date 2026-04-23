@@ -14,6 +14,7 @@ public class Payment
     public DateTime CreatedAt { get; private set; }
     public DateTime? PaidAt { get; private set; }
     // Populated by PRD-MP-04 webhook handler
+    public string? MpPaymentId { get; private set; }
     public string? PixCode { get; private set; }
     public string? PixQrCodeBase64 { get; private set; }
     public DateTime? PixExpiresAt { get; private set; }
@@ -47,6 +48,8 @@ public class Payment
         PaidAt = paidAt;
         GatewayFeeCents = gatewayFeeCents;
     }
+
+    public void SetMpPaymentId(string mpPaymentId) => MpPaymentId = mpPaymentId;
 
     public void SetPixDetails(string? code, string? qrCode, DateTime? expiresAt)
     {

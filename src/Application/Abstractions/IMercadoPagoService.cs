@@ -38,5 +38,12 @@ public sealed record MpPaymentDetails(
     string? PaymentTypeId,
     int TransactionAmountCents,
     DateTime? DateApproved,
-    int? TransactionNetAmountCents
+    int? TransactionNetAmountCents,
+    string? StatusDetail = null,
+    string? ExternalReference = null,
+    int? MarketplaceFeeCents = null,
+    int? MpGatewayFeeCents = null,
+    string? PixCode = null,
+    string? PixQrCodeBase64 = null,
+    DateTime? PixExpiresAt = null
 );

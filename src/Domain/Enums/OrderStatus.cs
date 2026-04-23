@@ -24,13 +24,15 @@ public static class OrderStatus
     public const string CancelledProfessional = "cancelled_professional";
     public const string Refunded = "refunded";
     public const string Rebooked = "rebooked";
+    public const string PaymentExpired = "payment_expired";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
         Aberto, Confirmado, Concluido, AutoConcluido, Cancelado,
         Draft, ProposalSent, AwaitingPayment, Scheduled, InTransit,
         InProgress, AwaitingConfirmation, Completed, Evaluated,
-        Disputed, CancelledClient, CancelledProfessional, Refunded, Rebooked
+        Disputed, CancelledClient, CancelledProfessional, Refunded, Rebooked,
+        PaymentExpired
     };
 
     public static readonly IReadOnlySet<string> Terminal = new HashSet<string>
