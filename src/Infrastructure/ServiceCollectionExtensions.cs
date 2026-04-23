@@ -154,6 +154,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IMercadoPagoService, Infrastructure.Services.MercadoPagoService>();
 
+        // Wallet ledger (PRD-MP-05)
+        services.AddScoped<ILedgerRepository, LedgerRepository>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();
