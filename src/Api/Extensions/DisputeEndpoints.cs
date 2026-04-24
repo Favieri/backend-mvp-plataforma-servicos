@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Api.Extensions;
@@ -98,8 +99,18 @@ public static class DisputeEndpoints
         });
 
         // PUT /disputes/{id}/resolve — resolve (admin/system)
-        app.MapPut("/disputes/{id}/resolve", async (string id, ResolveDisputeRequest body, IDisputeRepository repo, CancellationToken ct) =>
+        app.MapPut("/disputes/{id}/resolve", async (
+            string id,
+            ResolveDisputeRequest body,
+            IDisputeRepository repo,
+            IPaymentRepository paymentRepo,
+            ILedgerRepository ledgerRepo,
+            IRefundService refundService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("DisputeEndpoints");
+
             if (string.IsNullOrWhiteSpace(body.Resolution))
                 return Results.Json(new { error = "resolution é obrigatório" }, statusCode: 400);
             if (string.IsNullOrWhiteSpace(body.ResolvedBy))
@@ -112,6 +123,61 @@ public static class DisputeEndpoints
                 return Results.Json(new { error = "Disputa já encerrada" }, statusCode: 422);
 
             await repo.ResolveAsync(id, body.Resolution.Trim(), body.ResolvedBy.Trim(), body.RefundAmountCents, ct);
+
+            // Disputa resolvida a favor do cliente: disparar reembolso
+            if (body.RefundAmountCents > 0)
+            {
+                try
+                {
+                    var refundResult = await refundService.RefundOrderAsync(
+                        orderId: dispute.OrderId,
+                        reason: "dispute_resolved_client",
+                        amountCents: body.RefundAmountCents,
+                        ct);
+
+                    if (refundResult.Success)
+                    {
+                        // Ledger: débito para o profissional
+                        await ledgerRepo.AddAsync(LedgerEntry.Create(
+                            type: "earning_dispute_refunded",
+                            orderId: dispute.OrderId,
+                            paymentId: null,
+                            professionalId: dispute.ProfessionalId,
+                            amountCents: -body.RefundAmountCents.Value), ct);
+                        // Nota: RefundService já gerencia Order.status:
+                        //   reembolso total → status='refunded'
+                        //   reembolso parcial → status permanece inalterado
+                    }
+                    else
+                    {
+                        logger.LogError(
+                            "[DisputeEndpoints] Falha ao reembolsar disputa {DisputeId}. ErrorCode={Code}",
+                            id, refundResult.ErrorCode);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[DisputeEndpoints] Exceção ao reembolsar disputa {DisputeId}", id);
+                }
+            }
+            else
+            {
+                // Disputa resolvida a favor do profissional: liberar earning congelado
+                var payment = await paymentRepo.GetPaidByOrderIdAsync(dispute.OrderId, ct);
+                if (payment is not null && dispute.ProfessionalId is not null)
+                {
+                    var netCents = payment.AmountCents - payment.PlatformFeeCents - payment.GatewayFeeCents;
+                    if (netCents > 0)
+                    {
+                        await ledgerRepo.AddAsync(LedgerEntry.Create(
+                            type: "earning_dispute_released",
+                            orderId: dispute.OrderId,
+                            paymentId: payment.Id,
+                            professionalId: dispute.ProfessionalId,
+                            amountCents: netCents), ct);
+                    }
+                }
+            }
 
             return Results.Ok(new { ok = true, id, status = Domain.Enums.DisputeStatus.Resolved });
         });

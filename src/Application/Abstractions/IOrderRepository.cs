@@ -23,4 +23,5 @@ public interface IOrderRepository
     Task<IReadOnlyList<object>> GetMineByRoleAsync(string userId, string role, CancellationToken ct);
     Task<IReadOnlyList<Order>> GetOrdersAwaitingAutoConfirmAsync(DateTime before, CancellationToken ct);
     Task<IReadOnlyList<Order>> GetOrdersAwaitingPaymentTimedOutAsync(DateTime before, CancellationToken ct);
+    Task<bool> MarkRefundedAsync(string orderId, CancellationToken ct);
 }

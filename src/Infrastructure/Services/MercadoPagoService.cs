@@ -169,26 +169,39 @@ public sealed class MercadoPagoService : IMercadoPagoService
         );
     }
 
-    public async Task<bool> RefundPaymentAsync(string mpPaymentId, CancellationToken ct)
+    public async Task<MpRefundResult> RefundPaymentAsync(string mpPaymentId, int? amountCents, CancellationToken ct)
     {
         using var response = await SendWithRetryAsync(
             () =>
             {
                 var msg = new HttpRequestMessage(HttpMethod.Post, $"/v1/payments/{mpPaymentId}/refunds");
                 msg.Headers.Add("Authorization", $"Bearer {_platformAccessToken}");
-                msg.Content = JsonContent.Create(new { }, options: _jsonOptions);
+                // Omit amount for total refund; include for partial
+                var body = amountCents.HasValue
+                    ? (object)new { amount = amountCents.Value / 100.0 }
+                    : new { };
+                msg.Content = JsonContent.Create(body, options: _jsonOptions);
                 return msg;
             },
             ct);
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("[MpService] RefundPayment failed. MpPaymentId={Id} Status={Status}",
-                mpPaymentId, response.StatusCode);
-            return false;
+            var body = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("[MpService] RefundPayment failed. MpPaymentId={Id} Status={Status} Body={Body}",
+                mpPaymentId, response.StatusCode, body);
+
+            var errorCode = (int)response.StatusCode == 422 ? "refund_window_expired" : "gateway_error";
+            return new MpRefundResult(Success: false, RefundId: null, ErrorCode: errorCode);
         }
 
-        return true;
+        var result = await response.Content.ReadFromJsonAsync<MpRefundApiResponse>(ct);
+        var refundId = result?.Id?.ToString();
+
+        _logger.LogInformation("[MpService] Refund created. MpPaymentId={Id} RefundId={RefundId} AmountCents={Amount}",
+            mpPaymentId, refundId, amountCents);
+
+        return new MpRefundResult(Success: true, RefundId: refundId, ErrorCode: null);
     }
 
     private async Task<HttpResponseMessage> SendWithRetryAsync(
@@ -300,6 +313,12 @@ public sealed class MercadoPagoService : IMercadoPagoService
 
         [JsonPropertyName("qr_code_base64")]
         public string? QrCodeBase64 { get; init; }
+    }
+
+    private sealed class MpRefundApiResponse
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; init; }
     }
 }
 

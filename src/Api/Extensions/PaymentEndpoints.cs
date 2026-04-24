@@ -8,6 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
+// RefundResult alias to avoid ambiguity with local record
+using RefundResult = Application.Abstractions.RefundResult;
+
 namespace Api.Extensions;
 
 public static class PaymentEndpoints
@@ -239,6 +242,53 @@ public static class PaymentEndpoints
             });
         });
 
+        // ─── POST /api/payments/{orderId}/refund ─────────────────────────────────
+        // Auth: admin/sistema interno. Chamado internamente pelo fluxo de cancelamento ou disputa.
+        app.MapPost("/api/payments/{orderId}/refund", async (
+            string orderId,
+            RefundOrderRequest body,
+            IRefundService refundService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("PaymentEndpoints");
+
+            if (string.IsNullOrWhiteSpace(body.Reason))
+                return Results.Json(new { error = "reason é obrigatório" }, statusCode: 400);
+
+            RefundResult result;
+            try
+            {
+                result = await refundService.RefundOrderAsync(orderId, body.Reason, body.AmountCents, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "[PaymentEndpoints] Refund exception for order {OrderId}", orderId);
+                return Results.Json(
+                    new { error = "gateway_error", message = "Erro ao processar estorno no Mercado Pago." },
+                    statusCode: 502);
+            }
+
+            if (!result.Success)
+            {
+                var statusCode = result.ErrorCode switch
+                {
+                    "no_paid_payment" or "already_refunded" or "refund_window_expired" => 422,
+                    _ => 502
+                };
+                return Results.Json(new { error = result.ErrorCode, message = result.ErrorMessage }, statusCode: statusCode);
+            }
+
+            return Results.Ok(new
+            {
+                ok = true,
+                refundId = result.RefundId,
+                amountCents = result.AmountCents,
+                orderId,
+                status = "refunded"
+            });
+        });
+
         // ─── POST /api/payments/{paymentId}/cancel ────────────────────────────────
         app.MapPost("/api/payments/{paymentId}/cancel", async (
             string paymentId,
@@ -282,4 +332,10 @@ public static class PaymentEndpoints
 public sealed record CreatePaymentPreferenceRequest(
     string? OrderId,
     string? PayerEmail
+);
+
+public sealed record RefundOrderRequest(
+    string Reason,
+    int? AmountCents,
+    string? Note
 );

@@ -35,4 +35,37 @@ public sealed class PaymentRepository(AppDbContext ctx) : IPaymentRepository
         ctx.Payments
             .Where(p => p.OrderId == orderId && p.Status == "pending")
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "cancelled"), ct);
+
+    public Task<Payment?> GetPaidByOrderIdAsync(string orderId, CancellationToken ct) =>
+        ctx.Payments.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.OrderId == orderId && p.Status == "paid", ct);
+
+    public Task MarkRefundPendingAsync(string paymentId, string reason, CancellationToken ct) =>
+        ctx.Payments
+            .Where(p => p.Id == paymentId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.RefundStatus, "pending")
+                .SetProperty(p => p.RefundReason, reason), ct);
+
+    public Task MarkRefundedAsync(string paymentId, string refundId, string reason, CancellationToken ct) =>
+        ctx.Payments
+            .Where(p => p.Id == paymentId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, "refunded")
+                .SetProperty(p => p.RefundStatus, "completed")
+                .SetProperty(p => p.RefundId, refundId)
+                .SetProperty(p => p.RefundedAt, DateTime.UtcNow)
+                .SetProperty(p => p.RefundReason, reason), ct);
+
+    public Task MarkRefundFailedAsync(string paymentId, CancellationToken ct) =>
+        ctx.Payments
+            .Where(p => p.Id == paymentId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.RefundStatus, "failed"), ct);
+
+    public async Task<IReadOnlyList<Payment>> GetRefundPendingAsync(int maxCount, CancellationToken ct) =>
+        await ctx.Payments.AsNoTracking()
+            .Where(p => p.RefundStatus == "pending")
+            .OrderBy(p => p.CreatedAt)
+            .Take(maxCount)
+            .ToListAsync(ct);
 }

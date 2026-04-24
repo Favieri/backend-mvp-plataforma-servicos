@@ -18,6 +18,11 @@ public class Payment
     public string? PixCode { get; private set; }
     public string? PixQrCodeBase64 { get; private set; }
     public DateTime? PixExpiresAt { get; private set; }
+    // Refund tracking (PRD-MP-09)
+    public string? RefundStatus { get; private set; }   // null | pending | completed | failed
+    public string? RefundId { get; private set; }
+    public DateTime? RefundedAt { get; private set; }
+    public string? RefundReason { get; private set; }
 
     private Payment() { }
 
@@ -57,4 +62,21 @@ public class Payment
         PixQrCodeBase64 = qrCode;
         PixExpiresAt = expiresAt;
     }
+
+    public void SetRefundPending(string reason)
+    {
+        RefundStatus = "pending";
+        RefundReason = reason;
+    }
+
+    public void SetRefunded(string refundId, DateTime refundedAt, string reason)
+    {
+        RefundStatus = "completed";
+        RefundId = refundId;
+        RefundedAt = refundedAt;
+        RefundReason = reason;
+        Status = "refunded";
+    }
+
+    public void SetRefundFailed() => RefundStatus = "failed";
 }
