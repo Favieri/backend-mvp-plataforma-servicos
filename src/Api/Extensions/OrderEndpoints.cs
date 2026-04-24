@@ -8,6 +8,7 @@ using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -233,8 +234,13 @@ public static class OrderEndpoints
             UpdateOrderStatusRequest body,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
+            IPaymentRepository paymentRepo,
+            IRefundService refundService,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("OrderEndpoints");
+
             var order = await orderRepo.GetByIdAsync(id, ct);
             if (order is null)
                 return Results.NotFound(new { error = "Pedido não encontrado" });
@@ -270,6 +276,32 @@ public static class OrderEndpoints
                 actorId: body.ActorId,
                 actorRole: body.ActorRole,
                 metadata: body.Reason is not null ? $"{{\"reason\":\"{body.Reason}\"}}" : null), ct);
+
+            // Disparar reembolso automático em cancelamentos com pagamento confirmado.
+            // Falha no reembolso NÃO bloqueia o cancelamento — fica pendente para reprocessamento.
+            if (newStatus is OrderStatus.CancelledClient or OrderStatus.CancelledProfessional)
+            {
+                var paidPayment = await paymentRepo.GetPaidByOrderIdAsync(id, ct);
+                if (paidPayment is not null)
+                {
+                    try
+                    {
+                        var refundReason = newStatus == OrderStatus.CancelledClient
+                            ? "cancelled_by_client"
+                            : "cancelled_by_professional";
+                        await refundService.RefundOrderAsync(id, refundReason, amountCents: null, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex,
+                            "[OrderEndpoints] Falha ao reembolsar automaticamente o pedido {OrderId}. Marcando como pendente.",
+                            id);
+                        await paymentRepo.MarkRefundPendingAsync(paidPayment.Id,
+                            newStatus == OrderStatus.CancelledClient ? "cancelled_by_client" : "cancelled_by_professional",
+                            ct);
+                    }
+                }
+            }
 
             return Results.Ok(new { ok = true, status = newStatus });
         });

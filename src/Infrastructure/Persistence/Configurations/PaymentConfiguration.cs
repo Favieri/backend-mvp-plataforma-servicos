@@ -28,9 +28,17 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(x => x.PixQrCodeBase64).HasColumnName("pix_qr_code_base64");
         builder.Property(x => x.PixExpiresAt).HasColumnName("pix_expires_at");
 
+        builder.Property(x => x.RefundStatus).HasColumnName("refund_status");
+        builder.Property(x => x.RefundId).HasColumnName("refund_id");
+        builder.Property(x => x.RefundedAt).HasColumnName("refunded_at");
+        builder.Property(x => x.RefundReason).HasColumnName("refund_reason");
+
         builder.HasIndex(x => x.OrderId).HasDatabaseName("idx_payment_order_id");
         builder.HasIndex(x => new { x.OrderId, x.Status })
             .HasDatabaseName("idx_payment_order_status")
             .HasFilter("status = 'pending'");
+        builder.HasIndex(x => x.RefundStatus)
+            .HasDatabaseName("idx_payment_refund_pending")
+            .HasFilter("refund_status = 'pending'");
     }
 }

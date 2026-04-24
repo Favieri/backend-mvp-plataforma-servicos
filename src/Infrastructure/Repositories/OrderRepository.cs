@@ -265,4 +265,12 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             .Where(o => o.Status == OrderStatus.AwaitingPayment
                         && o.CreatedAt <= before)
             .ToListAsync(ct);
+
+    public async Task<bool> MarkRefundedAsync(string orderId, CancellationToken ct)
+    {
+        var rows = await ctx.Orders
+            .Where(o => o.Id == orderId)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Refunded), ct);
+        return rows > 0;
+    }
 }

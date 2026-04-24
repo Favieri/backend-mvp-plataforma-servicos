@@ -9,7 +9,7 @@ public interface IMercadoPagoService
 
     Task<MpPaymentDetails?> GetPaymentDetailsAsync(string mpPaymentId, CancellationToken ct);
 
-    Task<bool> RefundPaymentAsync(string mpPaymentId, CancellationToken ct);
+    Task<MpRefundResult> RefundPaymentAsync(string mpPaymentId, int? amountCents, CancellationToken ct);
 }
 
 public sealed record CreatePreferenceRequest(
@@ -30,6 +30,12 @@ public sealed record MpPreferenceResult(
     string CheckoutUrl,
     string SandboxUrl,
     DateTime ExpiresAt
+);
+
+public sealed record MpRefundResult(
+    bool Success,
+    string? RefundId,
+    string? ErrorCode
 );
 
 public sealed record MpPaymentDetails(

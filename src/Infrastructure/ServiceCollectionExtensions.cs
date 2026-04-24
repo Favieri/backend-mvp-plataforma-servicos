@@ -157,6 +157,10 @@ public static class ServiceCollectionExtensions
         // Wallet ledger (PRD-MP-05)
         services.AddScoped<ILedgerRepository, LedgerRepository>();
 
+        // Refund service + retry job (PRD-MP-09)
+        services.AddScoped<IRefundService, Infrastructure.Services.RefundService>();
+        services.AddHostedService<BackgroundJobs.RefundRetryJob>();
+
         // Email / notifications
         // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
         services.AddScoped<IEmailService, SmtpEmailService>();
