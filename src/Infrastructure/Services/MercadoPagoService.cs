@@ -196,7 +196,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
         }
 
         var result = await response.Content.ReadFromJsonAsync<MpRefundApiResponse>(ct);
-        var refundId = result?.Id?.ToString();
+        var refundId = result?.Id.ToString();
 
         _logger.LogInformation("[MpService] Refund created. MpPaymentId={Id} RefundId={RefundId} AmountCents={Amount}",
             mpPaymentId, refundId, amountCents);
