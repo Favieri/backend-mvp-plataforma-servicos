@@ -3,7 +3,9 @@ using Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
+using Infrastructure.Persistence;
 using Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -463,11 +465,92 @@ public static class ApiEndpoints
         // que enviam valores numéricos em query params (ex: filterZones=1).
         app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
-            string? professionalId, string? filterZones, string? active, IOrderRepository repo, CancellationToken ct) =>
+            string? professionalId, string? filterZones, string? active,
+            IOrderRepository repo, AppDbContext dbCtx, CancellationToken ct) =>
         {
             var cacheKey = $"orders:svc={serviceId ?? "*"}:excl={excludeProfessionalId ?? "*"}:pro={professionalId ?? "*"}:fz={filterZones ?? "0"}:act={active ?? "0"}";
-            return await GetOrSetCachedListAsync(ctx, cache, cacheKey, TimeSpan.FromSeconds(30),
-                async token => await repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId, ParseBoolParam(filterZones), ParseBoolParam(active), token), ct);
+
+            var orders = await GetOrCreateCachedAsync(
+                cache, cacheKey, TimeSpan.FromSeconds(30), ShouldBypassCache(ctx.Request),
+                () => repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId,
+                                          ParseBoolParam(filterZones), ParseBoolParam(active), ct),
+                logger: null, ct);
+
+            var orderIds = orders.Select(o => o.Id).ToArray();
+            var reviewByOrder = new Dictionary<string, (string Id, int Rating)>();
+            if (orderIds.Length > 0)
+            {
+                var reviews = await dbCtx.Reviews
+                    .AsNoTracking()
+                    .Where(r => orderIds.Contains(r.OrderId))
+                    .Select(r => new { r.OrderId, r.Id, r.Rating })
+                    .ToListAsync(ct);
+                reviewByOrder = reviews.ToDictionary(r => r.OrderId, r => (r.Id, r.Rating));
+            }
+
+            var requestingClientId = ctx.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? ctx.Request.Query["clientId"].FirstOrDefault();
+
+            var now = DateTime.UtcNow;
+            var result = orders.Select(o =>
+            {
+                var windowOk = (o.CompletedAt ?? o.CreatedAt) >= now.AddDays(-30);
+                var hasReview = reviewByOrder.TryGetValue(o.Id, out var rev);
+                var canReview = o.Status == OrderStatus.Completed
+                    && o.ClientId == requestingClientId
+                    && !hasReview
+                    && windowOk;
+                return (object)new
+                {
+                    id = o.Id,
+                    clientId = o.ClientId,
+                    serviceId = o.ServiceId,
+                    description = o.Description,
+                    location = o.Location,
+                    date = o.Date,
+                    status = o.Status,
+                    createdAt = o.CreatedAt,
+                    professionalId = o.ProfessionalId,
+                    tierId = o.TierId,
+                    origin = o.Origin,
+                    proposalId = o.ProposalId,
+                    appointmentId = o.AppointmentId,
+                    conversationId = o.ConversationId,
+                    priceTotalCents = o.PriceTotalCents,
+                    signalCents = o.SignalCents,
+                    balanceCents = o.BalanceCents,
+                    installments = o.Installments,
+                    paymentMethod = o.PaymentMethod,
+                    addressId = o.AddressId,
+                    scope = o.Scope,
+                    scheduledAt = o.ScheduledAt,
+                    completedAt = o.CompletedAt,
+                    cancelledAt = o.CancelledAt,
+                    cancelledBy = o.CancelledBy,
+                    cancellationReason = o.CancellationReason,
+                    autoConfirmAt = o.AutoConfirmAt,
+                    svcAddrZipCode = o.SvcAddrZipCode,
+                    svcAddrStreet = o.SvcAddrStreet,
+                    svcAddrNumber = o.SvcAddrNumber,
+                    svcAddrNeighborhood = o.SvcAddrNeighborhood,
+                    svcAddrCity = o.SvcAddrCity,
+                    svcAddrState = o.SvcAddrState,
+                    svcAddrComplement = o.SvcAddrComplement,
+                    svcAddrReference = o.SvcAddrReference,
+                    recurringPlanId = o.RecurringPlanId,
+                    platformFeePercent = o.PlatformFeePercent,
+                    platformFeeCents = o.PlatformFeeCents,
+                    gatewayFeeCents = o.GatewayFeeCents,
+                    paymentStatus = o.PaymentStatus,
+                    mpPreferenceId = o.MpPreferenceId,
+                    canReview,
+                    reviewId = hasReview ? rev.Id : (string?)null,
+                    reviewRating = hasReview ? (int?)rev.Rating : null,
+                };
+            }).ToList();
+
+            return Results.Ok(result);
         });
 
         app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
