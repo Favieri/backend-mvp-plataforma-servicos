@@ -95,7 +95,24 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ''
-    Description: "Token Mercado Pago (vazio = pagamentos desabilitados)"
+    Description: "Access Token da conta da plataforma (vazio = pagamentos desabilitados)"
+  MpAppId:
+    Type: String
+    Default: ''
+    Description: "Application ID numérico da aplicação MP (Client ID para OAuth)"
+  MpClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Client Secret da aplicação MP (trocado pelo access token do profissional)"
+  MpRedirectUri:
+    Type: String
+    Default: ''
+    Description: "URI de callback OAuth registrada no painel MP (ex: https://<api-gw>/payments/mp/callback)"
+  MpFrontendBaseUrl:
+    Type: String
+    Default: 'https://jobeasy.com.br'
+    Description: "URL base do frontend para redirecionamento pós-OAuth"
 
 Resources:
   JobeasyHttpApi:
@@ -111,7 +128,11 @@ Resources:
       Environment:
         Variables:
           # Mercado Pago fora de Globals pois usa chave com __ (seção aninhada ASP.NET)
-          MERCADOPAGO__ACCESSTOKEN: !Ref MercadoPagoAccessToken
+          MERCADOPAGO__ACCESSTOKEN:    !Ref MercadoPagoAccessToken
+          MERCADOPAGO__APPID:          !Ref MpAppId
+          MERCADOPAGO__CLIENTSECRET:   !Ref MpClientSecret
+          MERCADOPAGO__REDIRECTURI:    !Ref MpRedirectUri
+          MERCADOPAGO__FRONTENDBASEURL: !Ref MpFrontendBaseUrl
       Events:
         ProxyEvent:
           Type: HttpApi
