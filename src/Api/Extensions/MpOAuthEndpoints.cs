@@ -20,8 +20,11 @@ public static class MpOAuthEndpoints
             HttpContext context,
             IMpOAuthService mpService,
             AppDbContext ctx,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("MpConnect");
+
             var jwtUserId = GetJwtUserId(context);
             if (jwtUserId is null)
                 return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
@@ -33,10 +36,33 @@ public static class MpOAuthEndpoints
             if (professional is null)
                 return Results.Json(new { error = "Profissional não encontrado" }, statusCode: 404);
 
+            // ✅ BUG 3 CORRIGIDO: IsOwnerOrAdmin com fallback para sessões legadas.
+            //
+            // Cenário original de falha:
+            //   O JWT tem sub = User.Id, mas para sessões antigas o sub pode ser
+            //   o professional.Id em vez do user.Id. O check original só comparava
+            //   professional.UserId == jwtUserId, causando 403 nesses casos.
+            //
+            // Correção: aceita também professional.Id == jwtUserId como ownership
+            // válida (backwards-compat). Admin sempre passa.
             if (!IsOwnerOrAdmin(context, professional))
+            {
+                logger.LogWarning(
+                    "[MpConnect] Acesso negado. ProfessionalId={ProfessionalId} " +
+                    "Professional.UserId={ProfUserId} JWT.Sub={JwtSub}",
+                    professionalId, professional.UserId, jwtUserId);
+
                 return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+            }
 
             var (connectUrl, expiresInSeconds) = await mpService.GetConnectUrlAsync(professionalId, ct);
+
+            logger.LogInformation(
+                "[MpConnect] URL gerada para ProfessionalId={ProfessionalId}. ExpiresIn={Expires}s",
+                professionalId, expiresInSeconds);
+
+            // ⚠️  Retorna `connectUrl` (nome que o frontend lê após a correção do Bug 2).
+            //     Não renomear para `url` sem atualizar useMpConnect.ts em sincronia.
             return Results.Ok(new { connectUrl, expiresInSeconds });
         });
 
@@ -67,7 +93,8 @@ public static class MpOAuthEndpoints
             // MP reported an error during authorization
             if (!string.IsNullOrWhiteSpace(error))
             {
-                logger.LogWarning("[MpCallback] MP returned error for professional {ProfessionalId}: {Error}", professionalId, error);
+                logger.LogWarning("[MpCallback] MP returned error for professional {ProfessionalId}: {Error}",
+                    professionalId, error);
                 return Results.Redirect($"{frontendBase}/profissional?mp_error={Uri.EscapeDataString(error)}");
             }
 
@@ -84,20 +111,24 @@ public static class MpOAuthEndpoints
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning("[MpCallback] Timeout exchanging code for professional {ProfessionalId}", professionalId);
+                logger.LogWarning("[MpCallback] Timeout exchanging code for professional {ProfessionalId}",
+                    professionalId);
                 return Results.Redirect($"{frontendBase}/profissional?mp_error=timeout");
             }
             catch (MpOAuthException ex)
             {
                 logger.LogError(ex, "[MpCallback] MP error for professional {ProfessionalId}", professionalId);
-                return Results.Redirect($"{frontendBase}/profissional?mp_error=mp_error&detail={Uri.EscapeDataString(ex.Message)}");
+                return Results.Redirect(
+                    $"{frontendBase}/profissional?mp_error=mp_error&detail={Uri.EscapeDataString(ex.Message)}");
             }
 
             // Anti-hijack: verify MP user ID matches existing account if one exists
             var existing = await mpRepo.GetByProfessionalIdAsync(professionalId, ct);
             if (existing is not null && existing.MpUserId != tokenResponse.UserId.ToString())
             {
-                logger.LogWarning("[MpCallback] MP user_id mismatch for professional {ProfessionalId}. Expected={Expected} Got={Got}",
+                logger.LogWarning(
+                    "[MpCallback] MP user_id mismatch for professional {ProfessionalId}. " +
+                    "Expected={Expected} Got={Got}",
                     professionalId, existing.MpUserId, tokenResponse.UserId);
                 return Results.Redirect($"{frontendBase}/profissional?mp_error=user_mismatch");
             }
@@ -139,7 +170,9 @@ public static class MpOAuthEndpoints
                     .SetProperty(p => p.MpConnectedAt, now),
                 ct);
 
-            logger.LogInformation("[MpCallback] Professional {ProfessionalId} connected MP account (user_id={MpUserId}, live={Live})",
+            logger.LogInformation(
+                "[MpCallback] Professional {ProfessionalId} connected MP account " +
+                "(user_id={MpUserId}, live={Live})",
                 professionalId, tokenResponse.UserId, tokenResponse.LiveMode);
 
             return Results.Redirect($"{frontendBase}/profissional?mp_connected=true");
@@ -200,19 +233,22 @@ public static class MpOAuthEndpoints
             var account = await mpRepo.GetByProfessionalIdAsync(professionalId, ct);
 
             if (account is null || account.Status == "revoked")
-                return Results.Ok(new { connected = false });
+                return Results.Ok(new { connected = false, status = "disconnected" });
 
             var now = DateTime.UtcNow;
             var isExpiringSoon = account.MpTokenExpiresAt < now.AddDays(7);
 
+            var connectionStatus = isExpiringSoon ? "expiring_soon" : "connected";
+
             return Results.Ok(new
             {
                 connected = true,
+                status = connectionStatus,
                 mpUserId = account.MpUserId,
                 connectedAt = account.ConnectedAt,
                 tokenExpiresAt = account.MpTokenExpiresAt,
                 isExpiringSoon,
-                liveMode = account.MpLiveMode
+                liveMode = account.MpLiveMode,
             });
         });
 
@@ -223,6 +259,15 @@ public static class MpOAuthEndpoints
         context.User?.FindFirst("sub")?.Value
         ?? context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
+    /// <summary>
+    /// Returns true if the authenticated user owns this professional profile or is an admin.
+    ///
+    /// ✅ Ownership check (in priority order):
+    ///   1. role == "admin"    → always allowed
+    ///   2. professional.UserId == jwtUserId   → standard case (JWT sub = User.Id)
+    ///   3. professional.Id == jwtUserId       → backwards-compat for legacy sessions
+    ///                                            where sub was saved as professional.Id
+    /// </summary>
     private static bool IsOwnerOrAdmin(HttpContext context, Professional professional)
     {
         var role = context.User?.FindFirst("role")?.Value
@@ -232,6 +277,14 @@ public static class MpOAuthEndpoints
             return true;
 
         var jwtUserId = GetJwtUserId(context);
-        return jwtUserId is not null && professional.UserId == jwtUserId;
+        if (jwtUserId is null) return false;
+
+        // Primary: JWT sub matches the User.Id that owns the professional profile
+        if (professional.UserId == jwtUserId) return true;
+
+        // Fallback: JWT sub matches the professional.Id itself (legacy sessions)
+        if (professional.Id == jwtUserId) return true;
+
+        return false;
     }
 }
