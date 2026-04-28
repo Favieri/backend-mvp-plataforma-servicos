@@ -145,14 +145,26 @@ app.Run();
 
 static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrigins)
 {
-    var origins = (configuredOrigins ?? "*")
+    // Sem fallback para wildcard — ausência de configuração é erro de deploy, não comportamento padrão
+    if (string.IsNullOrWhiteSpace(configuredOrigins))
+    {
+        policy
+            .WithOrigins("http://localhost:3000", "http://localhost:3001")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .WithExposedHeaders("x-correlation-id");
+        return;
+    }
+
+    var origins = configuredOrigins
         .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
         .Where(origin => !string.IsNullOrWhiteSpace(origin))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    if (origins.Length == 0 || origins.Contains("*", StringComparer.Ordinal))
+    if (origins.Contains("*", StringComparer.Ordinal))
     {
+        // Wildcard explícito ainda é permitido se configurado intencionalmente (ex: preview ambientes)
         policy
             .AllowAnyOrigin()
             .AllowAnyHeader()

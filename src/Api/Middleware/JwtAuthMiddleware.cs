@@ -29,8 +29,10 @@ public sealed class JwtAuthMiddleware(RequestDelegate next, IConfiguration confi
                     {
                         ValidateIssuerSigningKey = true,
                         IssuerSigningKey = key,
-                        ValidateIssuer = false,
-                        ValidateAudience = false,
+                        ValidateIssuer = true,
+                        ValidIssuer = "jobeasy",
+                        ValidateAudience = true,
+                        ValidAudience = "jobeasy",
                         ValidateLifetime = true,
                         ClockSkew = TimeSpan.FromSeconds(30)
                     };
