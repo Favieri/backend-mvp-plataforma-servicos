@@ -42,6 +42,22 @@ public static class OrderEndpoints
 
             var events = await timeline.GetByOrderIdAsync(id, ct);
 
+            var reviewRow = await ctx.Reviews
+                .AsNoTracking()
+                .Where(r => r.OrderId == order.Id)
+                .Select(r => new { r.Id, r.Rating })
+                .FirstOrDefaultAsync(ct);
+
+            var requestingClientId = httpCtx.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? httpCtx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? httpCtx.Request.Query["clientId"].FirstOrDefault();
+
+            var windowOk = (order.CompletedAt ?? order.CreatedAt) >= DateTime.UtcNow.AddDays(-30);
+            var canReview = order.Status == OrderStatus.Completed
+                && order.ClientId == requestingClientId
+                && reviewRow is null
+                && windowOk;
+
             var professional = order.ProfessionalId is not null
                 ? await ctx.Professionals.AsNoTracking()
                     .Where(p => p.Id == order.ProfessionalId)
@@ -98,7 +114,10 @@ public static class OrderEndpoints
                 professional,
                 client,
                 service,
-                timeline = events
+                timeline = events,
+                canReview,
+                reviewId = reviewRow?.Id,
+                reviewRating = reviewRow?.Rating,
             });
         });
 
