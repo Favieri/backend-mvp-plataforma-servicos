@@ -44,8 +44,8 @@ Parameters:
   # ── CORS ────────────────────────────────────────────────────────────────────
   CorsAllowedOrigins:
     Type: String
-    Default: 'https://jobeasy.com.br,http://localhost:3000'
-    Description: "Origens CORS permitidas (vírgula-separadas ou *)"
+    Default: 'https://jobeasy.com.br,https://www.jobeasy.com.br'
+    Description: "Origens CORS permitidas — NUNCA incluir localhost em produção"
 
   # ── App ─────────────────────────────────────────────────────────────────────
   AppBaseUrl:

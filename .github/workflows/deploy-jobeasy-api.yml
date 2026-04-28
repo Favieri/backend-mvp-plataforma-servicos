@@ -37,12 +37,17 @@ jobs:
       - name: Validate required secrets
         env:
           DB_CONNECTION: ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
+          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
         run: |
           if [ -z "${DB_CONNECTION}" ]; then
-            echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2
+            echo "ERROR: configure DB_CONNECTION (ou DATABASE_URL) em GitHub Secrets." >&2; exit 1
+          fi
+          if [ -z "${CORS_ALLOWED_ORIGINS}" ]; then
+            echo "ERROR: configure CORS_ALLOWED_ORIGINS em GitHub Secrets." >&2
+            echo "Exemplo: https://jobeasy.com.br,https://www.jobeasy.com.br" >&2
             exit 1
           fi
-          echo "OK — DB_CONNECTION presente."
+          echo "OK — secrets obrigatórios presentes."
 
       - name: Restore / Build / Test
         run: |
@@ -88,7 +93,7 @@ jobs:
         env:
           DB_CONNECTION:          ${{ secrets.DB_CONNECTION || secrets.DATABASE_URL }}
           JWT_SECRET:             ${{ secrets.JWT_SECRET || 'jobeasy-jwt-default-CHANGE-IN-PROD' }}
-          CORS_ALLOWED_ORIGINS:   ${{ secrets.CORS_ALLOWED_ORIGINS || 'https://www.jobeasy.com.br,http://localhost:3000' }}
+          CORS_ALLOWED_ORIGINS:   ${{ secrets.CORS_ALLOWED_ORIGINS }}
           APP_BASE_URL:           ${{ secrets.APP_BASE_URL || 'https://jobeasy.com.br' }}
           EMAIL_FROM:             ${{ secrets.EMAIL_FROM || 'Jobeasy <naoresponda@jobeasy.com.br>' }}
           SMTP_HOST:              ${{ secrets.SMTP_HOST || '' }}
@@ -111,7 +116,7 @@ jobs:
           params = [
             {"ParameterKey": "DbConnection",           "ParameterValue": secret("DB_CONNECTION")},
             {"ParameterKey": "JwtSecret",              "ParameterValue": secret("JWT_SECRET", "jobeasy-jwt-default-CHANGE-IN-PROD")},
-            {"ParameterKey": "CorsAllowedOrigins",     "ParameterValue": secret("CORS_ALLOWED_ORIGINS", "https://jobeasy.com.br,http://localhost:3000")},
+            {"ParameterKey": "CorsAllowedOrigins",     "ParameterValue": secret("CORS_ALLOWED_ORIGINS")},
             {"ParameterKey": "AppBaseUrl",             "ParameterValue": secret("APP_BASE_URL", "https://jobeasy.com.br")},
             {"ParameterKey": "EmailFrom",              "ParameterValue": secret("EMAIL_FROM", "Jobeasy <naoresponda@jobeasy.com.br>")},
             {"ParameterKey": "SmtpHost",               "ParameterValue": secret("SMTP_HOST")},

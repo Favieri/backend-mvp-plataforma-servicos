@@ -24,6 +24,8 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["JWT_SECRET"]))
     missingVars.Add("JWT_SECRET");
 if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STORAGE_BUCKET_NAME")))
     missingVars.Add("STORAGE_BUCKET_NAME");
+if (string.IsNullOrWhiteSpace(builder.Configuration["CORS_ALLOWED_ORIGINS"]))
+    missingVars.Add("CORS_ALLOWED_ORIGINS");
 if (missingVars.Count > 0)
     throw new InvalidOperationException(
         $"Required environment variables are missing: {string.Join(", ", missingVars)}");
@@ -145,44 +147,40 @@ app.Run();
 
 static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrigins)
 {
-    // Sem fallback para wildcard — ausência de configuração é erro de deploy, não comportamento padrão
-    if (string.IsNullOrWhiteSpace(configuredOrigins))
-    {
-        policy
-            .WithOrigins("http://localhost:3000", "http://localhost:3001")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .WithExposedHeaders("x-correlation-id");
-        return;
-    }
-
-    var origins = configuredOrigins
+    // Sem fallback para wildcard ou localhost — ausência é capturada pelo fail-fast no startup
+    var raw = configuredOrigins ?? "";
+    var origins = raw
         .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Where(origin => !string.IsNullOrWhiteSpace(origin))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    if (origins.Contains("*", StringComparer.Ordinal))
+    if (origins.Length == 0)
     {
-        // Wildcard explícito ainda é permitido se configurado intencionalmente (ex: preview ambientes)
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .WithExposedHeaders("x-correlation-id");
+        // Não deveria chegar aqui (fail-fast acima), mas por segurança recusa tudo
+        policy.WithOrigins("https://placeholder-nenhuma-origem-configurada.invalid")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .WithExposedHeaders("x-correlation-id");
         return;
     }
 
-    policy
-        .WithOrigins(origins)
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .WithExposedHeaders("x-correlation-id");
-
-    if (origins.Any(origin => origin.Contains('*')))
+    if (origins.Contains("*", StringComparer.Ordinal))
     {
-        policy.SetIsOriginAllowedToAllowWildcardSubdomains();
+        // Wildcard explícito — somente permitido se configurado intencionalmente via env var
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .WithExposedHeaders("x-correlation-id");
+        return;
     }
+
+    policy.WithOrigins(origins)
+          .AllowAnyHeader()
+          .AllowAnyMethod()
+          .WithExposedHeaders("x-correlation-id");
+
+    if (origins.Any(o => o.Contains('*')))
+        policy.SetIsOriginAllowedToAllowWildcardSubdomains();
 }
 
 static bool IsDatabaseConnectivityError(Exception? ex)
