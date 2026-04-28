@@ -25,6 +25,7 @@ public static class OrderEndpoints
         // Endpoint estava ausente: o front-end chamava GET /orders/{id} e recebia 404.
         app.MapGet("/orders/{id}", async (
             string id,
+            HttpContext httpCtx,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             AppDbContext ctx,
@@ -35,6 +36,22 @@ public static class OrderEndpoints
                 return Results.NotFound(new { error = "Pedido não encontrado" });
 
             var events = await timeline.GetByOrderIdAsync(id, ct);
+
+            var reviewRow = await ctx.Reviews
+                .AsNoTracking()
+                .Where(r => r.OrderId == order.Id)
+                .Select(r => new { r.Id, r.Rating })
+                .FirstOrDefaultAsync(ct);
+
+            var requestingClientId = httpCtx.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? httpCtx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? httpCtx.Request.Query["clientId"].FirstOrDefault();
+
+            var windowOk = (order.CompletedAt ?? order.CreatedAt) >= DateTime.UtcNow.AddDays(-30);
+            var canReview = order.Status == OrderStatus.Completed
+                && order.ClientId == requestingClientId
+                && reviewRow is null
+                && windowOk;
 
             var professional = order.ProfessionalId is not null
                 ? await ctx.Professionals.AsNoTracking()
@@ -85,7 +102,10 @@ public static class OrderEndpoints
                 professional,
                 client,
                 service,
-                timeline = events
+                timeline = events,
+                canReview,
+                reviewId = reviewRow?.Id,
+                reviewRating = reviewRow?.Rating,
             });
         });
 
