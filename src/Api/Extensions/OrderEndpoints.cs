@@ -25,7 +25,7 @@ public static class OrderEndpoints
         // Endpoint estava ausente: o front-end chamava GET /orders/{id} e recebia 404.
         app.MapGet("/orders/{id}", async (
             string id,
-            HttpContext httpCtx,
+            HttpContext context,
             IOrderRepository orderRepo,
             IOrderTimelineRepository timeline,
             AppDbContext ctx,
@@ -34,6 +34,11 @@ public static class OrderEndpoints
             var order = await orderRepo.GetByIdAsync(id, ct);
             if (order is null)
                 return Results.NotFound(new { error = "Pedido não encontrado" });
+
+            var jwtUserId = context.User?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                         ?? context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
 
             var events = await timeline.GetByOrderIdAsync(id, ct);
 
@@ -65,6 +70,13 @@ public static class OrderEndpoints
                     })
                     .FirstOrDefaultAsync(ct)
                 : null;
+
+            var jwtRole = context.User?.FindFirst("role")?.Value ?? "";
+            var isAdmin = string.Equals(jwtRole, "admin", StringComparison.OrdinalIgnoreCase);
+            var isOrderClient = order.ClientId == jwtUserId;
+            var isOrderProfessional = professional?.userId == jwtUserId || professional?.id == jwtUserId;
+            if (!isOrderClient && !isOrderProfessional && !isAdmin)
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             var service = await ctx.Services.AsNoTracking()
                 .Where(s => s.Id == order.ServiceId)
@@ -461,17 +473,18 @@ public static class OrderEndpoints
 
         // ─── GET /orders/mine?role=client|professional ────────────────────────
         app.MapGet("/orders/mine-v2", async (
-            string? userId, string? role,
+            HttpRequest req,
             IOrderRepository orderRepo,
             CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(userId))
-                return Results.Json(new { error = "userId é obrigatório" }, statusCode: 400);
-            var normalizedRole = (role ?? "client").ToLowerInvariant();
-            if (normalizedRole != "client" && normalizedRole != "professional")
-                return Results.Json(new { error = "role deve ser 'client' ou 'professional'" }, statusCode: 400);
+            var jwtUserId = req.HttpContext.User?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                         ?? req.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
 
-            return Results.Ok(await orderRepo.GetMineByRoleAsync(userId, normalizedRole, ct));
+            var role = req.HttpContext.User?.FindFirst("role")?.Value ?? "cliente";
+            var normalizedRole = role == "profissional" ? "professional" : "client";
+            return Results.Ok(await orderRepo.GetMineByRoleAsync(jwtUserId, normalizedRole, ct));
         });
 
         // ─── Internal job endpoints (EventBridge targets) ─────────────────────

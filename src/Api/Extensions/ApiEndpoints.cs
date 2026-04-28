@@ -706,11 +706,18 @@ public static class ApiEndpoints
         });
 
         // ─── Conversations ─────────────────────────────────────────────────────
-        app.MapGet("/conversations", async (string? clientId, string? professionalId, IConversationRepository repo, CancellationToken ct) =>
+        app.MapGet("/conversations", async (HttpRequest req, IConversationRepository repo, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(clientId) && string.IsNullOrWhiteSpace(professionalId))
-                return Results.Json(new { error = "clientId ou professionalId é obrigatório" }, statusCode: 400);
-            return Results.Ok(await repo.GetByParticipantAsync(clientId, professionalId, ct));
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value
+                         ?? req.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
+
+            var role = req.HttpContext.User?.FindFirst("role")?.Value ?? "cliente";
+            var data = role == "cliente"
+                ? await repo.GetByParticipantAsync(jwtUserId, null, ct)
+                : await repo.GetByParticipantAsync(null, jwtUserId, ct);
+            return Results.Ok(data);
         });
 
         app.MapPost("/conversations", async (CreateConversationRequest body, IConversationRepository repo, CancellationToken ct) =>
@@ -725,10 +732,24 @@ public static class ApiEndpoints
         });
 
         // ─── Messages ──────────────────────────────────────────────────────────
-        app.MapGet("/messages", async (string? conversationId, IConversationRepository repo, CancellationToken ct) =>
+        app.MapGet("/messages", async (string? conversationId, HttpRequest req, IConversationRepository repo, CancellationToken ct) =>
         {
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value
+                         ?? req.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
+
             if (string.IsNullOrWhiteSpace(conversationId))
                 return Results.Json(new { error = "conversationId é obrigatório" }, statusCode: 400);
+
+            var conv = await repo.GetConversationForReadAsync(conversationId, ct);
+            if (conv is null)
+                return Results.NotFound(new { error = "Conversa não encontrada" });
+
+            var c = ToObjectDictionary(conv);
+            if (c["clientId"]?.ToString() != jwtUserId && c["professionalId"]?.ToString() != jwtUserId)
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
             return Results.Ok(await repo.GetMessagesAsync(conversationId, ct));
         });
 
@@ -760,6 +781,15 @@ public static class ApiEndpoints
             if (!await userRepo.UserExistsAsync(resolvedSenderId, ct))
                 return Results.Json(new { error = "Remetente inválido: usuário não encontrado" }, statusCode: 422);
 
+            // Verify sender is a participant of the conversation before persisting
+            var conv = await repo.GetConversationForReadAsync(body.ConversationId, ct);
+            if (conv is null)
+                return Results.Json(new { error = "Conversa não encontrada" }, statusCode: 404);
+
+            var convDict = ToObjectDictionary(conv);
+            if (convDict["clientId"]?.ToString() != resolvedSenderId && convDict["professionalId"]?.ToString() != resolvedSenderId)
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
             var messageType = string.IsNullOrWhiteSpace(body.Type) ? MessageType.Text : body.Type;
 
             var message = await repo.CreateMessageAsync(
@@ -789,24 +819,19 @@ public static class ApiEndpoints
                 _ = repo.UpdateConversationStatusAsync(body.ConversationId, ConversationStatus.Flagged, ct).ConfigureAwait(false);
             }
 
-            var conv = await repo.GetConversationForReadAsync(body.ConversationId, ct);
-            if (conv is not null)
-            {
-                var c = ToObjectDictionary(conv);
-                var isClient = resolvedSenderId == c["clientId"]?.ToString();
-                var lastReadAt = isClient ? c["professionalLastReadAt"] : c["clientLastReadAt"];
-                var recipientEmail = isClient ? c["professionalEmail"]?.ToString() : c["clientEmail"]?.ToString();
-                var recipientName = isClient ? c["professionalName"]?.ToString() ?? "Usuário" : c["clientName"]?.ToString() ?? "Usuário";
-                var senderName = msgDict["senderName"]?.ToString() ?? "Usuário";
+            var isClient = resolvedSenderId == convDict["clientId"]?.ToString();
+            var lastReadAt = isClient ? convDict["professionalLastReadAt"] : convDict["clientLastReadAt"];
+            var recipientEmail = isClient ? convDict["professionalEmail"]?.ToString() : convDict["clientEmail"]?.ToString();
+            var recipientName = isClient ? convDict["professionalName"]?.ToString() ?? "Usuário" : convDict["clientName"]?.ToString() ?? "Usuário";
+            var senderName = msgDict["senderName"]?.ToString() ?? "Usuário";
 
-                var recentlyActive = lastReadAt is DateTime lra && (DateTime.UtcNow - lra).TotalMilliseconds <= 120_000;
-                if (!recentlyActive && !string.IsNullOrWhiteSpace(recipientEmail))
-                {
-                    var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
-                    _ = emailSvc.SendChatMessageAsync(recipientEmail, recipientName, senderName,
-                        body.Text.Trim(), $"{appBaseUrl}/chat/{body.ConversationId}",
-                        body.ConversationId, windowMinutes: 10, ct).ConfigureAwait(false);
-                }
+            var recentlyActive = lastReadAt is DateTime lra && (DateTime.UtcNow - lra).TotalMilliseconds <= 120_000;
+            if (!recentlyActive && !string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
+                _ = emailSvc.SendChatMessageAsync(recipientEmail, recipientName, senderName,
+                    body.Text.Trim(), $"{appBaseUrl}/chat/{body.ConversationId}",
+                    body.ConversationId, windowMinutes: 10, ct).ConfigureAwait(false);
             }
 
             return Results.Ok(message);
