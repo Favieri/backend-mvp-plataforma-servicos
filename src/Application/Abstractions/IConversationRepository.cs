@@ -6,7 +6,7 @@ public interface IConversationRepository
 {
     Task<IReadOnlyList<object>> GetByParticipantAsync(string? clientId, string? professionalId, CancellationToken ct);
     Task<object?> GetOrCreateAsync(string clientId, string professionalUserId, string? orderId, CancellationToken ct);
-    Task<IReadOnlyList<object>> GetMessagesAsync(string conversationId, CancellationToken ct);
+    Task<IReadOnlyList<object>> GetMessagesAsync(string conversationId, CancellationToken ct, DateTime? since = null);
 
     /// <summary>Phase 2: create message with type, metadata and optional replyToId.</summary>
     Task<object> CreateMessageAsync(
