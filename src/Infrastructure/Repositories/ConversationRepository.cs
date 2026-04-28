@@ -181,12 +181,13 @@ public sealed class ConversationRepository(AppDbContext ctx, IContactMaskingServ
         return existing;
     }
 
-    public async Task<IReadOnlyList<object>> GetMessagesAsync(string conversationId, CancellationToken ct)
+    public async Task<IReadOnlyList<object>> GetMessagesAsync(string conversationId, CancellationToken ct, DateTime? since = null)
     {
         var messages = await (
             from m in ctx.Messages.AsNoTracking()
             join u in ctx.Users.AsNoTracking() on m.SenderId equals u.Id
             where m.ConversationId == conversationId
+               && (since == null || m.SentAt > since.Value)
             orderby m.SentAt ascending
             select new
             {

@@ -732,7 +732,12 @@ public static class ApiEndpoints
         });
 
         // ─── Messages ──────────────────────────────────────────────────────────
-        app.MapGet("/messages", async (string? conversationId, HttpRequest req, IConversationRepository repo, CancellationToken ct) =>
+        app.MapGet("/messages", async (
+            string? conversationId,
+            string? since,
+            HttpRequest req,
+            IConversationRepository repo,
+            CancellationToken ct) =>
         {
             var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value
                          ?? req.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -750,7 +755,14 @@ public static class ApiEndpoints
             if (c["clientId"]?.ToString() != jwtUserId && c["professionalId"]?.ToString() != jwtUserId)
                 return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
-            return Results.Ok(await repo.GetMessagesAsync(conversationId, ct));
+            DateTime? sinceDate = null;
+            if (!string.IsNullOrWhiteSpace(since))
+            {
+                if (DateTime.TryParse(since, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
+                    sinceDate = parsed.ToUniversalTime();
+            }
+
+            return Results.Ok(await repo.GetMessagesAsync(conversationId, ct, sinceDate));
         });
 
         // Phase 2: POST /messages accepts type, metadata, replyToId + anti-leak detection
