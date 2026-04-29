@@ -48,14 +48,32 @@ public static class MpOAuthEndpoints
             if (!IsOwnerOrAdmin(context, professional))
             {
                 logger.LogWarning(
-                    "[MpConnect] Acesso negado. ProfessionalId={ProfessionalId} " +
-                    "Professional.UserId={ProfUserId} JWT.Sub={JwtSub}",
-                    professionalId, professional.UserId, jwtUserId);
+                    "[MpConnect] 403 Acesso negado. " +
+                    "ProfessionalId={ProfessionalId} " +
+                    "Professional.UserId={ProfUserId} " +
+                    "JWT.Sub={JwtSub} " +
+                    "Professional.Id={ProfId}",
+                    professionalId,
+                    professional.UserId ?? "(null)",
+                    jwtUserId ?? "(null)",
+                    professional.Id);
 
                 return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
             }
 
-            var (connectUrl, expiresInSeconds) = await mpService.GetConnectUrlAsync(professionalId, ct);
+            string connectUrl;
+            int expiresInSeconds;
+            try
+            {
+                (connectUrl, expiresInSeconds) = await mpService.GetConnectUrlAsync(professionalId, ct);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("não configurado"))
+            {
+                logger.LogError("[MpConnect] Credencial MP ausente: {Message}", ex.Message);
+                return Results.Json(
+                    new { error = "Integração com Mercado Pago não está configurada. Contate o suporte." },
+                    statusCode: 503);
+            }
 
             logger.LogInformation(
                 "[MpConnect] URL gerada para ProfessionalId={ProfessionalId}. ExpiresIn={Expires}s",

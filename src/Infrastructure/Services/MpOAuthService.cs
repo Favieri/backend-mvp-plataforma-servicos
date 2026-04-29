@@ -49,6 +49,14 @@ public sealed class MpOAuthService : IMpOAuthService
 
     public Task<(string connectUrl, int expiresInSeconds)> GetConnectUrlAsync(string professionalId, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(_appId))
+            throw new InvalidOperationException(
+                "MercadoPago__AppId não configurado. Configure a variável de ambiente.");
+
+        if (string.IsNullOrWhiteSpace(_redirectUri))
+            throw new InvalidOperationException(
+                "MercadoPago__RedirectUri não configurado. Configure a variável de ambiente.");
+
         var raw = $"{professionalId}:{Guid.NewGuid()}";
         var state = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw))
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');

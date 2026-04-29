@@ -99,16 +99,16 @@ Parameters:
   MpAppId:
     Type: String
     Default: ''
-    Description: "Application ID numérico da aplicação MP (Client ID para OAuth)"
+    Description: "Application ID numérico da aplicação MP — OBRIGATÓRIO para OAuth MP"
   MpClientSecret:
     Type: String
     NoEcho: true
     Default: ''
-    Description: "Client Secret da aplicação MP (trocado pelo access token do profissional)"
+    Description: "Client Secret da aplicação MP — OBRIGATÓRIO para OAuth MP"
   MpRedirectUri:
     Type: String
     Default: ''
-    Description: "URI de callback OAuth registrada no painel MP (ex: https://<api-gw>/payments/mp/callback)"
+    Description: "URI de callback OAuth registrada no painel MP — deve ser https://<api-gw>/payments/mp/callback"
   MpFrontendBaseUrl:
     Type: String
     Default: 'https://jobeasy.com.br'
