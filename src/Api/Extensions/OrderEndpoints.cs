@@ -48,9 +48,9 @@ public static class OrderEndpoints
                 .Select(r => new { r.Id, r.Rating })
                 .FirstOrDefaultAsync(ct);
 
-            var requestingClientId = httpCtx.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                                  ?? httpCtx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                                  ?? httpCtx.Request.Query["clientId"].FirstOrDefault();
+            var requestingClientId = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? context.Request.Query["clientId"].FirstOrDefault();
 
             var windowOk = (order.CompletedAt ?? order.CreatedAt) >= DateTime.UtcNow.AddDays(-30);
             var canReview = order.Status == OrderStatus.Completed
