@@ -111,7 +111,12 @@ public static class ApiEndpoints
             Results.Redirect($"/bootstrap{ctx.Request.QueryString}"));
 
         // ─── Auth ──────────────────────────────────────────────────────────────
-        app.MapPost("/auth", async (LoginRequest body, IAuthRepository db, IConfiguration config, CancellationToken ct) =>
+        app.MapPost("/auth", async (
+            LoginRequest body,
+            IAuthRepository db,
+            AppDbContext ctx,
+            IConfiguration config,
+            CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.Email))
                 return Results.Json(new { error = "email é obrigatório." }, statusCode: 400);
@@ -122,22 +127,22 @@ public static class ApiEndpoints
             if (userObj is null)
                 return Results.Json(new { error = "Credenciais inválidas" }, statusCode: 401);
 
+            // Parse once — reused for JWT generation, professionalId lookup, and response shape.
+            var userJson = JsonSerializer.Serialize(userObj);
+            using var userDoc = JsonDocument.Parse(userJson);
+            var root = userDoc.RootElement;
+            var userId = root.TryGetProperty("id",    out var idEl)    ? idEl.GetString()    ?? "" : "";
+            var email  = root.TryGetProperty("email", out var emailEl) ? emailEl.GetString() ?? "" : "";
+            var role   = root.TryGetProperty("role",  out var roleEl)  ? roleEl.GetString()  ?? "" : "";
+
+            var professionalId = await ResolveProfessionalIdAsync(ctx, role, userId, ct);
+
             // Geração de JWT na camada de API (camada Infrastructure não tem dep. de JWT)
-            // O front-end usa esse token para enviar Authorization: Bearer <token>.
-            // O JwtAuthMiddleware valida usando o mesmo JWT_SECRET.
-            var jwtSecret = config["JWT_SECRET"];
             string? token = null;
+            var jwtSecret = config["JWT_SECRET"];
             if (!string.IsNullOrWhiteSpace(jwtSecret))
             {
-                // Serializar o objeto anônimo para extrair campos de forma segura
-                var userJson = JsonSerializer.Serialize(userObj);
-                using var userDoc = JsonDocument.Parse(userJson);
-                var root = userDoc.RootElement;
-                var userId = root.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
-                var email = root.TryGetProperty("email", out var emailEl) ? emailEl.GetString() ?? "" : "";
-                var role = root.TryGetProperty("role", out var roleEl) ? roleEl.GetString() ?? "" : "";
-
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+                var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
                 var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
                 var claims = new[]
                 {
@@ -156,11 +161,31 @@ public static class ApiEndpoints
                 token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
             }
 
-            return Results.Ok(new { token, user = userObj });
+            return Results.Ok(new
+            {
+                token,
+                user = new
+                {
+                    id          = userId.Length > 0 ? userId : (string?)null,
+                    name        = root.TryGetProperty("name",        out var r_name)  ? r_name.GetString()  : null,
+                    email       = root.TryGetProperty("email",       out var r_email) ? r_email.GetString() : null,
+                    role        = root.TryGetProperty("role",        out var r_role)  ? r_role.GetString()  : null,
+                    phone       = root.TryGetProperty("phone",       out var r_phone) ? r_phone.GetString() : null,
+                    zoneId      = root.TryGetProperty("zoneId",      out var r_zone)  ? r_zone.GetString()  : null,
+                    mpConnected = root.TryGetProperty("mpConnected", out var r_mp)    && r_mp.GetBoolean(),
+                    professionalId,
+                }
+            });
         });
 
         // ─── Social Auth ────────────────────────────────────────────────────────
-        app.MapPost("/auth/google", async (GoogleLoginRequest body, ISocialAuthService socialAuth, IUserRepository repo, IConfiguration config, CancellationToken ct) =>
+        app.MapPost("/auth/google", async (
+            GoogleLoginRequest body,
+            ISocialAuthService socialAuth,
+            IUserRepository repo,
+            AppDbContext ctx,
+            IConfiguration config,
+            CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.IdToken))
                 return Results.Json(new { error = "idToken é obrigatório" }, statusCode: 400);
@@ -178,10 +203,38 @@ public static class ApiEndpoints
             var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
 
             var token = GenerateJwt(config, userObj);
-            return Results.Ok(new { token, user = userObj });
+
+            var socialJson = JsonSerializer.Serialize(userObj);
+            using var socialDoc = JsonDocument.Parse(socialJson);
+            var sRoot = socialDoc.RootElement;
+            var sUserId = sRoot.TryGetProperty("id",   out var sIdEl)   ? sIdEl.GetString()   ?? "" : "";
+            var sRole   = sRoot.TryGetProperty("role", out var sRoleEl) ? sRoleEl.GetString() ?? "" : "";
+            var sProfessionalId = await ResolveProfessionalIdAsync(ctx, sRole, sUserId, ct);
+
+            return Results.Ok(new
+            {
+                token,
+                user = new
+                {
+                    id          = sUserId.Length > 0 ? sUserId : (string?)null,
+                    name        = sRoot.TryGetProperty("name",        out var sg_name)  ? sg_name.GetString()  : null,
+                    email       = sRoot.TryGetProperty("email",       out var sg_email) ? sg_email.GetString() : null,
+                    role        = sRoot.TryGetProperty("role",        out var sg_role)  ? sg_role.GetString()  : null,
+                    phone       = sRoot.TryGetProperty("phone",       out var sg_phone) ? sg_phone.GetString() : null,
+                    zoneId      = sRoot.TryGetProperty("zoneId",      out var sg_zone)  ? sg_zone.GetString()  : null,
+                    mpConnected = sRoot.TryGetProperty("mpConnected", out var sg_mp)    && sg_mp.GetBoolean(),
+                    professionalId = sProfessionalId,
+                }
+            });
         });
 
-        app.MapPost("/auth/facebook", async (FacebookLoginRequest body, ISocialAuthService socialAuth, IUserRepository repo, IConfiguration config, CancellationToken ct) =>
+        app.MapPost("/auth/facebook", async (
+            FacebookLoginRequest body,
+            ISocialAuthService socialAuth,
+            IUserRepository repo,
+            AppDbContext ctx,
+            IConfiguration config,
+            CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.AccessToken))
                 return Results.Json(new { error = "accessToken é obrigatório" }, statusCode: 400);
@@ -199,7 +252,29 @@ public static class ApiEndpoints
             var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
 
             var token = GenerateJwt(config, userObj);
-            return Results.Ok(new { token, user = userObj });
+
+            var fbJson = JsonSerializer.Serialize(userObj);
+            using var fbDoc = JsonDocument.Parse(fbJson);
+            var fRoot = fbDoc.RootElement;
+            var fUserId = fRoot.TryGetProperty("id",   out var fIdEl)   ? fIdEl.GetString()   ?? "" : "";
+            var fRole   = fRoot.TryGetProperty("role", out var fRoleEl) ? fRoleEl.GetString() ?? "" : "";
+            var fProfessionalId = await ResolveProfessionalIdAsync(ctx, fRole, fUserId, ct);
+
+            return Results.Ok(new
+            {
+                token,
+                user = new
+                {
+                    id          = fUserId.Length > 0 ? fUserId : (string?)null,
+                    name        = fRoot.TryGetProperty("name",        out var fb_name)  ? fb_name.GetString()  : null,
+                    email       = fRoot.TryGetProperty("email",       out var fb_email) ? fb_email.GetString() : null,
+                    role        = fRoot.TryGetProperty("role",        out var fb_role)  ? fb_role.GetString()  : null,
+                    phone       = fRoot.TryGetProperty("phone",       out var fb_phone) ? fb_phone.GetString() : null,
+                    zoneId      = fRoot.TryGetProperty("zoneId",      out var fb_zone)  ? fb_zone.GetString()  : null,
+                    mpConnected = fRoot.TryGetProperty("mpConnected", out var fb_mp)    && fb_mp.GetBoolean(),
+                    professionalId = fProfessionalId,
+                }
+            });
         });
 
         // ─── Users ─────────────────────────────────────────────────────────────
@@ -1340,6 +1415,20 @@ public static class ApiEndpoints
         var cacheKey = $"{keyPrefix}:{context.Request.QueryString.Value ?? string.Empty}";
         var items = await GetOrCreateCachedAsync(cache, cacheKey, ttl, ShouldBypassCache(context.Request), () => factory(ct), logger: null, ct);
         return Results.Ok(items);
+    }
+
+    private static Task<string?> ResolveProfessionalIdAsync(
+        AppDbContext ctx, string? role, string? userId, CancellationToken ct)
+    {
+        if (!string.Equals(role, "profissional", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(userId))
+            return Task.FromResult<string?>(null);
+
+        return ctx.Professionals
+            .AsNoTracking()
+            .Where(p => p.UserId == userId)
+            .Select(p => p.Id)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static async Task<T> GetOrCreateCachedAsync<T>(
