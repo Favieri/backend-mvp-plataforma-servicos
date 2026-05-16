@@ -48,8 +48,8 @@ public static class OrderEndpoints
                 .Select(r => new { r.Id, r.Rating })
                 .FirstOrDefaultAsync(ct);
 
-            var requestingClientId = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                                  ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            var requestingClientId = context.User?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                                   ?? context.Request.Query["clientId"].FirstOrDefault();
 
             var windowOk = (order.CompletedAt ?? order.CreatedAt) >= DateTime.UtcNow.AddDays(-30);
