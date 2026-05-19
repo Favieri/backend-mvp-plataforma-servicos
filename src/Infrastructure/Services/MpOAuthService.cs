@@ -41,10 +41,10 @@ public sealed class MpOAuthService : IMpOAuthService
         _ctx = ctx;
         _logger = logger;
 
-        _appId = config["MercadoPago__AppId"] ?? "";
-        _clientSecret = config["MercadoPago__ClientSecret"] ?? "";
-        _redirectUri = config["MercadoPago__RedirectUri"] ?? "";
-        _frontendBaseUrl = config["MercadoPago__FrontendBaseUrl"] ?? "";
+        _appId         = config["MercadoPago:AppId"]          ?? "";
+        _clientSecret  = config["MercadoPago:ClientSecret"]   ?? "";
+        _redirectUri   = config["MercadoPago:RedirectUri"]    ?? "";
+        _frontendBaseUrl = config["MercadoPago:FrontendBaseUrl"] ?? "";
     }
 
     public Task<(string connectUrl, int expiresInSeconds)> GetConnectUrlAsync(string professionalId, CancellationToken ct)
