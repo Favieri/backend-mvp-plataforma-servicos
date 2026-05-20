@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
 using Application.Abstractions;
@@ -63,26 +64,36 @@ public sealed class MpOAuthService : IMpOAuthService
 
         _cache.Set($"mp:state:{state}", professionalId, TimeSpan.FromSeconds(StateExpirySeconds));
 
+        var codeVerifier  = GenerateCodeVerifier();
+        var codeChallenge = GenerateCodeChallenge(codeVerifier);
+        _cache.Set($"mp:verifier:{state}", codeVerifier, TimeSpan.FromSeconds(StateExpirySeconds));
+
         var url = $"https://auth.mercadopago.com.br/authorization" +
                   $"?client_id={Uri.EscapeDataString(_appId)}" +
                   $"&response_type=code" +
                   $"&platform_id=mp" +
                   $"&state={Uri.EscapeDataString(state)}" +
-                  $"&redirect_uri={Uri.EscapeDataString(_redirectUri)}";
+                  $"&redirect_uri={Uri.EscapeDataString(_redirectUri)}" +
+                  $"&code_challenge={Uri.EscapeDataString(codeChallenge)}" +
+                  $"&code_challenge_method=S256";
 
         return Task.FromResult((url, StateExpirySeconds));
     }
 
-    public Task<string?> ValidateAndConsumeStateAsync(string state, CancellationToken ct)
+    public Task<(string? ProfessionalId, string? CodeVerifier)> ValidateAndConsumeStateAsync(string state, CancellationToken ct)
     {
         if (!_cache.TryGetValue($"mp:state:{state}", out string? professionalId) || professionalId is null)
-            return Task.FromResult<string?>(null);
+            return Task.FromResult<(string?, string?)>((null, null));
+
+        _cache.TryGetValue($"mp:verifier:{state}", out string? codeVerifier);
 
         _cache.Remove($"mp:state:{state}");
-        return Task.FromResult<string?>(professionalId);
+        _cache.Remove($"mp:verifier:{state}");
+
+        return Task.FromResult((professionalId, codeVerifier));
     }
 
-    public async Task<MpTokenResponse> ExchangeCodeForTokensAsync(string code, CancellationToken ct)
+    public async Task<MpTokenResponse> ExchangeCodeForTokensAsync(string code, string? codeVerifier, CancellationToken ct)
     {
         var client = _httpClientFactory.CreateClient("mercadopago");
 
@@ -92,7 +103,8 @@ public sealed class MpOAuthService : IMpOAuthService
             client_secret = _clientSecret,
             grant_type = "authorization_code",
             code,
-            redirect_uri = _redirectUri
+            redirect_uri = _redirectUri,
+            code_verifier = codeVerifier
         };
 
         using var response = await client.PostAsJsonAsync("/oauth/token", payload, ct);
@@ -185,6 +197,21 @@ public sealed class MpOAuthService : IMpOAuthService
         await _ctx.Professionals
             .Where(p => p.Id == professionalId)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.MpConnected, false), ct);
+    }
+
+    private static string GenerateCodeVerifier()
+    {
+        var bytes = new byte[64];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+    }
+
+    private static string GenerateCodeChallenge(string codeVerifier)
+    {
+        var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
+        return Convert.ToBase64String(hash)
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }
 
     private static string MaskToken(string token)
