@@ -90,7 +90,7 @@ public sealed class MpOAuthService : IMpOAuthService
         _cache.Remove($"mp:state:{state}");
         _cache.Remove($"mp:verifier:{state}");
 
-        return Task.FromResult((professionalId, codeVerifier));
+        return Task.FromResult<(string?, string?)>((professionalId, codeVerifier));
     }
 
     public async Task<MpTokenResponse> ExchangeCodeForTokensAsync(string code, string? codeVerifier, CancellationToken ct)
