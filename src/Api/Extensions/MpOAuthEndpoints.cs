@@ -98,7 +98,10 @@ public static class MpOAuthEndpoints
             CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("MpCallback");
-            var frontendBase = config["MercadoPago__FrontendBaseUrl"] ?? "";
+            // ✅ correto
+            var frontendBase = config["MercadoPago:FrontendBaseUrl"] 
+                ?? config["MercadoPago__FrontendBaseUrl"] 
+                ?? "";
 
             // Validate state anti-CSRF
             if (string.IsNullOrWhiteSpace(state))
