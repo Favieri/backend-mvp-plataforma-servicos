@@ -107,7 +107,7 @@ public static class MpOAuthEndpoints
             if (string.IsNullOrWhiteSpace(state))
                 return Results.Redirect($"{frontendBase}/profissional?mp_error=invalid_state");
 
-            var professionalId = await mpService.ValidateAndConsumeStateAsync(state, ct);
+            var (professionalId, codeVerifier) = await mpService.ValidateAndConsumeStateAsync(state, ct);
             if (professionalId is null)
                 return Results.Redirect($"{frontendBase}/profissional?mp_error=invalid_state");
 
@@ -128,7 +128,7 @@ public static class MpOAuthEndpoints
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(TimeSpan.FromSeconds(30));
-                tokenResponse = await mpService.ExchangeCodeForTokensAsync(code, cts.Token);
+                tokenResponse = await mpService.ExchangeCodeForTokensAsync(code, codeVerifier, cts.Token);
             }
             catch (OperationCanceledException)
             {
