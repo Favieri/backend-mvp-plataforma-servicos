@@ -100,7 +100,8 @@ public sealed class MpOAuthService : IMpOAuthService
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("[MpOAuth] Token exchange failed. Status={Status}", response.StatusCode);
+            _logger.LogError("[MpOAuth] Token exchange failed. Status={Status} Body={Body}",
+                response.StatusCode, body);
             throw new MpOAuthException($"MP token exchange failed: {response.StatusCode}");
         }
 
