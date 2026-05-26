@@ -102,6 +102,37 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             """, ct);
     }
 
+    public async Task<object?> GetByIdAsync(string userId, CancellationToken ct)
+    {
+        var row = await ctx.Database
+            .SqlQuery<SocialUserRow>($"""
+                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
+                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
+                       provider AS "Provider", provider_user_id AS "ProviderUserId"
+                FROM "User"
+                WHERE id = {userId}
+                LIMIT 1
+            """)
+            .FirstOrDefaultAsync(ct);
+
+        return row is null ? null : ToUserObject(row);
+    }
+
+    public async Task UpdateUserAsync(string userId, string? name, string? phone, string? zoneId, CancellationToken ct)
+    {
+        if (name is not null)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE "User" SET name = {name} WHERE id = {userId}""", ct);
+
+        if (phone is not null)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE "User" SET phone = {phone} WHERE id = {userId}""", ct);
+
+        if (zoneId is not null)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE "User" SET "zoneId" = {zoneId} WHERE id = {userId}""", ct);
+    }
+
     public async Task<object> FindOrCreateSocialUserAsync(string provider, string providerUserId, string email, string name, CancellationToken ct)
     {
         // 1. Search by provider + providerUserId

@@ -338,6 +338,30 @@ public static class ApiEndpoints
             return Results.Ok(new { ok = true, defaultAddress = body.Address });
         });
 
+        app.MapPut("/users/{id}", async (
+            string id,
+            Application.DTOs.UpdateUserRequest body,
+            IUserRepository repo,
+            CancellationToken ct) =>
+        {
+            var user = await repo.GetByIdAsync(id, ct);
+            if (user is null)
+                return Results.Json(new { error = "Usuário não encontrado" }, statusCode: 404);
+
+            await repo.UpdateUserAsync(id, body.Name?.Trim(), body.Phone?.Trim(), body.ZoneId?.Trim(), ct);
+
+            if (body.DefaultAddress is not null)
+            {
+                var (valid, addressError) = Application.Services.AddressResolver.Validate(body.DefaultAddress);
+                if (!valid)
+                    return Results.Json(new { error = addressError }, statusCode: 400);
+
+                await repo.UpdateDefaultAddressAsync(id, body.DefaultAddress, ct);
+            }
+
+            return Results.Ok(new { ok = true });
+        });
+
         // ─── Professionals ─────────────────────────────────────────────────────
         //app.MapGet("/professionals", async (
         //    HttpContext ctx, IMemoryCache cache, string? serviceId, string? zoneId,
