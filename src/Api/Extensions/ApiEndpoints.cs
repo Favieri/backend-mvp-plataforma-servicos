@@ -362,6 +362,68 @@ public static class ApiEndpoints
             return Results.Ok(new { ok = true });
         });
 
+        // ─── GET /users/{id}/addresses ──────────────────────────────────────────
+        app.MapGet("/users/{id}/addresses", async (
+            string id, HttpRequest req, IUserRepository repo, CancellationToken ct) =>
+        {
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
+                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+
+            var addresses = await repo.GetAddressesAsync(id, ct);
+            return Results.Ok(addresses);
+        });
+
+        // ─── POST /users/{id}/addresses ─────────────────────────────────────────
+        app.MapPost("/users/{id}/addresses", async (
+            string id, Application.DTOs.CreateUserAddressRequest body,
+            HttpRequest req, IUserRepository repo, CancellationToken ct) =>
+        {
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
+                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+
+            var addressToValidate = new Application.DTOs.AddressDto(
+                body.ZipCode, body.Street, body.Number,
+                body.Neighborhood, body.City, body.State,
+                body.Complement, body.Reference);
+
+            var (valid, error) = Application.Services.AddressResolver.Validate(addressToValidate);
+            if (!valid)
+                return Results.Json(new { error }, statusCode: 400);
+
+            var created = await repo.CreateAddressAsync(id, body, ct);
+            return Results.Json(created, statusCode: 201);
+        });
+
+        // ─── POST /users/{id}/addresses/{addrId}/use ────────────────────────────
+        app.MapPost("/users/{id}/addresses/{addrId}/use", async (
+            string id, string addrId,
+            HttpRequest req, IUserRepository repo, CancellationToken ct) =>
+        {
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
+                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+
+            await repo.MarkAddressAsUsedAsync(addrId, id, ct);
+            return Results.Ok(new { ok = true });
+        });
+
+        // ─── DELETE /users/{id}/addresses/{addrId} ──────────────────────────────
+        app.MapDelete("/users/{id}/addresses/{addrId}", async (
+            string id, string addrId,
+            HttpRequest req, IUserRepository repo, CancellationToken ct) =>
+        {
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
+                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+
+            var deleted = await repo.DeleteAddressAsync(addrId, id, ct);
+            return deleted
+                ? Results.Ok(new { ok = true })
+                : Results.NotFound(new { error = "Endereço não encontrado" });
+        });
+
         // ─── Professionals ─────────────────────────────────────────────────────
         //app.MapGet("/professionals", async (
         //    HttpContext ctx, IMemoryCache cache, string? serviceId, string? zoneId,
