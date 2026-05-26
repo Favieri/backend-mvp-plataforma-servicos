@@ -1,5 +1,32 @@
 namespace Application.DTOs;
 
+// ─── User Address (múltiplos endereços por usuário — PRD-18a) ────────────────
+public sealed record UserAddressDto(
+    string Id,
+    string? Label,
+    string ZipCode,
+    string Street,
+    string Number,
+    string Neighborhood,
+    string City,
+    string State,
+    string? Complement,
+    string? Reference,
+    bool IsDefault,
+    DateTime? LastUsedAt);
+
+public sealed record CreateUserAddressRequest(
+    string? Label,
+    string ZipCode,
+    string Street,
+    string Number,
+    string Neighborhood,
+    string City,
+    string State,
+    string? Complement,
+    string? Reference,
+    bool SetAsDefault = false);
+
 // ─── Address ────────────────────────────────────────────────────────────────
 public sealed record AddressDto(
     string ZipCode,

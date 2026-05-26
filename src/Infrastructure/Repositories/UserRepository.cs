@@ -197,6 +197,102 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         };
     }
 
+    // ─── Múltiplos endereços (PRD-18a) ────────────────────────────────────────
+
+    public async Task<IReadOnlyList<UserAddressDto>> GetAddressesAsync(string userId, CancellationToken ct)
+    {
+        var rows = await ctx.Database
+            .SqlQuery<UserAddressRow>($"""
+                SELECT id AS "Id", label AS "Label",
+                       zip_code AS "ZipCode", street AS "Street",
+                       number AS "Number", neighborhood AS "Neighborhood",
+                       city AS "City", state AS "State",
+                       complement AS "Complement", reference AS "Reference",
+                       is_default AS "IsDefault", last_used_at AS "LastUsedAt"
+                FROM user_address
+                WHERE user_id = {userId}
+                ORDER BY is_default DESC, last_used_at DESC NULLS LAST, created_at ASC
+            """)
+            .ToListAsync(ct);
+
+        return rows.Select(r => new UserAddressDto(
+            r.Id, r.Label, r.ZipCode, r.Street, r.Number,
+            r.Neighborhood, r.City, r.State, r.Complement,
+            r.Reference, r.IsDefault, r.LastUsedAt
+        )).ToList();
+    }
+
+    public async Task<UserAddressDto> CreateAddressAsync(string userId, CreateUserAddressRequest req, CancellationToken ct)
+    {
+        var id = Guid.NewGuid().ToString();
+        var zip = Application.Services.AddressResolver.NormalizeZipCode(req.ZipCode);
+
+        if (req.SetAsDefault)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE user_address SET is_default = false WHERE user_id = {userId}""", ct);
+
+        await ctx.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO user_address
+              (id, user_id, label, zip_code, street, number, neighborhood,
+               city, state, complement, reference, is_default, created_at)
+            VALUES
+              ({id}, {userId}, {req.Label}, {zip}, {req.Street},
+               {req.Number}, {req.Neighborhood}, {req.City}, {req.State},
+               {req.Complement}, {req.Reference}, {req.SetAsDefault}, now())
+        """, ct);
+
+        return new UserAddressDto(id, req.Label, zip, req.Street, req.Number,
+            req.Neighborhood, req.City, req.State, req.Complement,
+            req.Reference, req.SetAsDefault, null);
+    }
+
+    public async Task<UserAddressDto?> UpdateAddressAsync(string addressId, string userId, CreateUserAddressRequest req, CancellationToken ct)
+    {
+        var zip = Application.Services.AddressResolver.NormalizeZipCode(req.ZipCode);
+
+        if (req.SetAsDefault)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE user_address SET is_default = false WHERE user_id = {userId} AND id != {addressId}""", ct);
+
+        var rows = await ctx.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE user_address
+            SET label         = {req.Label},
+                zip_code      = {zip},
+                street        = {req.Street},
+                number        = {req.Number},
+                neighborhood  = {req.Neighborhood},
+                city          = {req.City},
+                state         = {req.State},
+                complement    = {req.Complement},
+                reference     = {req.Reference},
+                is_default    = {req.SetAsDefault}
+            WHERE id = {addressId} AND user_id = {userId}
+        """, ct);
+
+        if (rows == 0) return null;
+
+        return new UserAddressDto(addressId, req.Label, zip, req.Street, req.Number,
+            req.Neighborhood, req.City, req.State, req.Complement,
+            req.Reference, req.SetAsDefault, null);
+    }
+
+    public async Task<bool> DeleteAddressAsync(string addressId, string userId, CancellationToken ct)
+    {
+        var rows = await ctx.Database.ExecuteSqlInterpolatedAsync($"""
+            DELETE FROM user_address WHERE id = {addressId} AND user_id = {userId}
+        """, ct);
+        return rows > 0;
+    }
+
+    public async Task MarkAddressAsUsedAsync(string addressId, string userId, CancellationToken ct)
+    {
+        await ctx.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE user_address
+            SET last_used_at = now()
+            WHERE id = {addressId} AND user_id = {userId}
+        """, ct);
+    }
+
     private static object ToUserObject(SocialUserRow row) => new
     {
         id = row.Id, name = row.Name, email = row.Email, phone = row.Phone,
@@ -209,6 +305,22 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         string? ZipCode, string? Street, string? Number,
         string? Neighborhood, string? City, string? State,
         string? Complement, string? Reference);
+
+    private sealed record UserAddressRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string? Label { get; init; }
+        public string ZipCode { get; init; } = string.Empty;
+        public string Street { get; init; } = string.Empty;
+        public string Number { get; init; } = string.Empty;
+        public string Neighborhood { get; init; } = string.Empty;
+        public string City { get; init; } = string.Empty;
+        public string State { get; init; } = string.Empty;
+        public string? Complement { get; init; }
+        public string? Reference { get; init; }
+        public bool IsDefault { get; init; }
+        public DateTime? LastUsedAt { get; init; }
+    }
 
     private sealed record SocialUserRow
     {
