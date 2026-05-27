@@ -41,8 +41,13 @@ public sealed class MercadoPagoService : IMercadoPagoService
         string professionalAccessToken,
         CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
-        var expiresAt = now.AddMinutes(30);
+        // MP processa datas em São Paulo (UTC-3) — usar DateTimeOffset com offset fixo
+        var spOffset    = TimeSpan.FromHours(-3);
+        var nowSp       = DateTimeOffset.UtcNow.ToOffset(spOffset);
+        var expiresAtSp = nowSp.AddMinutes(30);
+
+        static string FormatMpDate(DateTimeOffset d) =>
+            d.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
 
         var payload = new
         {
@@ -75,8 +80,8 @@ public sealed class MercadoPagoService : IMercadoPagoService
             notification_url = request.NotificationUrl,
             external_reference = request.OrderId,
             expires = true,
-            expiration_date_from = now.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz"),
-            expiration_date_to = expiresAt.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz"),
+            expiration_date_from = FormatMpDate(nowSp),
+            expiration_date_to   = FormatMpDate(expiresAtSp),
             payment_methods = new
             {
                 excluded_payment_types = new[] { new { id = "ticket" } },
@@ -115,7 +120,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
             PreferenceId: result.Id,
             CheckoutUrl: $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}",
             SandboxUrl: $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}",
-            ExpiresAt: expiresAt
+            ExpiresAt: expiresAtSp.UtcDateTime
         );
     }
 
