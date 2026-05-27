@@ -10,8 +10,8 @@ public static class WalletEndpoints
 {
     public static IEndpointRouteBuilder MapWalletEndpoints(this IEndpointRouteBuilder app)
     {
-        // ─── GET /api/wallet/balance ───────────────────────────────────────────
-        app.MapGet("/api/wallet/balance", async (
+        // ─── GET /wallet/balance ──────────────────────────────────────────────
+        app.MapGet("/wallet/balance", async (
             HttpContext context,
             string? professionalId,
             ILedgerRepository ledgerRepo,
@@ -26,8 +26,8 @@ public static class WalletEndpoints
             return Results.Ok(balance);
         });
 
-        // ─── GET /api/wallet/ledger ────────────────────────────────────────────
-        app.MapGet("/api/wallet/ledger", async (
+        // ─── GET /wallet/ledger ───────────────────────────────────────────────
+        app.MapGet("/wallet/ledger", async (
             HttpContext context,
             string? professionalId,
             int? page,
@@ -61,8 +61,8 @@ public static class WalletEndpoints
             });
         });
 
-        // ─── GET /api/wallet/summary ───────────────────────────────────────────
-        app.MapGet("/api/wallet/summary", async (
+        // ─── GET /wallet/summary ──────────────────────────────────────────────
+        app.MapGet("/wallet/summary", async (
             HttpContext context,
             string? professionalId,
             int? months,
