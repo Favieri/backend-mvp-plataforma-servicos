@@ -72,7 +72,13 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("Domain.Entities.Order", b =>
         {
-            b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
+            b.Property<string>("Id")
+                .HasColumnName("id")
+                .HasColumnType("uuid")
+                .HasConversion<Guid>(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
             b.Property<string>("ClientId").IsRequired().HasColumnName("clientId");
             b.Property<DateTime>("CreatedAt").IsRequired().HasColumnName("createdAt");
             b.Property<DateTime?>("Date").HasColumnName("date");
