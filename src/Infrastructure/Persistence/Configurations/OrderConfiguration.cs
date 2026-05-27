@@ -1,7 +1,6 @@
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Infrastructure.Persistence.Configurations;
 
@@ -13,14 +12,8 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasKey(x => x.Id);
 
-        var uuidConverter = new ValueConverter<string, Guid>(
-            v => Guid.Parse(v),
-            v => v.ToString()
-        );
         builder.Property(x => x.Id)
-            .HasColumnName("id")
-            .HasColumnType("uuid")
-            .HasConversion(uuidConverter);
+            .HasColumnName("id");
 
         builder.Property(x => x.ClientId).HasColumnName("clientId").IsRequired();
         builder.Property(x => x.ServiceId).HasColumnName("serviceId").IsRequired();
