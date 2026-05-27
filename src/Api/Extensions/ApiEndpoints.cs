@@ -366,10 +366,7 @@ public static class ApiEndpoints
         app.MapGet("/users/{id}/addresses", async (
             string id, HttpRequest req, IUserRepository repo, CancellationToken ct) =>
         {
-            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
-                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
-
+            if (RequireSelf(req.HttpContext, id, out _) is { } err) return err;
             var addresses = await repo.GetAddressesAsync(id, ct);
             return Results.Ok(addresses);
         });
@@ -379,9 +376,7 @@ public static class ApiEndpoints
             string id, Application.DTOs.CreateUserAddressRequest body,
             HttpRequest req, IUserRepository repo, CancellationToken ct) =>
         {
-            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
-                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+            if (RequireSelf(req.HttpContext, id, out _) is { } err) return err;
 
             var addressToValidate = new Application.DTOs.AddressDto(
                 body.ZipCode, body.Street, body.Number,
@@ -401,9 +396,7 @@ public static class ApiEndpoints
             string id, string addrId,
             HttpRequest req, IUserRepository repo, CancellationToken ct) =>
         {
-            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
-                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+            if (RequireSelf(req.HttpContext, id, out _) is { } err) return err;
 
             await repo.MarkAddressAsUsedAsync(addrId, id, ct);
             return Results.Ok(new { ok = true });
@@ -414,9 +407,7 @@ public static class ApiEndpoints
             string id, string addrId,
             HttpRequest req, IUserRepository repo, CancellationToken ct) =>
         {
-            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrWhiteSpace(jwtUserId) || jwtUserId != id)
-                return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+            if (RequireSelf(req.HttpContext, id, out _) is { } err) return err;
 
             var deleted = await repo.DeleteAddressAsync(addrId, id, ct);
             return deleted
@@ -1388,6 +1379,22 @@ public static class ApiEndpoints
                 d["clientName"]?.ToString() ?? "", d["professionalName"]?.ToString() ?? "",
                 d["serviceName"]?.ToString() ?? "Serviço", when, bookingUrl,
                 dedupeKey: $"{dedupeBase}|cli|{clientEmail}", ct: ct).ConfigureAwait(false);
+    }
+
+    private static IResult? RequireSelf(HttpContext context, string routeId, out string jwtUserId)
+    {
+        jwtUserId = context.User?.FindFirst("sub")?.Value
+                 ?? context.User?.FindFirst(
+                     System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                 ?? "";
+
+        if (string.IsNullOrWhiteSpace(jwtUserId))
+            return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
+
+        if (!string.Equals(jwtUserId, routeId, StringComparison.OrdinalIgnoreCase))
+            return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
+
+        return null;
     }
 
     private static string? GenerateJwt(IConfiguration config, object userObj)
