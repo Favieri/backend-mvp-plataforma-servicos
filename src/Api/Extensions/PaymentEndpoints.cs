@@ -24,8 +24,8 @@ public static class PaymentEndpoints
 
     public static IEndpointRouteBuilder MapPaymentEndpoints(this IEndpointRouteBuilder app)
     {
-        // ─── POST /api/payments/preference ───────────────────────────────────────
-        app.MapPost("/api/payments/preference", async (
+        // ─── POST /payments/preference ───────────────────────────────────────────
+        app.MapPost("/payments/preference", async (
             CreatePaymentPreferenceRequest body,
             AppDbContext ctx,
             IPaymentRepository paymentRepo,
@@ -210,8 +210,8 @@ public static class PaymentEndpoints
             });
         });
 
-        // ─── GET /api/payments/{orderId} ─────────────────────────────────────────
-        app.MapGet("/api/payments/{orderId}", async (
+        // ─── GET /payments/{orderId} ─────────────────────────────────────────────
+        app.MapGet("/payments/{orderId}", async (
             string orderId,
             IPaymentRepository paymentRepo,
             CancellationToken ct) =>
@@ -242,9 +242,9 @@ public static class PaymentEndpoints
             });
         });
 
-        // ─── POST /api/payments/{orderId}/refund ─────────────────────────────────
+        // ─── POST /payments/{orderId}/refund ─────────────────────────────────────
         // Auth: admin/sistema interno. Chamado internamente pelo fluxo de cancelamento ou disputa.
-        app.MapPost("/api/payments/{orderId}/refund", async (
+        app.MapPost("/payments/{orderId}/refund", async (
             string orderId,
             RefundOrderRequest body,
             IRefundService refundService,
@@ -289,8 +289,8 @@ public static class PaymentEndpoints
             });
         });
 
-        // ─── POST /api/payments/{paymentId}/cancel ────────────────────────────────
-        app.MapPost("/api/payments/{paymentId}/cancel", async (
+        // ─── POST /payments/{paymentId}/cancel ───────────────────────────────────
+        app.MapPost("/payments/{paymentId}/cancel", async (
             string paymentId,
             HttpContext context,
             AppDbContext ctx,
