@@ -66,7 +66,12 @@ public sealed class MercadoPagoService : IMercadoPagoService
             },
             payer = new
             {
-                email = request.PayerEmail ?? "cliente@jobeasy.com.br"
+                email = request.PayerEmail ?? "cliente@jobeasy.com.br",
+                identification = new
+                {
+                    type   = "CPF",
+                    number = (request.PayerCpf ?? "").Replace(".", "").Replace("-", "").Trim()
+                }
             },
             marketplace = _appId,
             marketplace_fee = request.PlatformFeeCents / 100.0,

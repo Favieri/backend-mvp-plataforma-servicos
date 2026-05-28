@@ -154,6 +154,7 @@ public static class PaymentEndpoints
                 PlatformFeeCents: platformFeeCents,
                 MaxInstallments: maxInstallments,
                 PayerEmail: body.PayerEmail,
+                PayerCpf: body.PayerCpf,
                 BackUrlSuccess: $"{frontendUrl}/pagamento/sucesso?orderId={orderId}",
                 BackUrlFailure: $"{frontendUrl}/pagamento/falhou?orderId={orderId}",
                 BackUrlPending: $"{frontendUrl}/pagamento/pendente?orderId={orderId}",
@@ -331,7 +332,8 @@ public static class PaymentEndpoints
 
 public sealed record CreatePaymentPreferenceRequest(
     string? OrderId,
-    string? PayerEmail
+    string? PayerEmail,
+    string? PayerCpf
 );
 
 public sealed record RefundOrderRequest(
