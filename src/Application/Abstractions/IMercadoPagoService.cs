@@ -19,6 +19,7 @@ public sealed record CreatePreferenceRequest(
     int PlatformFeeCents,
     int MaxInstallments,
     string? PayerEmail,
+    string? PayerCpf,
     string BackUrlSuccess,
     string BackUrlFailure,
     string BackUrlPending,
