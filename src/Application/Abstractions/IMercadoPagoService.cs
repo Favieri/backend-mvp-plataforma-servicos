@@ -30,7 +30,8 @@ public sealed record MpPreferenceResult(
     string PreferenceId,
     string CheckoutUrl,
     string SandboxUrl,
-    DateTime ExpiresAt
+    DateTime ExpiresAt,
+    bool IsSandbox = false
 );
 
 public sealed record MpRefundResult(

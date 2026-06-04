@@ -71,19 +71,22 @@ public static class PaymentEndpoints
                 if (age.TotalMinutes < 30)
                 {
                     // Retorna o mesmo preferenceId sem chamar o MP novamente
-                    var frontendBase = config["MercadoPago__FrontendBaseUrl"] ?? config["MercadoPago:FrontendBaseUrl"] ?? "";
                     var amountReuse = existingPending.AmountCents;
                     var feeReuse = existingPending.PlatformFeeCents;
+                    var isSandboxReuse = config.GetValue<bool>("MercadoPago__IsSandbox")
+                                     || config.GetValue<bool>("MercadoPago:IsSandbox");
+                    var reuseCheckout = existingPending.GatewayRef is not null
+                        ? $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={existingPending.GatewayRef}"
+                        : null;
+                    var reuseSandbox = existingPending.GatewayRef is not null
+                        ? $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={existingPending.GatewayRef}"
+                        : null;
                     return Results.Ok(new
                     {
                         paymentId = existingPending.Id,
                         preferenceId = existingPending.GatewayRef,
-                        checkoutUrl = existingPending.GatewayRef is not null
-                            ? $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={existingPending.GatewayRef}"
-                            : null,
-                        sandboxUrl = existingPending.GatewayRef is not null
-                            ? $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={existingPending.GatewayRef}"
-                            : null,
+                        checkoutUrl = isSandboxReuse ? reuseSandbox : reuseCheckout,
+                        sandboxUrl = reuseSandbox,
                         amountCents = amountReuse,
                         platformFeeCents = feeReuse,
                         netAmountCents = amountReuse - feeReuse,
@@ -202,7 +205,7 @@ public static class PaymentEndpoints
             {
                 paymentId = payment.Id,
                 preferenceId = mpResult.PreferenceId,
-                checkoutUrl = mpResult.CheckoutUrl,
+                checkoutUrl = mpResult.IsSandbox ? mpResult.SandboxUrl : mpResult.CheckoutUrl,
                 sandboxUrl = mpResult.SandboxUrl,
                 amountCents,
                 platformFeeCents,
@@ -215,14 +218,22 @@ public static class PaymentEndpoints
         app.MapGet("/payments/{orderId}", async (
             string orderId,
             IPaymentRepository paymentRepo,
+            IConfiguration config,
             CancellationToken ct) =>
         {
             var payment = await paymentRepo.GetByOrderIdAsync(orderId, ct);
             if (payment is null)
                 return Results.NotFound(new { error = "Pagamento não encontrado para este pedido." });
 
+            var isSandbox = config.GetValue<bool>("MercadoPago__IsSandbox")
+                         || config.GetValue<bool>("MercadoPago:IsSandbox");
+
             string? checkoutUrl = payment.GatewayRef is not null
                 ? $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={payment.GatewayRef}"
+                : null;
+
+            string? sandboxUrl = payment.GatewayRef is not null
+                ? $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={payment.GatewayRef}"
                 : null;
 
             return Results.Ok(new
@@ -236,7 +247,8 @@ public static class PaymentEndpoints
                 gatewayFeeCents = payment.GatewayFeeCents,
                 paidAt = payment.PaidAt,
                 preferenceId = payment.GatewayRef,
-                checkoutUrl,
+                checkoutUrl = isSandbox ? sandboxUrl : checkoutUrl,
+                sandboxUrl,
                 pixCode = payment.PixCode,
                 pixQrCodeBase64 = payment.PixQrCodeBase64,
                 pixExpiresAt = payment.PixExpiresAt
