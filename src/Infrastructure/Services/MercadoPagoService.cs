@@ -16,6 +16,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
     private readonly string _platformAccessToken;
     private readonly string _frontendBaseUrl;
     private readonly string _apiBaseUrl;
+    private readonly bool _isSandbox;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -34,6 +35,11 @@ public sealed class MercadoPagoService : IMercadoPagoService
         _platformAccessToken = config["MercadoPago__AccessToken"] ?? config["MercadoPago:AccessToken"] ?? "";
         _frontendBaseUrl = config["MercadoPago__FrontendBaseUrl"] ?? config["MercadoPago:FrontendBaseUrl"] ?? "";
         _apiBaseUrl = config["MercadoPago__ApiBaseUrl"] ?? config["MercadoPago:ApiBaseUrl"] ?? "";
+        _isSandbox = config.GetValue<bool>("MercadoPago__IsSandbox")
+                  || config.GetValue<bool>("MercadoPago:IsSandbox");
+
+        if (_isSandbox)
+            _logger.LogWarning("[MpService] SANDBOX MODE ATIVO. Pagamentos reais não serão processados.");
     }
 
     public async Task<MpPreferenceResult> CreatePreferenceAsync(
@@ -66,7 +72,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
             },
             payer = new
             {
-                email = request.PayerEmail ?? "cliente@jobeasy.com.br"
+                email = _isSandbox ? "test@testuser.com" : (request.PayerEmail ?? "cliente@jobeasy.com.br")
             },
             marketplace = _appId,
             marketplace_fee = request.PlatformFeeCents / 100.0,
@@ -113,14 +119,22 @@ public sealed class MercadoPagoService : IMercadoPagoService
         var result = await response.Content.ReadFromJsonAsync<MpPreferenceApiResponse>(ct)
             ?? throw new MpGatewayException("Empty response from MP preferences endpoint");
 
-        _logger.LogInformation("[MpService] Preference created. OrderId={OrderId} PreferenceId={PreferenceId}",
-            request.OrderId, result.Id);
+        var checkoutUrl = result.InitPoint
+            ?? $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}";
+
+        var sandboxUrl = result.SandboxInitPoint
+            ?? $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}";
+
+        _logger.LogInformation(
+            "[MpService] Preference created. OrderId={OrderId} PreferenceId={PreferenceId} IsSandbox={IsSandbox}",
+            request.OrderId, result.Id, _isSandbox);
 
         return new MpPreferenceResult(
             PreferenceId: result.Id,
-            CheckoutUrl: $"https://www.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}",
-            SandboxUrl: $"https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id={result.Id}",
-            ExpiresAt: expiresAtSp.UtcDateTime
+            CheckoutUrl: checkoutUrl,
+            SandboxUrl: sandboxUrl,
+            ExpiresAt: expiresAtSp.UtcDateTime,
+            IsSandbox: _isSandbox
         );
     }
 
@@ -255,6 +269,12 @@ public sealed class MercadoPagoService : IMercadoPagoService
     {
         [JsonPropertyName("id")]
         public string Id { get; init; } = "";
+
+        [JsonPropertyName("init_point")]
+        public string? InitPoint { get; init; }
+
+        [JsonPropertyName("sandbox_init_point")]
+        public string? SandboxInitPoint { get; init; }
     }
 
     private sealed class MpPaymentApiResponse

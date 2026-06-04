@@ -113,6 +113,14 @@ Parameters:
     Type: String
     Default: 'https://jobeasy.com.br'
     Description: "URL base do frontend para redirecionamento pós-OAuth"
+  MpIsSandbox:
+    Type: String
+    Default: 'false'
+    Description: "true para habilitar modo sandbox do Mercado Pago"
+  MpApiBaseUrl:
+    Type: String
+    Default: ''
+    Description: "URL base do API Gateway (ex: https://xxx.execute-api.sa-east-1.amazonaws.com)"
 
 Resources:
   JobeasyHttpApi:
@@ -133,6 +141,9 @@ Resources:
           MERCADOPAGO__CLIENTSECRET:   !Ref MpClientSecret
           MERCADOPAGO__REDIRECTURI:    !Ref MpRedirectUri
           MERCADOPAGO__FRONTENDBASEURL: !Ref MpFrontendBaseUrl
+          MERCADOPAGO__ISSANDBOX:      !Ref MpIsSandbox
+          MERCADOPAGO__APIBASEURL:     !Ref MpApiBaseUrl
+          MERCADOPAGO__SKIPWEBHOOKSIGNATUREVALIDATION: !Ref MpIsSandbox
       Events:
         ProxyEvent:
           Type: HttpApi

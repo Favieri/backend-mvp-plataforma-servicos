@@ -25,6 +25,7 @@ public sealed class MpOAuthService : IMpOAuthService
     private readonly string _clientSecret;
     private readonly string _redirectUri;
     private readonly string _frontendBaseUrl;
+    private readonly bool _isSandbox;
 
     private const int StateExpirySeconds = 600;
 
@@ -46,6 +47,8 @@ public sealed class MpOAuthService : IMpOAuthService
         _clientSecret  = config["MercadoPago:ClientSecret"]   ?? "";
         _redirectUri   = config["MercadoPago:RedirectUri"]    ?? "";
         _frontendBaseUrl = config["MercadoPago:FrontendBaseUrl"] ?? "";
+        _isSandbox = config.GetValue<bool>("MercadoPago__IsSandbox")
+                  || config.GetValue<bool>("MercadoPago:IsSandbox");
     }
 
     public Task<(string connectUrl, int expiresInSeconds)> GetConnectUrlAsync(string professionalId, CancellationToken ct)
@@ -75,7 +78,8 @@ public sealed class MpOAuthService : IMpOAuthService
                   $"&state={Uri.EscapeDataString(state)}" +
                   $"&redirect_uri={Uri.EscapeDataString(_redirectUri)}" +
                   $"&code_challenge={Uri.EscapeDataString(codeChallenge)}" +
-                  $"&code_challenge_method=S256";
+                  $"&code_challenge_method=S256" +
+                  (_isSandbox ? "&test_token=true" : "");
 
         return Task.FromResult((url, StateExpirySeconds));
     }
@@ -104,7 +108,8 @@ public sealed class MpOAuthService : IMpOAuthService
             grant_type = "authorization_code",
             code,
             redirect_uri = _redirectUri,
-            code_verifier = codeVerifier
+            code_verifier = codeVerifier,
+            test_token = _isSandbox ? "true" : "false"
         };
 
         using var response = await client.PostAsJsonAsync("/oauth/token", payload, ct);
@@ -153,7 +158,8 @@ public sealed class MpOAuthService : IMpOAuthService
             client_id = _appId,
             client_secret = _clientSecret,
             grant_type = "refresh_token",
-            refresh_token = account.MpRefreshToken
+            refresh_token = account.MpRefreshToken,
+            test_token = _isSandbox ? "true" : "false"
         };
 
         try
