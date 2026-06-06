@@ -104,6 +104,13 @@ jobs:
           GOOGLE_CLIENT_ID:       ${{ secrets.GOOGLE_CLIENT_ID || '' }}
           FACEBOOK_APP_ID:        ${{ secrets.FACEBOOK_APP_ID || '' }}
           MP_ACCESS_TOKEN:        ${{ secrets.MP_ACCESS_TOKEN || secrets.MERCADOPAGO_ACCESS_TOKEN || '' }}
+          MP_APP_ID:                     ${{ secrets.MP_APP_ID || '' }}
+          MP_CLIENT_SECRET:              ${{ secrets.MP_CLIENT_SECRET || '' }}
+          MP_REDIRECT_URI:               ${{ secrets.MP_REDIRECT_URI || '' }}
+          MP_FRONTEND_BASE_URL:          ${{ secrets.MP_FRONTEND_BASE_URL || 'https://jobeasy.com.br' }}
+          MP_API_BASE_URL:               ${{ secrets.MP_API_BASE_URL || '' }}
+          MP_IS_SANDBOX:                 ${{ secrets.MP_IS_SANDBOX || 'false' }}
+          MP_SKIP_WEBHOOK_VALIDATION:    ${{ secrets.MP_SKIP_WEBHOOK_VALIDATION || 'false' }}
         run: |
           python3 - << 'PYEOF'
           import json, os
@@ -126,7 +133,14 @@ jobs:
             {"ParameterKey": "StorageBucketName",      "ParameterValue": secret("STORAGE_BUCKET_NAME", "jobeasy-bucket-prod")},
             {"ParameterKey": "GoogleClientId",         "ParameterValue": secret("GOOGLE_CLIENT_ID")},
             {"ParameterKey": "FacebookAppId",          "ParameterValue": secret("FACEBOOK_APP_ID")},
-            {"ParameterKey": "MercadoPagoAccessToken", "ParameterValue": secret("MP_ACCESS_TOKEN")},
+            {"ParameterKey": "MercadoPagoAccessToken",      "ParameterValue": secret("MP_ACCESS_TOKEN")},
+            {"ParameterKey": "MpAppId",                     "ParameterValue": secret("MP_APP_ID")},
+            {"ParameterKey": "MpClientSecret",              "ParameterValue": secret("MP_CLIENT_SECRET")},
+            {"ParameterKey": "MpRedirectUri",               "ParameterValue": secret("MP_REDIRECT_URI")},
+            {"ParameterKey": "MpFrontendBaseUrl",           "ParameterValue": secret("MP_FRONTEND_BASE_URL", "https://jobeasy.com.br")},
+            {"ParameterKey": "MpApiBaseUrl",                "ParameterValue": secret("MP_API_BASE_URL")},
+            {"ParameterKey": "MpIsSandbox",                 "ParameterValue": secret("MP_IS_SANDBOX", "false")},
+            {"ParameterKey": "MpSkipWebhookValidation",     "ParameterValue": secret("MP_SKIP_WEBHOOK_VALIDATION", "false")},
           ]
 
           with open("/tmp/sam-params.json", "w") as f:
