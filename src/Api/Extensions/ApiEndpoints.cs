@@ -200,7 +200,7 @@ public static class ApiEndpoints
                 return Results.Json(new { error = ex.Message }, statusCode: 400);
             }
 
-            var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
+            var (userObj, isNewUser) = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
 
             var token = GenerateJwt(config, userObj);
 
@@ -214,6 +214,7 @@ public static class ApiEndpoints
             return Results.Ok(new
             {
                 token,
+                isNewUser,
                 user = new
                 {
                     id          = sUserId.Length > 0 ? sUserId : (string?)null,
@@ -249,7 +250,7 @@ public static class ApiEndpoints
                 return Results.Json(new { error = ex.Message }, statusCode: 400);
             }
 
-            var userObj = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
+            var (userObj, isNewUser) = await repo.FindOrCreateSocialUserAsync(info.Provider, info.ProviderUserId, info.Email, info.Name, ct);
 
             var token = GenerateJwt(config, userObj);
 
@@ -263,6 +264,7 @@ public static class ApiEndpoints
             return Results.Ok(new
             {
                 token,
+                isNewUser,
                 user = new
                 {
                     id          = fUserId.Length > 0 ? fUserId : (string?)null,

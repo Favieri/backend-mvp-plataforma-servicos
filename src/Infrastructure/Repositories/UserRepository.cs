@@ -133,31 +133,37 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
                 $"""UPDATE "User" SET "zoneId" = {zoneId} WHERE id = {userId}""", ct);
     }
 
-    public async Task<object> FindOrCreateSocialUserAsync(string provider, string providerUserId, string email, string name, CancellationToken ct)
+    public async Task<(object User, bool IsNewUser)> FindOrCreateSocialUserAsync(string provider, string providerUserId, string email, string name, CancellationToken ct)
     {
         // 1. Search by provider + providerUserId
         var existing = await ctx.Database
             .SqlQuery<SocialUserRow>($"""
-                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
-                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
-                       provider AS "Provider", provider_user_id AS "ProviderUserId"
-                FROM "User"
-                WHERE provider = {provider} AND provider_user_id = {providerUserId}
+                SELECT u.id AS "Id", u.name AS "Name", u.email AS "Email", u.phone AS "Phone",
+                       u.role AS "Role", u."zoneId" AS "ZoneId", u."createdAt" AS "CreatedAt",
+                       u.provider AS "Provider", u.provider_user_id AS "ProviderUserId",
+                       p.id AS "ProfessionalId",
+                       COALESCE(p.mp_connected, false) AS "MpConnected"
+                FROM "User" u
+                LEFT JOIN professionals p ON p.user_id = u.id
+                WHERE u.provider = {provider} AND u.provider_user_id = {providerUserId}
                 LIMIT 1
             """)
             .FirstOrDefaultAsync(ct);
 
         if (existing is not null)
-            return ToUserObject(existing);
+            return (ToUserObject(existing), false);
 
         // 2. Search by email
         var byEmail = await ctx.Database
             .SqlQuery<SocialUserRow>($"""
-                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
-                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
-                       provider AS "Provider", provider_user_id AS "ProviderUserId"
-                FROM "User"
-                WHERE email = {email}
+                SELECT u.id AS "Id", u.name AS "Name", u.email AS "Email", u.phone AS "Phone",
+                       u.role AS "Role", u."zoneId" AS "ZoneId", u."createdAt" AS "CreatedAt",
+                       u.provider AS "Provider", u.provider_user_id AS "ProviderUserId",
+                       p.id AS "ProfessionalId",
+                       COALESCE(p.mp_connected, false) AS "MpConnected"
+                FROM "User" u
+                LEFT JOIN professionals p ON p.user_id = u.id
+                WHERE u.email = {email}
                 LIMIT 1
             """)
             .FirstOrDefaultAsync(ct);
@@ -175,7 +181,7 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
                     """, ct);
                 byEmail = byEmail with { Provider = provider, ProviderUserId = providerUserId };
             }
-            return ToUserObject(byEmail);
+            return (ToUserObject(byEmail), false);
         }
 
         // 3. Create new user
@@ -188,13 +194,15 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             VALUES ({id}, {name}, {email}, {(string?)null}, {"cliente"}, {(string?)null}, {(string?)null}, {now}, {provider}, {providerUserId})
             """, ct);
 
-        return new
+        return (new
         {
             id, name, email, phone = (string?)null, role = "cliente",
             zoneId = (string?)null, createdAt = now,
             provider, providerUserId,
+            professionalId = (string?)null,
+            mpConnected = false,
             defaultAddress = (object?)null
-        };
+        }, true);
     }
 
     // ─── Múltiplos endereços (PRD-18a) ────────────────────────────────────────
@@ -297,7 +305,9 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
     {
         id = row.Id, name = row.Name, email = row.Email, phone = row.Phone,
         role = row.Role, zoneId = row.ZoneId, createdAt = row.CreatedAt,
-        provider = row.Provider, providerUserId = row.ProviderUserId
+        provider = row.Provider, providerUserId = row.ProviderUserId,
+        professionalId = row.ProfessionalId,
+        mpConnected = row.MpConnected,
     };
 
     // Internal record for raw SQL projection
@@ -333,5 +343,7 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         public DateTime CreatedAt { get; init; }
         public string? Provider { get; init; }
         public string? ProviderUserId { get; init; }
+        public string? ProfessionalId { get; init; }
+        public bool MpConnected { get; init; }
     }
 }

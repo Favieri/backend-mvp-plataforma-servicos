@@ -10,8 +10,24 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
     {
         // senha is not part of the User domain entity; project it via raw SQL to avoid exposing it elsewhere
         var row = await ctx.Database
-            .SqlQueryRaw<AuthRow>(
-                """SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone", role AS "Role", senha AS "Senha", "createdAt" AS "CreatedAt", provider AS "Provider", provider_user_id AS "ProviderUserId" FROM "User" WHERE email = {0}""",
+            .SqlQueryRaw<AuthRowWithProfessional>(
+                """
+                SELECT
+                    u.id                                    AS "Id",
+                    u.name                                  AS "Name",
+                    u.email                                 AS "Email",
+                    u.phone                                 AS "Phone",
+                    u.role                                  AS "Role",
+                    u.senha                                 AS "Senha",
+                    u."createdAt"                           AS "CreatedAt",
+                    u.provider                              AS "Provider",
+                    u.provider_user_id                      AS "ProviderUserId",
+                    p.id                                    AS "ProfessionalId",
+                    COALESCE(p.mp_connected, false)         AS "MpConnected"
+                FROM "User" u
+                LEFT JOIN professionals p ON p.user_id = u.id
+                WHERE u.email = {0}
+                """,
                 email)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
@@ -21,9 +37,6 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
         var valid = BCrypt.Net.BCrypt.Verify(password, row.Senha);
         if (!valid) return null;
 
-        // Retorna apenas dados do usuário. A geração de JWT é responsabilidade
-        // da camada de API (endpoint /auth em ApiEndpoints.cs) para manter
-        // separação de responsabilidades e evitar dependência de JWT na Infrastructure.
         return new
         {
             id = row.Id,
@@ -33,11 +46,13 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
             role = row.Role,
             createdAt = row.CreatedAt,
             provider = row.Provider,
-            providerUserId = row.ProviderUserId
+            providerUserId = row.ProviderUserId,
+            professionalId = row.ProfessionalId,
+            mpConnected = row.MpConnected,
         };
     }
 
-    private sealed class AuthRow
+    private sealed class AuthRowWithProfessional
     {
         public string Id { get; init; } = string.Empty;
         public string Name { get; init; } = string.Empty;
@@ -48,5 +63,7 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
         public DateTime CreatedAt { get; init; }
         public string? Provider { get; init; }
         public string? ProviderUserId { get; init; }
+        public string? ProfessionalId { get; init; }
+        public bool MpConnected { get; init; }
     }
 }
