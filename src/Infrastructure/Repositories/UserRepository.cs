@@ -148,7 +148,10 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             .FirstOrDefaultAsync(ct);
 
         if (existing is not null)
-            return (ToUserObject(existing), false);
+        {
+            var address = await GetDefaultAddressAsync(existing.Id, ct);
+            return (ToUserObject(existing, address), false);
+        }
 
         // 2. Search by email
         var byEmail = await ctx.Database
@@ -175,7 +178,8 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
                     """, ct);
                 byEmail = byEmail with { Provider = provider, ProviderUserId = providerUserId };
             }
-            return (ToUserObject(byEmail), false);
+            var addressByEmail = await GetDefaultAddressAsync(byEmail.Id, ct);
+            return (ToUserObject(byEmail, addressByEmail), false);
         }
 
         // 3. Create new user
@@ -293,11 +297,22 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         """, ct);
     }
 
-    private static object ToUserObject(SocialUserRow row) => new
+    private static object ToUserObject(SocialUserRow row, AddressDto? address = null) => new
     {
         id = row.Id, name = row.Name, email = row.Email, phone = row.Phone,
         role = row.Role, zoneId = row.ZoneId, createdAt = row.CreatedAt,
         provider = row.Provider, providerUserId = row.ProviderUserId,
+        defaultAddress = address is not null ? (object)new
+        {
+            zipCode = address.ZipCode,
+            street = address.Street,
+            number = address.Number,
+            neighborhood = address.Neighborhood,
+            city = address.City,
+            state = address.State,
+            complement = address.Complement,
+            reference = address.Reference
+        } : null
     };
 
     // Internal record for raw SQL projection

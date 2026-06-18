@@ -211,20 +211,37 @@ public static class ApiEndpoints
             var sRole   = sRoot.TryGetProperty("role", out var sRoleEl) ? sRoleEl.GetString() ?? "" : "";
             var sProfessionalId = await ResolveProfessionalIdAsync(ctx, sRole, sUserId, ct);
 
+            object? sgDefaultAddress = null;
+            if (sRoot.TryGetProperty("defaultAddress", out var sgAddrEl) && sgAddrEl.ValueKind == JsonValueKind.Object)
+            {
+                sgDefaultAddress = new
+                {
+                    zipCode      = sgAddrEl.TryGetProperty("zipCode",      out var p) ? p.GetString() : null,
+                    street       = sgAddrEl.TryGetProperty("street",       out p)     ? p.GetString() : null,
+                    number       = sgAddrEl.TryGetProperty("number",       out p)     ? p.GetString() : null,
+                    neighborhood = sgAddrEl.TryGetProperty("neighborhood", out p)     ? p.GetString() : null,
+                    city         = sgAddrEl.TryGetProperty("city",         out p)     ? p.GetString() : null,
+                    state        = sgAddrEl.TryGetProperty("state",        out p)     ? p.GetString() : null,
+                    complement   = sgAddrEl.TryGetProperty("complement",   out p)     ? p.GetString() : null,
+                    reference    = sgAddrEl.TryGetProperty("reference",    out p)     ? p.GetString() : null,
+                };
+            }
+
             return Results.Ok(new
             {
                 token,
                 isNewUser,
                 user = new
                 {
-                    id          = sUserId.Length > 0 ? sUserId : (string?)null,
-                    name        = sRoot.TryGetProperty("name",        out var sg_name)  ? sg_name.GetString()  : null,
-                    email       = sRoot.TryGetProperty("email",       out var sg_email) ? sg_email.GetString() : null,
-                    role        = sRoot.TryGetProperty("role",        out var sg_role)  ? sg_role.GetString()  : null,
-                    phone       = sRoot.TryGetProperty("phone",       out var sg_phone) ? sg_phone.GetString() : null,
-                    zoneId      = sRoot.TryGetProperty("zoneId",      out var sg_zone)  ? sg_zone.GetString()  : null,
-                    mpConnected = sRoot.TryGetProperty("mpConnected", out var sg_mp)    && sg_mp.GetBoolean(),
+                    id             = sUserId.Length > 0 ? sUserId : (string?)null,
+                    name           = sRoot.TryGetProperty("name",        out var sg_name)  ? sg_name.GetString()  : null,
+                    email          = sRoot.TryGetProperty("email",       out var sg_email) ? sg_email.GetString() : null,
+                    role           = sRoot.TryGetProperty("role",        out var sg_role)  ? sg_role.GetString()  : null,
+                    phone          = sRoot.TryGetProperty("phone",       out var sg_phone) ? sg_phone.GetString() : null,
+                    zoneId         = sRoot.TryGetProperty("zoneId",      out var sg_zone)  ? sg_zone.GetString()  : null,
+                    mpConnected    = sRoot.TryGetProperty("mpConnected", out var sg_mp)    && sg_mp.GetBoolean(),
                     professionalId = sProfessionalId,
+                    defaultAddress = sgDefaultAddress,
                 }
             });
         });
@@ -261,20 +278,37 @@ public static class ApiEndpoints
             var fRole   = fRoot.TryGetProperty("role", out var fRoleEl) ? fRoleEl.GetString() ?? "" : "";
             var fProfessionalId = await ResolveProfessionalIdAsync(ctx, fRole, fUserId, ct);
 
+            object? fbDefaultAddress = null;
+            if (fRoot.TryGetProperty("defaultAddress", out var fbAddrEl) && fbAddrEl.ValueKind == JsonValueKind.Object)
+            {
+                fbDefaultAddress = new
+                {
+                    zipCode      = fbAddrEl.TryGetProperty("zipCode",      out var p) ? p.GetString() : null,
+                    street       = fbAddrEl.TryGetProperty("street",       out p)     ? p.GetString() : null,
+                    number       = fbAddrEl.TryGetProperty("number",       out p)     ? p.GetString() : null,
+                    neighborhood = fbAddrEl.TryGetProperty("neighborhood", out p)     ? p.GetString() : null,
+                    city         = fbAddrEl.TryGetProperty("city",         out p)     ? p.GetString() : null,
+                    state        = fbAddrEl.TryGetProperty("state",        out p)     ? p.GetString() : null,
+                    complement   = fbAddrEl.TryGetProperty("complement",   out p)     ? p.GetString() : null,
+                    reference    = fbAddrEl.TryGetProperty("reference",    out p)     ? p.GetString() : null,
+                };
+            }
+
             return Results.Ok(new
             {
                 token,
                 isNewUser,
                 user = new
                 {
-                    id          = fUserId.Length > 0 ? fUserId : (string?)null,
-                    name        = fRoot.TryGetProperty("name",        out var fb_name)  ? fb_name.GetString()  : null,
-                    email       = fRoot.TryGetProperty("email",       out var fb_email) ? fb_email.GetString() : null,
-                    role        = fRoot.TryGetProperty("role",        out var fb_role)  ? fb_role.GetString()  : null,
-                    phone       = fRoot.TryGetProperty("phone",       out var fb_phone) ? fb_phone.GetString() : null,
-                    zoneId      = fRoot.TryGetProperty("zoneId",      out var fb_zone)  ? fb_zone.GetString()  : null,
-                    mpConnected = fRoot.TryGetProperty("mpConnected", out var fb_mp)    && fb_mp.GetBoolean(),
+                    id             = fUserId.Length > 0 ? fUserId : (string?)null,
+                    name           = fRoot.TryGetProperty("name",        out var fb_name)  ? fb_name.GetString()  : null,
+                    email          = fRoot.TryGetProperty("email",       out var fb_email) ? fb_email.GetString() : null,
+                    role           = fRoot.TryGetProperty("role",        out var fb_role)  ? fb_role.GetString()  : null,
+                    phone          = fRoot.TryGetProperty("phone",       out var fb_phone) ? fb_phone.GetString() : null,
+                    zoneId         = fRoot.TryGetProperty("zoneId",      out var fb_zone)  ? fb_zone.GetString()  : null,
+                    mpConnected    = fRoot.TryGetProperty("mpConnected", out var fb_mp)    && fb_mp.GetBoolean(),
                     professionalId = fProfessionalId,
+                    defaultAddress = fbDefaultAddress,
                 }
             });
         });
