@@ -138,14 +138,11 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         // 1. Search by provider + providerUserId
         var existing = await ctx.Database
             .SqlQuery<SocialUserRow>($"""
-                SELECT u.id AS "Id", u.name AS "Name", u.email AS "Email", u.phone AS "Phone",
-                       u.role AS "Role", u."zoneId" AS "ZoneId", u."createdAt" AS "CreatedAt",
-                       u.provider AS "Provider", u.provider_user_id AS "ProviderUserId",
-                       p.id AS "ProfessionalId",
-                       COALESCE(p.mp_connected, false) AS "MpConnected"
-                FROM "User" u
-                LEFT JOIN professionals p ON p.user_id = u.id
-                WHERE u.provider = {provider} AND u.provider_user_id = {providerUserId}
+                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
+                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
+                       provider AS "Provider", provider_user_id AS "ProviderUserId"
+                FROM "User"
+                WHERE provider = {provider} AND provider_user_id = {providerUserId}
                 LIMIT 1
             """)
             .FirstOrDefaultAsync(ct);
@@ -156,14 +153,11 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         // 2. Search by email
         var byEmail = await ctx.Database
             .SqlQuery<SocialUserRow>($"""
-                SELECT u.id AS "Id", u.name AS "Name", u.email AS "Email", u.phone AS "Phone",
-                       u.role AS "Role", u."zoneId" AS "ZoneId", u."createdAt" AS "CreatedAt",
-                       u.provider AS "Provider", u.provider_user_id AS "ProviderUserId",
-                       p.id AS "ProfessionalId",
-                       COALESCE(p.mp_connected, false) AS "MpConnected"
-                FROM "User" u
-                LEFT JOIN professionals p ON p.user_id = u.id
-                WHERE u.email = {email}
+                SELECT id AS "Id", name AS "Name", email AS "Email", phone AS "Phone",
+                       role AS "Role", "zoneId" AS "ZoneId", "createdAt" AS "CreatedAt",
+                       provider AS "Provider", provider_user_id AS "ProviderUserId"
+                FROM "User"
+                WHERE email = {email}
                 LIMIT 1
             """)
             .FirstOrDefaultAsync(ct);
@@ -199,8 +193,6 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             id, name, email, phone = (string?)null, role = "cliente",
             zoneId = (string?)null, createdAt = now,
             provider, providerUserId,
-            professionalId = (string?)null,
-            mpConnected = false,
             defaultAddress = (object?)null
         }, true);
     }
@@ -306,8 +298,6 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         id = row.Id, name = row.Name, email = row.Email, phone = row.Phone,
         role = row.Role, zoneId = row.ZoneId, createdAt = row.CreatedAt,
         provider = row.Provider, providerUserId = row.ProviderUserId,
-        professionalId = row.ProfessionalId,
-        mpConnected = row.MpConnected,
     };
 
     // Internal record for raw SQL projection
@@ -343,7 +333,5 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         public DateTime CreatedAt { get; init; }
         public string? Provider { get; init; }
         public string? ProviderUserId { get; init; }
-        public string? ProfessionalId { get; init; }
-        public bool MpConnected { get; init; }
     }
 }
