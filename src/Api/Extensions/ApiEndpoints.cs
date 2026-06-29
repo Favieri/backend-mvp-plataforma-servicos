@@ -161,19 +161,36 @@ public static class ApiEndpoints
                 token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
             }
 
+            object? r_defaultAddress = null;
+            if (root.TryGetProperty("defaultAddress", out var r_addrEl) && r_addrEl.ValueKind == JsonValueKind.Object)
+            {
+                r_defaultAddress = new
+                {
+                    zipCode      = r_addrEl.TryGetProperty("zipCode",      out var rp) ? rp.GetString() : null,
+                    street       = r_addrEl.TryGetProperty("street",       out rp)     ? rp.GetString() : null,
+                    number       = r_addrEl.TryGetProperty("number",       out rp)     ? rp.GetString() : null,
+                    neighborhood = r_addrEl.TryGetProperty("neighborhood", out rp)     ? rp.GetString() : null,
+                    city         = r_addrEl.TryGetProperty("city",         out rp)     ? rp.GetString() : null,
+                    state        = r_addrEl.TryGetProperty("state",        out rp)     ? rp.GetString() : null,
+                    complement   = r_addrEl.TryGetProperty("complement",   out rp)     ? rp.GetString() : null,
+                    reference    = r_addrEl.TryGetProperty("reference",    out rp)     ? rp.GetString() : null,
+                };
+            }
+
             return Results.Ok(new
             {
                 token,
                 user = new
                 {
-                    id          = userId.Length > 0 ? userId : (string?)null,
-                    name        = root.TryGetProperty("name",        out var r_name)  ? r_name.GetString()  : null,
-                    email       = root.TryGetProperty("email",       out var r_email) ? r_email.GetString() : null,
-                    role        = root.TryGetProperty("role",        out var r_role)  ? r_role.GetString()  : null,
-                    phone       = root.TryGetProperty("phone",       out var r_phone) ? r_phone.GetString() : null,
-                    zoneId      = root.TryGetProperty("zoneId",      out var r_zone)  ? r_zone.GetString()  : null,
-                    mpConnected = root.TryGetProperty("mpConnected", out var r_mp)    && r_mp.GetBoolean(),
+                    id             = userId.Length > 0 ? userId : (string?)null,
+                    name           = root.TryGetProperty("name",        out var r_name)  ? r_name.GetString()  : null,
+                    email          = root.TryGetProperty("email",       out var r_email) ? r_email.GetString() : null,
+                    role           = root.TryGetProperty("role",        out var r_role)  ? r_role.GetString()  : null,
+                    phone          = root.TryGetProperty("phone",       out var r_phone) ? r_phone.GetString() : null,
+                    zoneId         = root.TryGetProperty("zoneId",      out var r_zone)  ? r_zone.GetString()  : null,
+                    mpConnected    = root.TryGetProperty("mpConnected", out var r_mp)    && r_mp.GetBoolean(),
                     professionalId,
+                    defaultAddress = r_defaultAddress,
                 }
             });
         });
@@ -345,6 +362,17 @@ public static class ApiEndpoints
             return Results.Json(user, statusCode: 201);
         });
 
+        app.MapGet("/users/{id}", async (
+            string id,
+            IUserRepository repo,
+            CancellationToken ct) =>
+        {
+            var user = await repo.GetByIdAsync(id, ct);
+            return user is null
+                ? Results.Json(new { error = "Usuário não encontrado" }, statusCode: 404)
+                : Results.Ok(user);
+        });
+
         // ─── User default address ───────────────────────────────────────────────
         app.MapGet("/users/{id}/default-address", async (
             string id,
@@ -395,7 +423,8 @@ public static class ApiEndpoints
                 await repo.UpdateDefaultAddressAsync(id, body.DefaultAddress, ct);
             }
 
-            return Results.Ok(new { ok = true });
+            var updatedUser = await repo.GetByIdAsync(id, ct);
+            return Results.Ok(updatedUser);
         });
 
         // ─── GET /users/{id}/addresses ──────────────────────────────────────────
