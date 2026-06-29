@@ -115,7 +115,10 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
             """)
             .FirstOrDefaultAsync(ct);
 
-        return row is null ? null : ToUserObject(row);
+        if (row is null) return null;
+
+        var address = await GetDefaultAddressAsync(userId, ct);
+        return ToUserObject(row, address);
     }
 
     public async Task UpdateUserAsync(string userId, string? name, string? phone, string? zoneId, CancellationToken ct)
