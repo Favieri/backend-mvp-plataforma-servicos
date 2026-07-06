@@ -412,7 +412,11 @@ public static class ApiEndpoints
             if (user is null)
                 return Results.Json(new { error = "Usuário não encontrado" }, statusCode: 404);
 
-            await repo.UpdateUserAsync(id, body.Name?.Trim(), body.Phone?.Trim(), body.ZoneId?.Trim(), ct);
+            var trimmedZoneId = body.ZoneId?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmedZoneId) && !await repo.ZoneExistsAndActiveAsync(trimmedZoneId, ct))
+                return Results.Json(new { error = "zoneId inválido (zona inexistente ou inativa)" }, statusCode: 400);
+
+            await repo.UpdateUserAsync(id, body.Name?.Trim(), body.Phone?.Trim(), trimmedZoneId, ct);
 
             if (body.DefaultAddress is not null)
             {
