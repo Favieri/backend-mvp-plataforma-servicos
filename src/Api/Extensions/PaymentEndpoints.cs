@@ -68,7 +68,9 @@ public static class PaymentEndpoints
             if (existingPending is not null)
             {
                 var age = DateTime.UtcNow - existingPending.CreatedAt;
-                if (age.TotalMinutes < 30)
+                var remainingMinutes = 60 - age.TotalMinutes; // preference TTL é 60 min
+
+                if (remainingMinutes >= 10) // só reutiliza se sobram pelo menos 10 min de validade
                 {
                     // Retorna o mesmo preferenceId sem chamar o MP novamente
                     var amountReuse = existingPending.AmountCents;
@@ -94,9 +96,11 @@ public static class PaymentEndpoints
                     });
                 }
 
-                // Preference expirada — cancela o pendente anterior e cria um novo
+                // Preference expirada ou prestes a expirar — cancela o pendente anterior e cria um novo
                 await paymentRepo.CancelPendingByOrderIdAsync(body.OrderId, ct);
-                logger.LogInformation("[PaymentEndpoints] Cancelled expired pending payment for order {OrderId}", body.OrderId);
+                logger.LogInformation(
+                    "[PaymentEndpoints] Cancelled stale pending payment for order {OrderId} (age: {Age:F1} min)",
+                    body.OrderId, age.TotalMinutes);
             }
 
             // 4. Calcular valores e taxas por tier
