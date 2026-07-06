@@ -50,7 +50,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
         // MP processa datas em São Paulo (UTC-3) — usar DateTimeOffset com offset fixo
         var spOffset    = TimeSpan.FromHours(-3);
         var nowSp       = DateTimeOffset.UtcNow.ToOffset(spOffset);
-        var expiresAtSp = nowSp.AddMinutes(30);
+        var expiresAtSp = nowSp.AddMinutes(60);
 
         static string FormatMpDate(DateTimeOffset d) =>
             d.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
@@ -74,7 +74,7 @@ public sealed class MercadoPagoService : IMercadoPagoService
             {
                 email = _isSandbox ? "test@testuser.com" : (request.PayerEmail ?? "cliente@jobeasy.com.br")
             },
-            marketplace = _appId,
+            marketplace = $"MP-MKT-{_appId}",
             marketplace_fee = request.PlatformFeeCents / 100.0,
             back_urls = new
             {
@@ -96,6 +96,14 @@ public sealed class MercadoPagoService : IMercadoPagoService
             },
             statement_descriptor = "JOBEASY"
         };
+
+        _logger.LogDebug(
+            "[MpService] Creating preference. OrderId={OrderId} Amount={Amount} Fee={Fee} PayerEmail={Email} Marketplace={Marketplace}",
+            request.OrderId,
+            request.AmountCents / 100.0,
+            request.PlatformFeeCents / 100.0,
+            request.PayerEmail,
+            $"MP-MKT-{_appId}");
 
         using var response = await SendWithRetryAsync(
             () =>
