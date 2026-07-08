@@ -208,8 +208,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<bool>("MpConnected").IsRequired().HasColumnName("mpConnected").HasDefaultValue(false);
             b.Property<DateTime?>("MpConnectedAt").HasColumnName("mpConnectedAt");
             b.HasKey("Id");
-            b.HasIndex("Active", "Rating").HasDatabaseName("IX_Professional_active_rating");
+            b.HasIndex("Active", "Rating").IsDescending(false, true).HasDatabaseName("IX_Professional_active_rating");
             b.HasIndex("UserId").HasDatabaseName("IX_Professional_userId");
+            b.HasIndex("VerificationStatus").HasDatabaseName("IX_Professional_verificationStatus");
             b.HasIndex("MpConnected")
                 .HasFilter("\"mpConnected\" = true")
                 .HasDatabaseName("IX_Professional_mpConnected");

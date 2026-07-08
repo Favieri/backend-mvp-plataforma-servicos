@@ -1,0 +1,109 @@
+using System.Net.Http.Json;
+using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Xunit;
+
+namespace IntegrationTests;
+
+/// <summary>
+/// HTTP-level coverage for Item 1 (PRD Performance/Escalabilidade): GET /professionals must
+/// never return more than the default pageSize even when no page/pageSize params are sent.
+/// Swaps AppDbContext to SQLite in-memory (same approach as RepositoryTestBase) so the test
+/// doesn't require a live Postgres instance.
+/// </summary>
+public sealed class ProfessionalsPaginationEndpointTests : IClassFixture<ProfessionalsPaginationEndpointTests.ApiFactory>
+{
+    private readonly ApiFactory _factory;
+
+    public ProfessionalsPaginationEndpointTests(ApiFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task GetProfessionals_WithoutPageParams_NeverExceedsDefaultPageSize()
+    {
+        await _factory.SeedProfessionalsAsync(25);
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/professionals");
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<List<System.Text.Json.JsonElement>>();
+
+        Assert.NotNull(body);
+        Assert.True(body!.Count <= 20, $"Expected at most 20 items, got {body.Count}");
+        Assert.Equal("25", response.Headers.GetValues("X-Total-Count").Single());
+    }
+
+    public sealed class ApiFactory : WebApplicationFactory<Program>
+    {
+        private readonly SqliteConnection _connection = new("DataSource=:memory:");
+
+        public ApiFactory()
+        {
+            Environment.SetEnvironmentVariable("JWT_SECRET", "test-jwt-secret-test-jwt-secret");
+            Environment.SetEnvironmentVariable("STORAGE_BUCKET_NAME", "test-bucket");
+            Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "http://localhost");
+            _connection.Open();
+        }
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<DbContextOptions<AppDbContext>>();
+                services.RemoveAll<AppDbContext>();
+                services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
+            });
+        }
+
+        public async Task SeedProfessionalsAsync(int count)
+        {
+            using var scope = Services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Program.cs runs Database.MigrateAsync() unconditionally at host startup, which fails
+            // against SQLite (the migration history assumes Postgres tables already exist) and
+            // leaves the in-memory database without tables. Force a clean rebuild from the current
+            // model before seeding, mirroring RepositoryTestBase's EnsureCreated-only approach.
+            await ctx.Database.EnsureDeletedAsync();
+            await ctx.Database.EnsureCreatedAsync();
+
+            for (var i = 0; i < count; i++)
+            {
+                var userId = $"user{i}";
+                ctx.Users.Add(new User(userId, $"Pro {i}", $"pro{i}@test.com", null, "PROFESSIONAL", null, DateTime.UtcNow));
+                ctx.Professionals.Add(new Professional(
+                    Id: $"pro{i}",
+                    UserId: userId,
+                    Bio: null,
+                    Rating: i % 5,
+                    Active: true,
+                    AvatarUrl: null,
+                    AvailabilityText: null,
+                    CompletedJobsCount: 0,
+                    SlotMinutes: null,
+                    LeadTimeMinutes: null,
+                    MaxAdvanceDays: null,
+                    AllowInstantBooking: null));
+            }
+            await ctx.SaveChangesAsync();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                _connection.Dispose();
+            }
+        }
+    }
+}

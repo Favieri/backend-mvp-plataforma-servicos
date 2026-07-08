@@ -1,4 +1,5 @@
 using Application.Abstractions;
+using Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Persistence;
@@ -10,12 +11,14 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 {
     // ─── Legacy methods (backward compatible) ────────────────────────────────
 
-    public async Task<IReadOnlyList<Order>> GetOrdersAsync(
+    public async Task<PagedResult<Order>> GetOrdersAsync(
         string? serviceId,
         string? excludeProfessionalId,
         string? professionalId,
         bool filterZones,
         bool active,
+        int page,
+        int pageSize,
         CancellationToken ct)
     {
         var query = ctx.Orders.AsNoTracking();
@@ -28,7 +31,10 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             var terminalStatuses = OrderStatus.Terminal.ToList();
             query = query.Where(o => o.ProfessionalId == professionalId);
             query = query.Where(o => !terminalStatuses.Contains(o.Status));
-            return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
+            var activeTotal = await query.CountAsync(ct);
+            var activeItems = await query.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            return new PagedResult<Order>(activeItems, activeTotal);
         }
 
         query = query.Where(o => o.ProfessionalId == null);
@@ -55,7 +61,10 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
                     .Any(poi => poi.ProfessionalId == excludeProfessionalId && poi.OrderId == o.Id));
         }
 
-        return await query.OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
+        var totalCount = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        return new PagedResult<Order>(items, totalCount);
     }
 
     public async Task<Order?> GetByIdAsync(string id, CancellationToken ct)
@@ -83,14 +92,21 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             .Where(o => o.Id == orderId)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Concluido), ct);
 
-    public async Task<IReadOnlyList<object>> GetMineAsync(string clientId, CancellationToken ct)
+    public async Task<PagedResult<object>> GetMineAsync(string clientId, int page, int pageSize, CancellationToken ct)
     {
         // Inclui service.name, professional.name, location, totalCents e serviceAddress para que o
         // front-end possa exibir os dados completos na listagem de pedidos.
-        var rows = await ctx.Orders
+        var baseQuery = ctx.Orders
             .AsNoTracking()
-            .Where(o => o.ClientId == clientId)
+            .Where(o => o.ClientId == clientId);
+
+        var totalCount = await baseQuery.CountAsync(ct);
+
+        var rows = await baseQuery
             .OrderByDescending(o => o.CreatedAt)
+            .ThenBy(o => o.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(o => new
             {
                 id = o.Id,
@@ -128,7 +144,7 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             })
             .ToListAsync(ct);
 
-        return rows.Cast<object>().ToList();
+        return new PagedResult<object>(rows.Cast<object>().ToList(), totalCount);
     }
 
     // ─── Phase 1 methods ──────────────────────────────────────────────────────

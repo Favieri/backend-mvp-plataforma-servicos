@@ -27,7 +27,6 @@ public sealed class ProfessionalServiceDto
     public string ServiceId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public double? Price { get; init; }
-    public string? Description { get; init; }
     public int? TierId { get; init; }
     public string? ContractMode { get; init; }
     public string ContractModeResolved { get; init; } = "booking";

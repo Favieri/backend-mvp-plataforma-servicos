@@ -27,23 +27,26 @@ public static class ApiEndpoints
          //─── Public marketplace(cached) ───────────────────────────────────────
         // Phase 5: suporta filtros ?verificationStatus=verified&minRating=4.5 além dos filtros base
         app.MapGet("/professionals", async (
-            HttpRequest req,
+            HttpContext ctx,
             string? zoneId, string? serviceId,
             string? verificationStatus, double? minRating,
-            string? professionalId,
+            string? professionalId, int? page, int? pageSize,
             IProfessionalReadRepository repo, IMemoryCache cache, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("HomeEndpoints");
+            var effPage = ClampPage(page);
+            var effPageSize = ClampPageSize(pageSize);
             var hasExtraFilters = !string.IsNullOrWhiteSpace(verificationStatus) || minRating.HasValue;
             var cacheKey = hasExtraFilters
-                ? $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:vs={verificationStatus ?? "*"}:mr={minRating}:pro={professionalId ?? "*"}"
-                : $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:pro={professionalId ?? "*"}";
-            var professionals = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(req),
+                ? $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:vs={verificationStatus ?? "*"}:mr={minRating}:pro={professionalId ?? "*"}:pg={effPage}:ps={effPageSize}"
+                : $"professionals:{zoneId ?? "*"}:{serviceId ?? "*"}:pro={professionalId ?? "*"}:pg={effPage}:ps={effPageSize}";
+            var result = await GetOrCreateCachedAsync(cache, cacheKey, TimeSpan.FromSeconds(45), ShouldBypassCache(ctx.Request),
                 () => hasExtraFilters
-                    ? repo.GetProfessionalsFilteredAsync(zoneId, serviceId, verificationStatus, minRating, professionalId, ct)
-                    : repo.GetProfessionalsAsync(zoneId, serviceId, professionalId, ct),
+                    ? repo.GetProfessionalsFilteredAsync(zoneId, serviceId, verificationStatus, minRating, professionalId, effPage, effPageSize, ct)
+                    : repo.GetProfessionalsAsync(zoneId, serviceId, professionalId, effPage, effPageSize, ct),
                 logger, ct);
-            return Results.Ok(professionals);
+            SetPaginationHeaders(ctx.Response, result.TotalCount, effPage, effPageSize);
+            return Results.Ok(result.Items);
         });
 
         app.MapGet("/zones", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
@@ -92,7 +95,7 @@ public static class ApiEndpoints
                 {
                     // IProfessionalReadRepository e IServiceCatalogRepository compartilham o mesmo AppDbContext scoped.
                     // Executar queries em paralelo aqui dispara concorrência no DbContext (não thread-safe).
-                    var professionals = await repo.GetProfessionalsAsync(null, null, null, ct);
+                    var professionals = await repo.GetProfessionalsAsync(null, null, null, 1, DefaultPageSize, ct);
                     var zones = await repo.GetZonesAsync(ct);
                     var services = await repo.GetServicesAsync(ct);
                     var categoriesRaw = await catalog.GetCategoriesAsync(ct);
@@ -102,7 +105,7 @@ public static class ApiEndpoints
                     var tiers = tiersRaw.Select(t => new TierDto(
                         t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
                         t.AllowedPriceFormats)).ToList();
-                    return new HomeBootstrapDto(professionals, zones, services, categories, tiers);
+                    return new HomeBootstrapDto(professionals.Items, zones, services, categories, tiers);
                 }, logger, ct);
             return Results.Ok(bootstrap);
         });
@@ -568,8 +571,8 @@ public static class ApiEndpoints
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório." }, statusCode: 400);
 
-            var professional = await professionalRepo.GetByIdAsync(professionalId, ct);
-            if (professional is null)
+            var professionalExists = await professionalRepo.ExistsAsync(professionalId, ct);
+            if (!professionalExists)
                 return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
 
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
@@ -583,8 +586,8 @@ public static class ApiEndpoints
             if (string.IsNullOrWhiteSpace(publicUrl))
                 return Results.Json(new { error = "Falha no upload." }, statusCode: 500);
 
-            var updated = await professionalRepo.UpdateAsync(professionalId, bio: null, active: null, availabilityText: null, avatarUrl: publicUrl, ct: ct);
-            if (updated is null)
+            var updated = await professionalRepo.UpdateAvatarUrlAsync(professionalId, publicUrl, ct);
+            if (!updated)
                 return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
 
             return Results.Ok(new { ok = true, avatarUrl = publicUrl });
@@ -686,17 +689,20 @@ public static class ApiEndpoints
         // que enviam valores numéricos em query params (ex: filterZones=1).
         app.MapGet("/orders", async (
             HttpContext ctx, IMemoryCache cache, string? serviceId, string? excludeProfessionalId,
-            string? professionalId, string? filterZones, string? active,
+            string? professionalId, string? filterZones, string? active, int? page, int? pageSize,
             IOrderRepository repo, AppDbContext dbCtx, CancellationToken ct) =>
         {
-            var cacheKey = $"orders:svc={serviceId ?? "*"}:excl={excludeProfessionalId ?? "*"}:pro={professionalId ?? "*"}:fz={filterZones ?? "0"}:act={active ?? "0"}";
+            var effPage = ClampPage(page);
+            var effPageSize = ClampPageSize(pageSize);
+            var cacheKey = $"orders:svc={serviceId ?? "*"}:excl={excludeProfessionalId ?? "*"}:pro={professionalId ?? "*"}:fz={filterZones ?? "0"}:act={active ?? "0"}:pg={effPage}:ps={effPageSize}";
 
-            var orders = await GetOrCreateCachedAsync(
+            var paged = await GetOrCreateCachedAsync(
                 cache, cacheKey, TimeSpan.FromSeconds(30), ShouldBypassCache(ctx.Request),
                 () => repo.GetOrdersAsync(serviceId, excludeProfessionalId, professionalId,
-                                          ParseBoolParam(filterZones), ParseBoolParam(active), ct),
+                                          ParseBoolParam(filterZones), ParseBoolParam(active), effPage, effPageSize, ct),
                 logger: null, ct);
 
+            var orders = paged.Items;
             var orderIds = orders.Select(o => o.Id).ToArray();
             var reviewByOrder = new Dictionary<string, (string Id, int Rating)>();
             if (orderIds.Length > 0)
@@ -771,6 +777,7 @@ public static class ApiEndpoints
                 };
             }).ToList();
 
+            SetPaginationHeaders(ctx.Response, paged.TotalCount, effPage, effPageSize);
             return Results.Ok(result);
         });
 
@@ -783,10 +790,17 @@ public static class ApiEndpoints
             return Results.Json(created, statusCode: 201);
         });
 
-        app.MapGet("/orders/mine", async (string clientId, IOrderRepository repo, CancellationToken ct) =>
-            string.IsNullOrWhiteSpace(clientId)
-                ? Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400)
-                : Results.Ok(await repo.GetMineAsync(clientId, ct)));
+        app.MapGet("/orders/mine", async (HttpContext ctx, string clientId, int? page, int? pageSize, IOrderRepository repo, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(clientId))
+                return Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400);
+
+            var effPage = ClampPage(page);
+            var effPageSize = ClampPageSize(pageSize);
+            var paged = await repo.GetMineAsync(clientId, effPage, effPageSize, ct);
+            SetPaginationHeaders(ctx.Response, paged.TotalCount, effPage, effPageSize);
+            return Results.Ok(paged.Items);
+        });
 
         app.MapPost("/orders/{id}/complete", async (string id, CompleteOrderRequest _, IOrderRepository repo, CancellationToken ct) =>
         {
@@ -1504,6 +1518,21 @@ public static class ApiEndpoints
     private static bool ShouldBypassCache(HttpRequest req)
         => req.Headers.TryGetValue("Cache-Control", out var values)
            && values.Any(v => v?.Contains("no-cache", StringComparison.OrdinalIgnoreCase) == true);
+
+    // ─── Pagination helpers (PRD Performance/Escalabilidade — Item 1) ─────────
+    private const int DefaultPageSize = 20;
+    private const int MaxPageSize = 50;
+
+    private static int ClampPage(int? page) => page is > 0 ? page.Value : 1;
+
+    private static int ClampPageSize(int? pageSize) => pageSize is > 0 ? Math.Min(pageSize.Value, MaxPageSize) : DefaultPageSize;
+
+    private static void SetPaginationHeaders(HttpResponse response, int totalCount, int page, int pageSize)
+    {
+        response.Headers["X-Total-Count"] = totalCount.ToString();
+        response.Headers["X-Page"] = page.ToString();
+        response.Headers["X-Page-Size"] = pageSize.ToString();
+    }
 
     private static async Task<SendMessageRequest?> ParseSendMessageRequestAsync(HttpRequest req, CancellationToken ct)
     {

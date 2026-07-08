@@ -7,16 +7,18 @@ namespace Infrastructure.Repositories;
 
 public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessionalReadRepository
 {
-    public Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsAsync(
-        string? zoneId, string? serviceId, string? professionalId, CancellationToken ct)
-        => GetProfessionalsFilteredAsync(zoneId, serviceId, null, null, professionalId, ct);
+    public Task<PagedResult<ProfessionalCardDto>> GetProfessionalsAsync(
+        string? zoneId, string? serviceId, string? professionalId, int page, int pageSize, CancellationToken ct)
+        => GetProfessionalsFilteredAsync(zoneId, serviceId, null, null, professionalId, page, pageSize, ct);
 
-    public async Task<IReadOnlyList<ProfessionalCardDto>> GetProfessionalsFilteredAsync(
+    public async Task<PagedResult<ProfessionalCardDto>> GetProfessionalsFilteredAsync(
         string? zoneId,
         string? serviceId,
         string? verificationStatus,
         double? minRating,
         string? professionalId,
+        int page,
+        int pageSize,
         CancellationToken ct)
     {
         var query =
@@ -52,8 +54,13 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             query = query.Where(x => x.p.Id == professionalId);
         }
 
+        var totalCount = await query.CountAsync(ct);
+
         var professionals = await query
-            .OrderBy(x => x.p.Id)
+            .OrderByDescending(x => x.p.Rating)
+            .ThenBy(x => x.p.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(x => new
             {
                 x.p.Id,
@@ -73,7 +80,7 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             .ToListAsync(ct);
 
         if (professionals.Count == 0)
-            return [];
+            return new PagedResult<ProfessionalCardDto>([], totalCount);
 
         var professionalIds = professionals.Select(x => x.Id).Distinct().ToArray();
 
@@ -88,7 +95,6 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     ps.ServiceId,
                     Name = ps.NomeServico ?? string.Empty,
                     Price = ps.Preco,
-                    Description = ps.Descricao,
                     Icon = s.Icon,
                     ps.TierId,
                     ps.ContractMode,
@@ -115,7 +121,6 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                     ServiceId = x.ServiceId,
                     Name = x.Name,
                     Price = x.Price,
-                    Description = x.Description,
                     TierId = x.TierId,
                     ContractMode = x.ContractMode,
                     ContractModeResolved = x.ContractMode != null
@@ -137,7 +142,7 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
                 g => (IReadOnlyList<ZoneDto>)g.Select(x => new ZoneDto(x.ZoneId, x.ZoneName)).ToList(),
                 StringComparer.Ordinal);
 
-        return professionals.Select(p => new ProfessionalCardDto
+        var cards = professionals.Select(p => new ProfessionalCardDto
         {
             Id = p.Id,
             UserId = p.UserId,
@@ -157,6 +162,8 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             Services = servicesByProfessional.GetValueOrDefault(p.Id) ?? [],
             Zones = zonesByProfessional.GetValueOrDefault(p.Id) ?? []
         }).ToList();
+
+        return new PagedResult<ProfessionalCardDto>(cards, totalCount);
     }
 
     public async Task<IReadOnlyList<ZoneDto>> GetZonesAsync(CancellationToken ct)

@@ -47,7 +47,8 @@ public sealed class ProfessionalConfiguration : IEntityTypeConfiguration<Profess
         builder.Property(x => x.MpConnectedAt).HasColumnName("mpConnectedAt");
 
         builder.HasIndex(x => x.UserId);
-        builder.HasIndex(x => new { x.Active, x.Rating });
+        builder.HasIndex(x => new { x.Active, x.Rating }).IsDescending(false, true);
+        builder.HasIndex(x => x.VerificationStatus);
         // Partial index: fast lookup for professionals eligible to receive MP payments
         builder.HasIndex(x => x.MpConnected).HasFilter("\"mpConnected\" = true");
     }
