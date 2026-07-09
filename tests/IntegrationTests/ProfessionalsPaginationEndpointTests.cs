@@ -12,8 +12,10 @@ using Xunit;
 namespace IntegrationTests;
 
 /// <summary>
-/// HTTP-level coverage for Item 1 (PRD Performance/Escalabilidade): GET /professionals must
-/// never return more than the default pageSize even when no page/pageSize params are sent.
+/// HTTP-level coverage for Item 1 (PRD Paginação real em GET /professionals): the endpoint must
+/// never return more than the default pageSize even when no page/pageSize params are sent, and
+/// must respond with the paginated envelope { items, total, page, pageSize, totalPages } used
+/// elsewhere in the API (see GET /wallet/ledger).
 /// Swaps AppDbContext to SQLite in-memory (same approach as RepositoryTestBase) so the test
 /// doesn't require a live Postgres instance.
 /// </summary>
@@ -35,11 +37,32 @@ public sealed class ProfessionalsPaginationEndpointTests : IClassFixture<Profess
         var response = await client.GetAsync("/professionals");
         response.EnsureSuccessStatusCode();
 
-        var body = await response.Content.ReadFromJsonAsync<List<System.Text.Json.JsonElement>>();
+        var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
 
-        Assert.NotNull(body);
-        Assert.True(body!.Count <= 20, $"Expected at most 20 items, got {body.Count}");
+        var items = body.GetProperty("items");
+        Assert.True(items.GetArrayLength() <= 20, $"Expected at most 20 items, got {items.GetArrayLength()}");
+        Assert.Equal(25, body.GetProperty("total").GetInt32());
+        Assert.Equal(1, body.GetProperty("page").GetInt32());
+        Assert.Equal(20, body.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, body.GetProperty("totalPages").GetInt32());
         Assert.Equal("25", response.Headers.GetValues("X-Total-Count").Single());
+    }
+
+    [Fact]
+    public async Task GetProfessionals_Page2_ReturnsRemainder()
+    {
+        await _factory.SeedProfessionalsAsync(25);
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/professionals?page=2&pageSize=20");
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+        var items = body.GetProperty("items");
+        Assert.Equal(5, items.GetArrayLength());
+        Assert.Equal(25, body.GetProperty("total").GetInt32());
+        Assert.Equal(2, body.GetProperty("page").GetInt32());
     }
 
     public sealed class ApiFactory : WebApplicationFactory<Program>
