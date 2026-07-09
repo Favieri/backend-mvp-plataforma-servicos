@@ -13,6 +13,9 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
     public async Task<bool> ProfessionalExistsByUserIdAsync(string userId, CancellationToken ct)
         => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.UserId == userId, ct);
 
+    public async Task<bool> ExistsAsync(string id, CancellationToken ct)
+        => await ctx.Professionals.AsNoTracking().AnyAsync(p => p.Id == id, ct);
+
     public async Task<bool> ZonesExistAndActiveAsync(string[] zoneIds, CancellationToken ct)
     {
         if (zoneIds.Length == 0) return true;
@@ -194,6 +197,14 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
                 .SetProperty(p => p.AvatarUrl, newAvatarUrl), ct);
 
         return await GetByIdAsync(id, ct);
+    }
+
+    public async Task<bool> UpdateAvatarUrlAsync(string id, string avatarUrl, CancellationToken ct)
+    {
+        var rows = await ctx.Professionals
+            .Where(p => p.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.AvatarUrl, avatarUrl), ct);
+        return rows > 0;
     }
 
     public async Task<IReadOnlyList<object>> GetZonesAsync(string professionalId, CancellationToken ct)

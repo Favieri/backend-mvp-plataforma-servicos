@@ -73,8 +73,8 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         await _repo.CreateAsync("client1", "svc1", null, null, null, CancellationToken.None);
         await _repo.CreateAsync("client1", "svc2", null, null, null, CancellationToken.None);
 
-        var result = await _repo.GetOrdersAsync("svc1", null, null, false, false, CancellationToken.None);
-        Assert.All(result, o => Assert.Equal("svc1", o.ServiceId));
+        var result = await _repo.GetOrdersAsync("svc1", null, null, false, false, 1, 20, CancellationToken.None);
+        Assert.All(result.Items, o => Assert.Equal("svc1", o.ServiceId));
     }
 
     [Fact]
@@ -97,10 +97,10 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
             scheduledAt: DateTime.UtcNow.AddDays(1));
         await _repo.CreateBookingAsync(taken, CancellationToken.None);
 
-        var leads = await _repo.GetOrdersAsync(null, null, null, false, false, CancellationToken.None);
+        var leads = await _repo.GetOrdersAsync(null, null, null, false, false, 1, 20, CancellationToken.None);
 
-        Assert.DoesNotContain(leads, o => o.Id == taken.Id);
-        Assert.Contains(leads, o => o.Description == "open order");
+        Assert.DoesNotContain(leads.Items, o => o.Id == taken.Id);
+        Assert.Contains(leads.Items, o => o.Description == "open order");
     }
 
     [Fact]
@@ -112,8 +112,8 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         await _repo.CreateAsync("client1", "svc1", null, null, null, CancellationToken.None);
         await _repo.CreateAsync("client2", "svc1", null, null, null, CancellationToken.None);
 
-        var result = await _repo.GetMineAsync("client1", CancellationToken.None);
-        Assert.Single(result);
+        var result = await _repo.GetMineAsync("client1", 1, 20, CancellationToken.None);
+        Assert.Single(result.Items);
     }
 
     [Fact]
@@ -123,8 +123,29 @@ public sealed class OrderRepositoryTests : RepositoryTestBase
         await Task.Delay(10); // ensure time difference
         await _repo.CreateAsync("client1", "svc1", "second", null, null, CancellationToken.None);
 
-        var result = await _repo.GetOrdersAsync(null, null, null, false, true, CancellationToken.None);
-        Assert.True(result[0].CreatedAt >= result[1].CreatedAt);
+        var result = await _repo.GetOrdersAsync(null, null, null, false, true, 1, 20, CancellationToken.None);
+        Assert.True(result.Items[0].CreatedAt >= result.Items[1].CreatedAt);
+    }
+
+    [Fact]
+    public async Task GetOrdersAsync_Page2_ReturnsRemainder_WithNoOverlapWithPage1()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await _repo.CreateAsync("client1", "svc1", $"order{i}", null, null, CancellationToken.None);
+        }
+
+        var page1 = await _repo.GetOrdersAsync(null, null, null, false, false, 1, 2, CancellationToken.None);
+        var page2 = await _repo.GetOrdersAsync(null, null, null, false, false, 2, 2, CancellationToken.None);
+
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(5, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(o => o.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(o => o.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
     }
 
     // ─── Phase 1 Tests ────────────────────────────────────────────────────────

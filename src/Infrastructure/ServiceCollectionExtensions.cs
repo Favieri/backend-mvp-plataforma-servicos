@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Application.Abstractions;
 using Application.Services;
 using Infrastructure.Data;
@@ -111,6 +112,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
         services.AddScoped<IOrderIgnoreRepository, OrderIgnoreRepository>();
+        // Cliente S3 reutilizável (thread-safe por design da AWS SDK) — evita reconstruir
+        // handler HTTP/credenciais a cada upload de avatar.
+        services.AddSingleton<IAmazonS3>(_ =>
+        {
+            var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+            var s3Config = new AmazonS3Config
+            {
+                ServiceURL     = $"https://s3.{region}.amazonaws.com",
+                ForcePathStyle = false
+            };
+            return new AmazonS3Client(s3Config);
+        });
         services.AddScoped<IAvatarStorageRepository, AvatarStorageRepository>();
 
         // Service catalog (tiers + categories)

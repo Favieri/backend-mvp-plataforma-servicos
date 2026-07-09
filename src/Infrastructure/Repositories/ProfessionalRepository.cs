@@ -110,8 +110,7 @@ public sealed class ProfessionalRepository(AppDbContext ctx) : IProfessionalRepo
                     Id = s.Id,
                     ServiceId = s.ServiceId,
                     Name = s.Name ?? string.Empty,
-                    Price = s.Price,
-                    Description = s.Descricao
+                    Price = s.Price
                 }).ToList(),
                 StringComparer.Ordinal);
 

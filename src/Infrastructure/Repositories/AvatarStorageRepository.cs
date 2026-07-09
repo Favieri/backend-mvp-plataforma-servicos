@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 namespace Infrastructure.Repositories;
 
 public sealed class AvatarStorageRepository(
+    IAmazonS3 s3,
     ILogger<AvatarStorageRepository> logger) : IAvatarStorageRepository
 {
     public async Task<string?> UploadProfessionalAvatarAsync(
@@ -33,15 +34,6 @@ public sealed class AvatarStorageRepository(
 
         try
         {
-            // AmazonS3Config com ServiceURL explícita elimina ambiguidade de região
-            var config = new AmazonS3Config
-            {
-                ServiceURL     = $"https://s3.{region}.amazonaws.com",
-                ForcePathStyle = false
-            };
-
-            using var s3 = new AmazonS3Client(config);
-
             var request = new PutObjectRequest
             {
                 BucketName  = bucketName,

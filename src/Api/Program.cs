@@ -7,11 +7,13 @@ using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Formatting.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
+using System.IO.Compression;
 
 // Required for Npgsql timestamp compatibility: maps timestamptz columns to DateTime (not DateTimeOffset)
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -52,7 +54,13 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddMemoryCache();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/json"]);
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("mp-callback", o =>
@@ -71,6 +79,11 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Compressão deve ser o primeiro middleware, envolvendo toda a pipeline (inclusive respostas
+// geradas por CORS/rotas/erros abaixo). API Gateway HTTP API v2 não faz compressão no gateway
+// (diferente de REST API v1), então precisa ser feita aqui.
+app.UseResponseCompression();
 
 // CORS deve rodar cedo no pipeline para garantir headers em respostas geradas
 // por middlewares anteriores aos endpoints (incluindo falhas 500).
@@ -160,7 +173,7 @@ static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrig
         policy.WithOrigins("https://placeholder-nenhuma-origem-configurada.invalid")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .WithExposedHeaders("x-correlation-id");
+              .WithExposedHeaders("x-correlation-id", "X-Total-Count", "X-Page", "X-Page-Size");
         return;
     }
 
@@ -170,14 +183,14 @@ static void ConfigureCorsPolicy(CorsPolicyBuilder policy, string? configuredOrig
         policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .WithExposedHeaders("x-correlation-id");
+              .WithExposedHeaders("x-correlation-id", "X-Total-Count", "X-Page", "X-Page-Size");
         return;
     }
 
     policy.WithOrigins(origins)
           .AllowAnyHeader()
           .AllowAnyMethod()
-          .WithExposedHeaders("x-correlation-id");
+          .WithExposedHeaders("x-correlation-id", "X-Total-Count", "X-Page", "X-Page-Size");
 
     if (origins.Any(o => o.Contains('*')))
         policy.SetIsOriginAllowedToAllowWildcardSubdomains();
