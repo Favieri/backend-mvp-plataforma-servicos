@@ -7,6 +7,7 @@ public sealed class ProfessionalCardDto
     public string Name { get; init; } = string.Empty;
     public string? AvatarUrl { get; init; }
     public double? Rating { get; init; }
+    public int ReviewCount { get; init; }
     public bool Active { get; init; }
     public int? CompletedJobsCount { get; init; }
     public string? AvailabilityText { get; init; }
