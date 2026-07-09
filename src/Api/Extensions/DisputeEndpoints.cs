@@ -258,9 +258,9 @@ public static class DisputeEndpoints
             });
         });
 
-        // GET /disputes — list by professional or client
+        // GET /disputes — list by professional or client (admin: list all, optionally filtered by status)
         app.MapGet("/disputes", async (
-            string? professionalId, string? clientId, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
+            string? professionalId, string? clientId, string? status, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
         {
             var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
             if (string.IsNullOrWhiteSpace(jwtUserId))
@@ -286,6 +286,10 @@ public static class DisputeEndpoints
                     clientId = jwtUserId;
                 return Results.Ok(await repo.GetByClientAsync(clientId, ct));
             }
+
+            // Sem filtro: só admin pode listar tudo (opcionalmente filtrando por status)
+            if (isAdmin)
+                return Results.Ok(await repo.GetAllAsync(status, ct));
 
             return Results.Json(new { error = "professionalId ou clientId é obrigatório" }, statusCode: 400);
         });

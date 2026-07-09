@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.Abstractions;
 using Application.DTOs;
 using Application.Services;
@@ -71,8 +72,7 @@ public static class OrderEndpoints
                     .FirstOrDefaultAsync(ct)
                 : null;
 
-            var jwtRole = context.User?.FindFirst("role")?.Value ?? "";
-            var isAdmin = string.Equals(jwtRole, "admin", StringComparison.OrdinalIgnoreCase);
+            var isAdmin = AuthorizationHelpers.IsAdmin(context);
             var isOrderClient = order.ClientId == jwtUserId;
             var isOrderProfessional = professional?.userId == jwtUserId || professional?.id == jwtUserId;
             if (!isOrderClient && !isOrderProfessional && !isAdmin)

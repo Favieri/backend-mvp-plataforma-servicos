@@ -273,10 +273,14 @@ public static class PaymentEndpoints
         app.MapPost("/payments/{orderId}/refund", async (
             string orderId,
             RefundOrderRequest body,
+            HttpContext context,
             IRefundService refundService,
             ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            if (AuthorizationHelpers.RequireAdmin(context) is { } authError)
+                return authError;
+
             var logger = loggerFactory.CreateLogger("PaymentEndpoints");
 
             if (string.IsNullOrWhiteSpace(body.Reason))

@@ -8,6 +8,7 @@ public interface IDisputeRepository
     Task<Dispute?> GetByOrderIdAsync(string orderId, CancellationToken ct);
     Task<IReadOnlyList<object>> GetByProfessionalAsync(string professionalId, CancellationToken ct);
     Task<IReadOnlyList<object>> GetByClientAsync(string clientId, CancellationToken ct);
+    Task<IReadOnlyList<object>> GetAllAsync(string? status, CancellationToken ct);
     Task<Dispute> CreateAsync(Dispute dispute, CancellationToken ct);
     Task<bool> AddProfessionalResponseAsync(string id, string response, string? evidenceUrls, CancellationToken ct);
     Task<bool> ResolveAsync(string id, string resolution, string resolvedBy, int? refundAmountCents, CancellationToken ct);
