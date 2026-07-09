@@ -111,6 +111,13 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             select new { pz.ProfessionalId, ZoneId = z.Id, ZoneName = z.Name }
         ).ToListAsync(ct);
 
+        var reviewCountsByProfessional = await ctx.Reviews
+            .AsNoTracking()
+            .Where(r => professionalIds.Contains(r.ProfessionalId))
+            .GroupBy(r => r.ProfessionalId)
+            .Select(g => new { ProfessionalId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.ProfessionalId, g => g.Count, StringComparer.Ordinal, ct);
+
         var servicesByProfessional = serviceRows
             .GroupBy(x => x.ProfessionalId, StringComparer.Ordinal)
             .ToDictionary(
@@ -149,6 +156,7 @@ public sealed class ProfessionalReadRepository(AppDbContext ctx) : IProfessional
             Name = p.Name,
             AvatarUrl = p.AvatarUrl,
             Rating = p.Rating,
+            ReviewCount = reviewCountsByProfessional.GetValueOrDefault(p.Id),
             Active = p.Active,
             CompletedJobsCount = p.CompletedJobsCount,
             AvailabilityText = p.AvailabilityText,
