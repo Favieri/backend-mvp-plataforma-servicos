@@ -5,6 +5,8 @@ Description: Jobeasy API (.NET 8 Minimal API + Lambda HTTP API v2)
 Globals:
   Function:
     Runtime: dotnet8
+    Architectures:
+      - arm64
     Timeout: 30
     MemorySize: 512
     Environment:
@@ -122,6 +124,18 @@ Parameters:
     Default: ''
     Description: "URL base do API Gateway (ex: https://xxx.execute-api.sa-east-1.amazonaws.com)"
 
+  # ── Performance / Provisioned Concurrency (desligado por padrão) ─────────────
+  ProvisionedConcurrencyCount:
+    Type: Number
+    Default: 0
+    Description: >
+      Número de instâncias quentes mantidas pelo Provisioned Concurrency.
+      0 = desabilitado (custo zero, comportamento atual). Para habilitar,
+      defina um valor > 0 (ex.: 5 ou 10) e reimplante.
+
+Conditions:
+  EnableProvisionedConcurrency: !Not [!Equals [!Ref ProvisionedConcurrencyCount, 0]]
+
 Resources:
   JobeasyHttpApi:
     Type: AWS::Serverless::HttpApi
@@ -133,6 +147,11 @@ Resources:
     Properties:
       CodeUri: ../../
       Handler: Api
+      AutoPublishAlias: live
+      ProvisionedConcurrencyConfig: !If
+        - EnableProvisionedConcurrency
+        - ProvisionedConcurrentExecutions: !Ref ProvisionedConcurrencyCount
+        - !Ref AWS::NoValue
       Environment:
         Variables:
           # Mercado Pago fora de Globals pois usa chave com __ (seção aninhada ASP.NET)
