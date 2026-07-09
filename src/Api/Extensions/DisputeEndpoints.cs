@@ -1,6 +1,9 @@
+using Api.Security;
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -8,23 +11,43 @@ namespace Api.Extensions;
 
 public static class DisputeEndpoints
 {
+    private static async Task<bool> IsDisputePartyOrAdminAsync(
+        HttpContext context, Dispute dispute, AppDbContext ctx, CancellationToken ct)
+    {
+        if (AuthorizationHelpers.IsAdmin(context))
+            return true;
+
+        var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+        if (string.IsNullOrWhiteSpace(jwtUserId))
+            return false;
+
+        if (dispute.ClientId == jwtUserId)
+            return true;
+
+        return await ctx.Professionals.AsNoTracking()
+            .AnyAsync(p => p.Id == dispute.ProfessionalId && (p.UserId == jwtUserId || p.Id == jwtUserId), ct);
+    }
+
     public static IEndpointRouteBuilder MapDisputeEndpoints(this IEndpointRouteBuilder app)
     {
         // POST /disputes — open a dispute (client)
-        app.MapPost("/disputes", async (OpenDisputeRequest body, IDisputeRepository repo, IOrderRepository orderRepo, CancellationToken ct) =>
+        app.MapPost("/disputes", async (
+            OpenDisputeRequest body, HttpContext context, IDisputeRepository repo, IOrderRepository orderRepo, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.OrderId))
                 return Results.Json(new { error = "orderId é obrigatório" }, statusCode: 400);
-            if (string.IsNullOrWhiteSpace(body.ClientId))
-                return Results.Json(new { error = "clientId é obrigatório" }, statusCode: 400);
             if (string.IsNullOrWhiteSpace(body.Reason))
                 return Results.Json(new { error = "reason é obrigatório" }, statusCode: 400);
 
-            // Ensure order exists and belongs to client
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
+
+            // Ensure order exists and belongs to the authenticated client
             var order = await orderRepo.GetByIdAsync(body.OrderId, ct);
             if (order is null)
                 return Results.Json(new { error = "Pedido não encontrado" }, statusCode: 404);
-            if (order.ClientId != body.ClientId)
+            if (order.ClientId != jwtUserId)
                 return Results.Json(new { error = "Pedido não pertence a este cliente" }, statusCode: 403);
 
             // Only orders in awaiting_confirmation or disputed-eligible states can be disputed
@@ -52,7 +75,7 @@ public static class DisputeEndpoints
             var dispute = Dispute.Open(
                 id: Guid.NewGuid().ToString(),
                 orderId: body.OrderId,
-                clientId: body.ClientId,
+                clientId: jwtUserId,
                 professionalId: professionalId,
                 reason: body.Reason.Trim(),
                 description: body.Description?.Trim(),
@@ -74,17 +97,19 @@ public static class DisputeEndpoints
         });
 
         // PUT /disputes/{id}/respond — professional responds
-        app.MapPut("/disputes/{id}/respond", async (string id, RespondDisputeRequest body, IDisputeRepository repo, CancellationToken ct) =>
+        app.MapPut("/disputes/{id}/respond", async (
+            string id, RespondDisputeRequest body, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(body.ProfessionalId))
-                return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
             if (string.IsNullOrWhiteSpace(body.Response))
                 return Results.Json(new { error = "response é obrigatório" }, statusCode: 400);
 
             var dispute = await repo.GetByIdAsync(id, ct);
             if (dispute is null)
                 return Results.NotFound(new { error = "Disputa não encontrada" });
-            if (dispute.ProfessionalId != body.ProfessionalId)
+
+            var professional = await ctx.Professionals.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == dispute.ProfessionalId, ct);
+            if (professional is null || !AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
                 return Results.Json(new { error = "Não autorizado" }, statusCode: 403);
             if (dispute.Status != Domain.Enums.DisputeStatus.Opened)
                 return Results.Json(new { error = $"Disputa no status '{dispute.Status}' não aceita resposta" }, statusCode: 422);
@@ -102,6 +127,7 @@ public static class DisputeEndpoints
         app.MapPut("/disputes/{id}/resolve", async (
             string id,
             ResolveDisputeRequest body,
+            HttpContext context,
             IDisputeRepository repo,
             IPaymentRepository paymentRepo,
             ILedgerRepository ledgerRepo,
@@ -111,10 +137,14 @@ public static class DisputeEndpoints
         {
             var logger = loggerFactory.CreateLogger("DisputeEndpoints");
 
+            var adminError = AuthorizationHelpers.RequireAdmin(context);
+            if (adminError is not null)
+                return adminError;
+
             if (string.IsNullOrWhiteSpace(body.Resolution))
                 return Results.Json(new { error = "resolution é obrigatório" }, statusCode: 400);
-            if (string.IsNullOrWhiteSpace(body.ResolvedBy))
-                return Results.Json(new { error = "resolvedBy é obrigatório" }, statusCode: 400);
+
+            var resolvedBy = AuthorizationHelpers.GetJwtUserId(context)!;
 
             var dispute = await repo.GetByIdAsync(id, ct);
             if (dispute is null)
@@ -122,7 +152,7 @@ public static class DisputeEndpoints
             if (Domain.Enums.DisputeStatus.Terminal.Contains(dispute.Status))
                 return Results.Json(new { error = "Disputa já encerrada" }, statusCode: 422);
 
-            await repo.ResolveAsync(id, body.Resolution.Trim(), body.ResolvedBy.Trim(), body.RefundAmountCents, ct);
+            await repo.ResolveAsync(id, body.Resolution.Trim(), resolvedBy, body.RefundAmountCents, ct);
 
             // Disputa resolvida a favor do cliente: disparar reembolso
             if (body.RefundAmountCents > 0)
@@ -183,11 +213,14 @@ public static class DisputeEndpoints
         });
 
         // PUT /disputes/{id}/escalate — escalate to mediation
-        app.MapPut("/disputes/{id}/escalate", async (string id, IDisputeRepository repo, CancellationToken ct) =>
+        app.MapPut("/disputes/{id}/escalate", async (
+            string id, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
         {
             var dispute = await repo.GetByIdAsync(id, ct);
             if (dispute is null)
                 return Results.NotFound(new { error = "Disputa não encontrada" });
+            if (!await IsDisputePartyOrAdminAsync(context, dispute, ctx, ct))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
             if (dispute.Status != Domain.Enums.DisputeStatus.ProfessionalResponded)
                 return Results.Json(new { error = $"Disputa no status '{dispute.Status}' não pode ser escalada" }, statusCode: 422);
 
@@ -196,11 +229,14 @@ public static class DisputeEndpoints
         });
 
         // GET /disputes/{id} — get dispute details
-        app.MapGet("/disputes/{id}", async (string id, IDisputeRepository repo, CancellationToken ct) =>
+        app.MapGet("/disputes/{id}", async (
+            string id, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
         {
             var dispute = await repo.GetByIdAsync(id, ct);
             if (dispute is null)
                 return Results.NotFound(new { error = "Disputa não encontrada" });
+            if (!await IsDisputePartyOrAdminAsync(context, dispute, ctx, ct))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             return Results.Ok(new
             {
@@ -223,12 +259,34 @@ public static class DisputeEndpoints
         });
 
         // GET /disputes — list by professional or client
-        app.MapGet("/disputes", async (string? professionalId, string? clientId, IDisputeRepository repo, CancellationToken ct) =>
+        app.MapGet("/disputes", async (
+            string? professionalId, string? clientId, HttpContext context, IDisputeRepository repo, AppDbContext ctx, CancellationToken ct) =>
         {
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
+
+            var isAdmin = AuthorizationHelpers.IsAdmin(context);
+
             if (!string.IsNullOrWhiteSpace(professionalId))
-                return Results.Ok(await repo.GetByProfessionalAsync(professionalId, ct));
+            {
+                if (!isAdmin)
+                {
+                    var (resolvedId, error) = await AuthorizationHelpers.ResolveProfessionalIdAsync(context, professionalId, ctx, ct);
+                    if (error is not null)
+                        return error;
+                    professionalId = resolvedId;
+                }
+                return Results.Ok(await repo.GetByProfessionalAsync(professionalId!, ct));
+            }
+
             if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                if (!isAdmin)
+                    clientId = jwtUserId;
                 return Results.Ok(await repo.GetByClientAsync(clientId, ct));
+            }
+
             return Results.Json(new { error = "professionalId ou clientId é obrigatório" }, statusCode: 400);
         });
 
