@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
@@ -25,7 +26,7 @@ public static class MpOAuthEndpoints
         {
             var logger = loggerFactory.CreateLogger("MpConnect");
 
-            var jwtUserId = GetJwtUserId(context);
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
             if (jwtUserId is null)
                 return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
 
@@ -45,7 +46,7 @@ public static class MpOAuthEndpoints
             //
             // Correção: aceita também professional.Id == jwtUserId como ownership
             // válida (backwards-compat). Admin sempre passa.
-            if (!IsOwnerOrAdmin(context, professional))
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
             {
                 logger.LogWarning(
                     "[MpConnect] 403 Acesso negado. " +
@@ -207,7 +208,7 @@ public static class MpOAuthEndpoints
             AppDbContext ctx,
             CancellationToken ct) =>
         {
-            var jwtUserId = GetJwtUserId(context);
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
             if (jwtUserId is null)
                 return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
 
@@ -218,7 +219,7 @@ public static class MpOAuthEndpoints
             if (professional is null)
                 return Results.Json(new { error = "Profissional não encontrado" }, statusCode: 404);
 
-            if (!IsOwnerOrAdmin(context, professional))
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
                 return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             await mpRepo.UpdateStatusAsync(professionalId, "revoked", ct);
@@ -237,7 +238,7 @@ public static class MpOAuthEndpoints
             AppDbContext ctx,
             CancellationToken ct) =>
         {
-            var jwtUserId = GetJwtUserId(context);
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
             if (jwtUserId is null)
                 return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
 
@@ -248,7 +249,7 @@ public static class MpOAuthEndpoints
             if (professional is null)
                 return Results.Json(new { error = "Profissional não encontrado" }, statusCode: 404);
 
-            if (!IsOwnerOrAdmin(context, professional))
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
                 return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             var account = await mpRepo.GetByProfessionalIdAsync(professionalId, ct);
@@ -274,38 +275,5 @@ public static class MpOAuthEndpoints
         });
 
         return app;
-    }
-
-    private static string? GetJwtUserId(HttpContext context) =>
-        context.User?.FindFirst("sub")?.Value
-        ?? context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-    /// <summary>
-    /// Returns true if the authenticated user owns this professional profile or is an admin.
-    ///
-    /// ✅ Ownership check (in priority order):
-    ///   1. role == "admin"    → always allowed
-    ///   2. professional.UserId == jwtUserId   → standard case (JWT sub = User.Id)
-    ///   3. professional.Id == jwtUserId       → backwards-compat for legacy sessions
-    ///                                            where sub was saved as professional.Id
-    /// </summary>
-    private static bool IsOwnerOrAdmin(HttpContext context, Professional professional)
-    {
-        var role = context.User?.FindFirst("role")?.Value
-                ?? context.User?.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var jwtUserId = GetJwtUserId(context);
-        if (jwtUserId is null) return false;
-
-        // Primary: JWT sub matches the User.Id that owns the professional profile
-        if (professional.UserId == jwtUserId) return true;
-
-        // Fallback: JWT sub matches the professional.Id itself (legacy sessions)
-        if (professional.Id == jwtUserId) return true;
-
-        return false;
     }
 }

@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.Abstractions;
 using Application.DTOs;
 using Domain.Entities;
@@ -205,7 +206,7 @@ public static class ApiEndpoints
                     defaultAddress = r_defaultAddress,
                 }
             });
-        });
+        }).RequireRateLimiting("auth");
 
         // ─── Social Auth ────────────────────────────────────────────────────────
         app.MapPost("/auth/google", async (
@@ -273,7 +274,7 @@ public static class ApiEndpoints
                     defaultAddress = sgDefaultAddress,
                 }
             });
-        });
+        }).RequireRateLimiting("auth");
 
         app.MapPost("/auth/facebook", async (
             FacebookLoginRequest body,
@@ -340,7 +341,7 @@ public static class ApiEndpoints
                     defaultAddress = fbDefaultAddress,
                 }
             });
-        });
+        }).RequireRateLimiting("auth");
 
         // ─── Users ─────────────────────────────────────────────────────────────
         app.MapPost("/users", async (CreateUserRequest body, IUserRepository repo, CancellationToken ct) =>
@@ -400,9 +401,13 @@ public static class ApiEndpoints
         app.MapPut("/users/{id}/default-address", async (
             string id,
             Application.DTOs.UpdateDefaultAddressRequest body,
+            HttpContext context,
             IUserRepository repo,
             CancellationToken ct) =>
         {
+            if (AuthorizationHelpers.RequireSelfOrAdmin(context, id) is { } authError)
+                return authError;
+
             if (body.Address is null)
                 return Results.Json(new { error = "address é obrigatório" }, statusCode: 400);
 
@@ -536,13 +541,21 @@ public static class ApiEndpoints
             return Results.Ok(await repo.GetZonesAsync(professionalId, ct));
         });
 
-        app.MapPut("/professionals/zones", async (UpdateProfessionalZonesRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapPut("/professionals/zones", async (
+            UpdateProfessionalZonesRequest body,
+            HttpContext context,
+            IProfessionalDetailRepository repo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(body.ProfessionalId))
-                return Results.Json(new { error = "professionalId é obrigatório" }, statusCode: 400);
+            var (resolvedId, authError) = await AuthorizationHelpers.ResolveProfessionalIdAsync(
+                context, body.ProfessionalId, dbCtx, ct);
+            if (authError is not null)
+                return authError;
+
             try
             {
-                var result = await repo.UpdateZonesAsync(body.ProfessionalId, body.Zones ?? [], ct);
+                var result = await repo.UpdateZonesAsync(resolvedId!, body.Zones ?? [], ct);
                 return result is null ? Results.NotFound(new { error = "Profissional não encontrado" }) : Results.Ok(result);
             }
             catch (InvalidOperationException ex)
@@ -557,13 +570,32 @@ public static class ApiEndpoints
             return pro is null ? Results.NotFound(new { error = "Profissional não encontrado." }) : Results.Ok(pro);
         });
 
-        app.MapPut("/professionals/{id}", async (string id, UpdateProfessionalRequest body, IProfessionalDetailRepository repo, CancellationToken ct) =>
+        app.MapPut("/professionals/{id}", async (
+            string id,
+            UpdateProfessionalRequest body,
+            HttpContext context,
+            IProfessionalDetailRepository repo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
+            var professional = await dbCtx.Professionals.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (professional is null)
+                return Results.NotFound(new { error = "Profissional não encontrado." });
+
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
             var updated = await repo.UpdateAsync(id, body.Bio, body.Active, body.AvailabilityText, body.AvatarUrl, ct);
             return updated is null ? Results.NotFound(new { error = "Profissional não encontrado." }) : Results.Ok(updated);
         });
 
-        app.MapPost("/upload-avatar", async (HttpRequest req, IProfessionalDetailRepository professionalRepo, IAvatarStorageRepository avatarStorageRepo, CancellationToken ct) =>
+        app.MapPost("/upload-avatar", async (
+            HttpRequest req,
+            HttpContext context,
+            IProfessionalDetailRepository professionalRepo,
+            IAvatarStorageRepository avatarStorageRepo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
             const long maxSizeBytes = 5 * 1024 * 1024;
             var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "image/jpeg", "image/png", "image/webp" };
@@ -580,9 +612,12 @@ public static class ApiEndpoints
             if (string.IsNullOrWhiteSpace(professionalId))
                 return Results.Json(new { error = "professionalId é obrigatório." }, statusCode: 400);
 
-            var professionalExists = await professionalRepo.ExistsAsync(professionalId, ct);
-            if (!professionalExists)
+            var professional = await dbCtx.Professionals.AsNoTracking().FirstOrDefaultAsync(p => p.Id == professionalId, ct);
+            if (professional is null)
                 return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
+
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
             if (!allowedTypes.Contains(contentType))
@@ -681,14 +716,33 @@ public static class ApiEndpoints
             return svc is null ? Results.NotFound(new { error = "Serviço não encontrado" }) : Results.Ok(svc);
         });
 
-        app.MapPut("/professional-services/{id}", async (string id, UpdateProfessionalServiceRequest body, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapPut("/professional-services/{id}", async (
+            string id,
+            UpdateProfessionalServiceRequest body,
+            HttpContext context,
+            IProfessionalServiceRepository repo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
+            var authError = await RequireProfessionalServiceOwnerOrAdminAsync(id, context, dbCtx, ct);
+            if (authError is not null)
+                return authError;
+
             var updated = await repo.UpdateAsync(id, body.NomeServico, body.Preco, body.Descricao, ct);
             return updated is null ? Results.NotFound(new { error = "Serviço não encontrado" }) : Results.Ok(updated);
         });
 
-        app.MapDelete("/professional-services/{id}", async (string id, IProfessionalServiceRepository repo, CancellationToken ct) =>
+        app.MapDelete("/professional-services/{id}", async (
+            string id,
+            HttpContext context,
+            IProfessionalServiceRepository repo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
+            var authError = await RequireProfessionalServiceOwnerOrAdminAsync(id, context, dbCtx, ct);
+            if (authError is not null)
+                return authError;
+
             var deleted = await repo.DeleteAsync(id, ct);
             return deleted ? Results.Ok(new { ok = true }) : Results.NotFound(new { error = "Serviço não encontrado" });
         });
@@ -790,8 +844,24 @@ public static class ApiEndpoints
             return Results.Ok(result);
         });
 
-        app.MapPost("/orders", async (CreateOrderRequest body, IValidator<CreateOrderRequest> validator, IOrderRepository repo, CancellationToken ct) =>
+        app.MapPost("/orders", async (
+            CreateOrderRequest body,
+            HttpContext context,
+            IValidator<CreateOrderRequest> validator,
+            IOrderRepository repo,
+            CancellationToken ct) =>
         {
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+            if (jwtUserId is null)
+                return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
+
+            // clientId sempre vem do JWT autenticado, exceto quando o chamador é admin
+            // e envia clientId explicitamente (criação em nome de terceiros).
+            var clientId = AuthorizationHelpers.IsAdmin(context) && !string.IsNullOrWhiteSpace(body.ClientId)
+                ? body.ClientId
+                : jwtUserId;
+            body = body with { ClientId = clientId };
+
             var val = await validator.ValidateAsync(body, ct);
             if (!val.IsValid) return Results.ValidationProblem(val.ToDictionary());
             var date = DateTime.TryParse(body.Date, out var parsed) ? parsed : (DateTime?)null;
@@ -811,10 +881,28 @@ public static class ApiEndpoints
             return Results.Ok(paged.Items);
         });
 
-        app.MapPost("/orders/{id}/complete", async (string id, CompleteOrderRequest _, IOrderRepository repo, CancellationToken ct) =>
+        app.MapPost("/orders/{id}/complete", async (
+            string id,
+            CompleteOrderRequest _,
+            HttpContext context,
+            IOrderRepository repo,
+            AppDbContext dbCtx,
+            CancellationToken ct) =>
         {
             var order = await repo.GetByIdAsync(id, ct);
             if (order is null) return Results.NotFound(new { error = "Pedido não encontrado" });
+
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+            if (jwtUserId is null)
+                return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
+
+            var isClient = order.ClientId == jwtUserId;
+            var isProfessional = order.ProfessionalId is not null && await dbCtx.Professionals.AnyAsync(
+                p => p.Id == order.ProfessionalId && (p.UserId == jwtUserId || p.Id == jwtUserId), ct);
+
+            if (!AuthorizationHelpers.IsAdmin(context) && !isClient && !isProfessional)
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
             await repo.CompleteOrderAsync(id, ct);
             return Results.Ok(new { ok = true });
         });
@@ -1471,6 +1559,22 @@ public static class ApiEndpoints
                 d["clientName"]?.ToString() ?? "", d["professionalName"]?.ToString() ?? "",
                 d["serviceName"]?.ToString() ?? "Serviço", when, bookingUrl,
                 dedupeKey: $"{dedupeBase}|cli|{clientEmail}", ct: ct).ConfigureAwait(false);
+    }
+
+    private static async Task<IResult?> RequireProfessionalServiceOwnerOrAdminAsync(
+        string professionalServiceId, HttpContext context, AppDbContext ctx, CancellationToken ct)
+    {
+        var svc = await ctx.ProfessionalServices.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == professionalServiceId, ct);
+        if (svc is null)
+            return Results.NotFound(new { error = "Serviço não encontrado" });
+
+        var professional = await ctx.Professionals.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == svc.ProfessionalId, ct);
+        if (professional is null || !AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
+            return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
+        return null;
     }
 
     private static IResult? RequireSelf(HttpContext context, string routeId, out string jwtUserId)

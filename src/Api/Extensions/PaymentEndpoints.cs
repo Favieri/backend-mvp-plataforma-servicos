@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.Abstractions;
 using Domain.Entities;
 using Domain.Enums;
@@ -27,6 +28,7 @@ public static class PaymentEndpoints
         // ─── POST /payments/preference ───────────────────────────────────────────
         app.MapPost("/payments/preference", async (
             CreatePaymentPreferenceRequest body,
+            HttpContext context,
             AppDbContext ctx,
             IPaymentRepository paymentRepo,
             IMercadoPagoService mpService,
@@ -40,6 +42,10 @@ public static class PaymentEndpoints
             if (string.IsNullOrWhiteSpace(body.OrderId))
                 return Results.Json(new { error = "orderId é obrigatório" }, statusCode: 400);
 
+            var jwtUserId = AuthorizationHelpers.GetJwtUserId(context);
+            if (jwtUserId is null)
+                return Results.Json(new { error = "Autenticação necessária" }, statusCode: 401);
+
             // 1. Buscar e validar o pedido
             var order = await ctx.Orders.AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == body.OrderId, ct);
@@ -48,6 +54,9 @@ public static class PaymentEndpoints
                 return Results.Json(
                     new { error = "order_not_payable", message = "Pedido não está disponível para pagamento." },
                     statusCode: 422);
+
+            if (order.ClientId != jwtUserId && !AuthorizationHelpers.IsAdmin(context))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             if (order.ProfessionalId is null)
                 return Results.Json(

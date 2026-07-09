@@ -1,6 +1,9 @@
+using Api.Security;
 using Application.Abstractions;
 using Application.DTOs;
 using FluentValidation;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Extensions;
 
@@ -37,9 +40,18 @@ public static class VerificationEndpoints
         app.MapPost("/professionals/{id}/verification", async (
             string id,
             SubmitVerificationRequest body,
+            HttpContext context,
             IProfessionalVerificationRepository repo,
+            AppDbContext dbCtx,
             CancellationToken ct) =>
         {
+            var professional = await dbCtx.Professionals.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (professional is null)
+                return Results.Json(new { error = "Profissional não encontrado." }, statusCode: 404);
+
+            if (!AuthorizationHelpers.IsOwnerOrAdmin(context, professional))
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
+
             if (string.IsNullOrWhiteSpace(body.DocumentType))
                 return Results.Json(new { error = "documentType é obrigatório." }, statusCode: 400);
 
@@ -59,9 +71,13 @@ public static class VerificationEndpoints
         app.MapPut("/professionals/verification/{verificationId}/review", async (
             string verificationId,
             ReviewVerificationRequest body,
+            HttpContext context,
             IProfessionalVerificationRepository repo,
             CancellationToken ct) =>
         {
+            if (AuthorizationHelpers.RequireAdmin(context) is { } authError)
+                return authError;
+
             var validStatuses = new[] { "in_review", "verified", "rejected" };
             if (string.IsNullOrWhiteSpace(body.Status) || !validStatuses.Contains(body.Status))
                 return Results.Json(new { error = $"status inválido. Valores aceitos: {string.Join(", ", validStatuses)}." }, statusCode: 400);
@@ -69,8 +85,7 @@ public static class VerificationEndpoints
             if (body.Status == "rejected" && string.IsNullOrWhiteSpace(body.Notes))
                 return Results.Json(new { error = "notes é obrigatório ao rejeitar um documento." }, statusCode: 400);
 
-            // TODO: Extrair reviewedBy do token de autenticação (userId do admin)
-            var reviewedBy = "system";
+            var reviewedBy = AuthorizationHelpers.GetJwtUserId(context)!;
 
             var result = await repo.ReviewAsync(verificationId, body.Status, body.Notes, reviewedBy, ct);
             return result is null
@@ -81,9 +96,13 @@ public static class VerificationEndpoints
         // ─── GET /admin/verification/pending ─────────────────────────────────
         // Fila de documentos aguardando revisão (admin).
         app.MapGet("/admin/verification/pending", async (
+            HttpContext context,
             IProfessionalVerificationRepository repo,
             CancellationToken ct) =>
         {
+            if (AuthorizationHelpers.RequireAdmin(context) is { } authError)
+                return authError;
+
             var pending = await repo.GetPendingReviewAsync(ct);
             return Results.Ok(pending);
         });
