@@ -46,7 +46,14 @@ public static class ApiEndpoints
                     : repo.GetProfessionalsAsync(zoneId, serviceId, professionalId, effPage, effPageSize, ct),
                 logger, ct);
             SetPaginationHeaders(ctx.Response, result.TotalCount, effPage, effPageSize);
-            return Results.Ok(result.Items);
+            return Results.Ok(new
+            {
+                items      = result.Items,
+                total      = result.TotalCount,
+                page       = effPage,
+                pageSize   = effPageSize,
+                totalPages = (int)Math.Ceiling(result.TotalCount / (double)effPageSize),
+            });
         });
 
         app.MapGet("/zones", async (HttpRequest req, IProfessionalReadRepository repo, IMemoryCache cache, CancellationToken ct) =>
@@ -105,7 +112,9 @@ public static class ApiEndpoints
                     var tiers = tiersRaw.Select(t => new TierDto(
                         t.Id, t.Name, t.Code, t.AllowBookingDirect, t.RequiresProposal, t.RequiresChat,
                         t.AllowedPriceFormats)).ToList();
-                    return new HomeBootstrapDto(professionals.Items, zones, services, categories, tiers);
+                    var hasMore = professionals.TotalCount > DefaultPageSize;
+                    return new HomeBootstrapDto(professionals.Items, zones, services, categories, tiers,
+                        ProfessionalsTotal: professionals.TotalCount, ProfessionalsHasMore: hasMore);
                 }, logger, ct);
             return Results.Ok(bootstrap);
         });

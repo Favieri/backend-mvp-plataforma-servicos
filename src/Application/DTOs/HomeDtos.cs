@@ -9,4 +9,6 @@ public sealed record HomeBootstrapDto(
     IReadOnlyList<ZoneDto> Zones,
     IReadOnlyList<ServiceDto> Services,
     IReadOnlyList<CategoryDto>? Categories = null,
-    IReadOnlyList<TierDto>? Tiers = null);
+    IReadOnlyList<TierDto>? Tiers = null,
+    int ProfessionalsTotal = 0,
+    bool ProfessionalsHasMore = false);
