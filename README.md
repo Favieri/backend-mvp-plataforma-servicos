@@ -128,6 +128,43 @@ Se o comando falhar, o deploy deve ser bloqueado até o `Handler` e o DLL public
 sam deploy --guided --template-file infra/sam/template.yaml
 ```
 
+## Provisioned Concurrency (desligado por padrão)
+
+`infra/sam/template.yaml` já traz a estrutura completa de Provisioned Concurrency, controlada por um único parâmetro:
+
+- `ProvisionedConcurrencyCount` (`Number`, `Default: 0`) — com `0`, a condição `EnableProvisionedConcurrency` resolve para `AWS::NoValue` e **nenhum** recurso de Provisioned Concurrency é criado (custo zero, comportamento atual inalterado).
+- A função `JobeasyApiFunction` usa `AutoPublishAlias: live`, então todo deploy publica uma versão numerada e atualiza o alias `live`; o evento `ProxyEvent` do API Gateway é redirecionado automaticamente pelo SAM para o alias.
+
+### Permissões IAM necessárias no role de deploy
+
+O role assumido via OIDC pelo GitHub Actions (`arn:aws:iam::660573993178:role/GitHubActions-JobeasyApi-Deploy`) precisa, além das permissões Lambda já existentes, das ações abaixo — obrigatórias a partir do momento em que `AutoPublishAlias` está no template, mesmo com Provisioned Concurrency em `0`, porque o CloudFormation passa a publicar versão e gerenciar alias a cada deploy. Esse role **não é gerenciado por IaC neste repositório** (é configurado direto na conta AWS), então a policy precisa ser ajustada manualmente:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "lambda:PublishVersion",
+    "lambda:CreateAlias",
+    "lambda:UpdateAlias",
+    "lambda:GetAlias",
+    "lambda:PutProvisionedConcurrencyConfig",
+    "lambda:GetProvisionedConcurrencyConfig",
+    "lambda:DeleteProvisionedConcurrencyConfig"
+  ],
+  "Resource": "arn:aws:lambda:sa-east-1:660573993178:function:*"
+}
+```
+
+Ajuste o `Resource` para o padrão de nome real da função gerada pelo stack `jobeasy-api` (ex.: `jobeasy-api-JobeasyApiFunction-*`) se a policy atual já restringir por prefixo.
+
+### Runbook — ativar Provisioned Concurrency no futuro
+
+1. Confirme que o role de deploy tem as permissões acima (sem elas, o deploy falha com `AccessDenied` assim que `AutoPublishAlias` tentar publicar versão/alias).
+2. Redeploy com `ProvisionedConcurrencyCount` maior que zero via `--parameter-overrides ParameterKey=ProvisionedConcurrencyCount,ParameterValue=5` (ajuste o valor).
+3. No console Lambda, aguarde o status do Provisioned Concurrency mudar para `READY` (leva alguns minutos).
+4. Rode o smoke test padrão (`GET /health`, `GET /professionals`) através do alias `live`.
+5. Para reverter, redeploy com `ProvisionedConcurrencyCount=0` e confirme no console que o recurso foi removido (não fica "fantasma" cobrando).
+
 ## Container (futuro ECS/Fargate)
 
 ```bash
