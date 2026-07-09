@@ -32,6 +32,16 @@ if (missingVars.Count > 0)
     throw new InvalidOperationException(
         $"Required environment variables are missing: {string.Join(", ", missingVars)}");
 
+// Fail-fast: nunca permitir que o ambiente de produção suba com a validação de
+// assinatura do webhook do Mercado Pago desligada — isso deixaria o endpoint de
+// webhook aberto a forjamento de eventos de pagamento.
+var skipWebhookValidation =
+    builder.Configuration.GetValue<bool>("MercadoPago__SkipWebhookSignatureValidation") ||
+    builder.Configuration.GetValue<bool>("MercadoPago:SkipWebhookSignatureValidation");
+if (builder.Environment.IsProduction() && skipWebhookValidation)
+    throw new InvalidOperationException(
+        "MercadoPago__SkipWebhookSignatureValidation não pode ser true em produção.");
+
 builder.Logging.ClearProviders();
 builder.Services.AddHttpContextAccessor();
 
@@ -64,6 +74,13 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = Compre
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("mp-callback", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 10;
+        o.QueueLimit = 0;
+    });
+    // Reduz a superfície de força bruta/credential stuffing em /auth, /auth/google, /auth/facebook.
+    options.AddFixedWindowLimiter("auth", o =>
     {
         o.Window = TimeSpan.FromMinutes(1);
         o.PermitLimit = 10;
