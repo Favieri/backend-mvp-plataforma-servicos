@@ -55,6 +55,31 @@ public sealed class DisputeRepository(AppDbContext ctx) : IDisputeRepository
         return rows;
     }
 
+    public async Task<IReadOnlyList<object>> GetAllAsync(string? status, CancellationToken ct)
+    {
+        var query = ctx.Disputes.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(d => d.Status == status);
+
+        var rows = await query
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => (object)new
+            {
+                id = d.Id,
+                orderId = d.OrderId,
+                professionalId = d.ProfessionalId,
+                clientId = d.ClientId,
+                reason = d.Reason,
+                status = d.Status,
+                createdAt = d.CreatedAt,
+                resolvedAt = d.ResolvedAt
+            })
+            .ToListAsync(ct);
+
+        return rows;
+    }
+
     public async Task<Dispute> CreateAsync(Dispute dispute, CancellationToken ct)
     {
         ctx.Disputes.Add(dispute);

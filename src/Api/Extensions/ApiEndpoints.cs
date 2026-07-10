@@ -344,7 +344,7 @@ public static class ApiEndpoints
         }).RequireRateLimiting("auth");
 
         // ─── Users ─────────────────────────────────────────────────────────────
-        app.MapPost("/users", async (CreateUserRequest body, IUserRepository repo, CancellationToken ct) =>
+        app.MapPost("/users", async (CreateUserRequest body, HttpContext context, IUserRepository repo, CancellationToken ct) =>
         {
             var name = body.Name?.Trim() ?? "";
             var email = body.Email?.Trim() ?? "";
@@ -355,6 +355,8 @@ public static class ApiEndpoints
                 return Results.Json(new { error = "name, email, role e senha são obrigatórios" }, statusCode: 400);
             if (role != "cliente" && role != "profissional" && role != "admin")
                 return Results.Json(new { error = "role inválido" }, statusCode: 400);
+            if (role == "admin" && !AuthorizationHelpers.IsAdmin(context))
+                return Results.Json(new { error = "Não é possível se cadastrar como admin." }, statusCode: 403);
             if (role == "cliente" && string.IsNullOrWhiteSpace(body.ZoneId))
                 return Results.Json(new { error = "zoneId é obrigatório para clientes" }, statusCode: 400);
             if (await repo.EmailExistsAsync(email, ct))
@@ -1533,6 +1535,9 @@ public static class ApiEndpoints
 
         // Wallet (PRD-MP-05)
         app.MapWalletEndpoints();
+
+        // Admin panel backend
+        app.MapAdminEndpoints();
 
         return app;
     }
