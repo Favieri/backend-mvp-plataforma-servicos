@@ -108,3 +108,14 @@ amostra estatisticamente vazia (ex.: 1/1 = 100%). O limiar é a constante
 `MinSampleForCompletionRate` no serviço. O frontend não precisa replicar essa
 regra — quando `completionRate` vier `null`, é para ocultar o sinal, seja por
 ausência de dados ou por amostra pequena demais.
+
+## `POST /messages/attachment` — resolução de remetente (Item 1.6)
+
+`senderId` é resolvido a partir da claim `sub`/`ClaimTypes.NameIdentifier` do
+JWT autenticado, no mesmo padrão já usado por `POST /messages` — o valor
+enviado no corpo `multipart/form-data` é ignorado. O endpoint também valida
+que o remetente resolvido é participante (`clientId` ou `professionalId`) da
+`conversationId` informada antes de criar a mensagem e subir o arquivo,
+retornando `401` sem JWT válido e `403` se o remetente não pertencer à
+conversa. Cobertura em
+`tests/IntegrationTests/MessageAttachmentAuthorizationTests.cs`.
