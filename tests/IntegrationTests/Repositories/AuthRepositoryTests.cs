@@ -18,6 +18,21 @@ public sealed class AuthRepositoryTests : RepositoryTestBase
         // "Senha" is Ignore()'d on the EF model (see UserConfiguration), so EnsureCreated
         // does not create the column. AuthRepository's raw SQL still selects u.senha directly.
         Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN senha TEXT NOT NULL DEFAULT ''");
+
+        // addr_* columns are not part of the User domain entity/EF model either (see
+        // UserConfiguration and migration 20260320000000_AddAddressFields, which adds them via
+        // raw SQL directly against Postgres). AuthRepository's raw SQL selects them for the
+        // login response's defaultAddress, so the SQLite test schema needs them added manually
+        // here too, the same way senha is handled above.
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_zip_code TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_street TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_number TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_neighborhood TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_city TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_state TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_complement TEXT");
+        Ctx.Database.ExecuteSqlRaw("ALTER TABLE \"User\" ADD COLUMN addr_reference TEXT");
+
         _repo = new AuthRepository(Ctx);
     }
 
