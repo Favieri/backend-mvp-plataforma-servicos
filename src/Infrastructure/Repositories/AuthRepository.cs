@@ -32,9 +32,9 @@ public sealed class AuthRepository(AppDbContext ctx) : IAuthRepository
                     u.addr_complement                       AS "AddrComplement",
                     u.addr_reference                        AS "AddrReference",
                     p.id                                    AS "ProfessionalId",
-                    COALESCE(p.mp_connected, false)         AS "MpConnected"
+                    COALESCE(p."mpConnected", false)        AS "MpConnected"
                 FROM "User" u
-                LEFT JOIN professionals p ON p.user_id = u.id
+                LEFT JOIN "Professional" p ON p."userId" = u.id
                 WHERE u.email = {0}
                 """,
                 email)
