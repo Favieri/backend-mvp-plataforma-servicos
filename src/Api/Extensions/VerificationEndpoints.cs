@@ -114,12 +114,11 @@ public static class VerificationEndpoints
             Application.Abstractions.IProfessionalDetailRepository repo,
             CancellationToken ct) =>
         {
-            var pro = await repo.GetByIdAsync(id, ct);
-            if (pro is null)
+            var metrics = await repo.GetTrustMetricsAsync(id, ct);
+            if (metrics is null)
                 return Results.NotFound(new { error = "Profissional não encontrado." });
 
-            // O objeto retornado pelo detail repo já contém as métricas
-            return Results.Ok(pro);
+            return Results.Ok(metrics);
         });
 
         // ─── POST /internal/jobs/trust-metrics ───────────────────────────────

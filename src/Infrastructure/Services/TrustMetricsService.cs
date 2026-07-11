@@ -12,6 +12,7 @@ namespace Infrastructure.Services;
 ///   - responseRate: % de conversas em que o profissional respondeu ao menos uma mensagem
 ///   - avgResponseTimeMinutes: tempo médio (em minutos) da primeira resposta do profissional
 ///   - completionRate: % de pedidos confirmados que chegaram ao status completed/evaluated
+///     (null se houver menos de 3 pedidos iniciados — amostra pequena demais para ser um sinal confiável)
 ///
 /// Badges automáticos:
 ///   - "verified": verificationStatus = 'verified'
@@ -25,6 +26,7 @@ public sealed class TrustMetricsService(AppDbContext ctx, ILogger<TrustMetricsSe
     private const int TopProMinCompletedJobs = 10;
     private const double ResponsiveBadgeMinRate = 0.90;
     private const int ResponsiveBadgeMaxMinutes = 60;
+    private const int MinSampleForCompletionRate = 3;
 
     public async Task RecalculateAsync(string professionalId, CancellationToken ct)
     {
@@ -164,7 +166,8 @@ public sealed class TrustMetricsService(AppDbContext ctx, ILogger<TrustMetricsSe
             .CountAsync(o => o.ProfessionalId == professionalId
                           && startedStatuses.Contains(o.Status), ct);
 
-        if (totalStarted == 0)
+        // Amostra pequena demais para ser um sinal confiável (ex.: 1/1 = 100% não é garantia real).
+        if (totalStarted < MinSampleForCompletionRate)
             return null;
 
         var completedStatuses = new[] { "completed", "evaluated" };
