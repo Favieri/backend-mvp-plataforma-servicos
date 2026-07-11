@@ -77,6 +77,31 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
         return new { id = professionalId, userId };
     }
 
+    public async Task<object?> GetTrustMetricsAsync(string id, CancellationToken ct)
+    {
+        var row = await ctx.Professionals
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new
+            {
+                p.VerificationStatus, p.Badges, p.ResponseRate, p.AvgResponseTimeMinutes, p.CompletionRate
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (row is null) return null;
+
+        return new
+        {
+            verificationStatus = row.VerificationStatus ?? "pending",
+            badges = row.Badges != null
+                ? row.Badges.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                : [],
+            responseRate = row.ResponseRate,
+            avgResponseTimeMinutes = row.AvgResponseTimeMinutes,
+            completionRate = row.CompletionRate
+        };
+    }
+
     public async Task<object?> GetByIdAsync(string id, CancellationToken ct)
     {
         var row = await (
@@ -87,6 +112,7 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
             {
                 p.Id, p.UserId, p.Bio, p.Rating, p.Active, p.AvatarUrl, p.AvailabilityText,
                 p.CompletedJobsCount, p.SlotMinutes, p.LeadTimeMinutes, p.MaxAdvanceDays, p.AllowInstantBooking,
+                p.VerificationStatus, p.Badges, p.ResponseRate, p.AvgResponseTimeMinutes, p.CompletionRate,
                 UserId2 = u.Id, UserName = u.Name, UserEmail = u.Email, UserPhone = u.Phone,
                 UserRole = u.Role, UserZoneId = u.ZoneId, UserCreatedAt = u.CreatedAt
             }
@@ -167,6 +193,13 @@ public sealed class ProfessionalDetailRepository(AppDbContext ctx) : IProfession
             leadTimeMinutes = row.LeadTimeMinutes,
             maxAdvanceDays = row.MaxAdvanceDays,
             allowInstantBooking = row.AllowInstantBooking,
+            verificationStatus = row.VerificationStatus ?? "pending",
+            badges = row.Badges != null
+                ? row.Badges.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                : [],
+            responseRate = row.ResponseRate,
+            avgResponseTimeMinutes = row.AvgResponseTimeMinutes,
+            completionRate = row.CompletionRate,
             user = new { id = row.UserId2, name = row.UserName, email = row.UserEmail, phone = row.UserPhone, role = row.UserRole, zoneId = row.UserZoneId, createdAt = row.UserCreatedAt },
             services,
             portfolio,
