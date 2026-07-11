@@ -54,7 +54,6 @@ public sealed record CreateAppointmentRequest(string ProfessionalId, string? Cli
 // Users
 public sealed record CreateUserRequest(string Name, string Email, string? Phone, string Role, string Senha, string? ZoneId, AddressDto? DefaultAddress = null);
 public sealed record UpdateUserRequest(string? Name, string? Phone, string? ZoneId, AddressDto? DefaultAddress);
-public sealed record BootstrapAdminRequest(string Name, string Email, string? Phone, string Senha);
 
 // Professionals
 public sealed record CreateProfessionalRequest(string UserId, string? Bio, string[]? Zones, bool? Active);
