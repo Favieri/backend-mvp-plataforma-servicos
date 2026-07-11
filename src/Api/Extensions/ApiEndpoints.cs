@@ -1189,6 +1189,7 @@ public static class ApiEndpoints
             IConversationRepository convRepo,
             IAttachmentStorageRepository storageRepo,
             IMessageAttachmentRepository attachmentRepo,
+            IProfessionalDetailRepository userRepo,
             CancellationToken ct) =>
         {
             const long maxSizeBytes = 20 * 1024 * 1024; // 20 MB
@@ -1201,13 +1202,19 @@ public static class ApiEndpoints
                 "video/mp4", "video/quicktime"
             };
 
+            // Resolve senderId from the JWT — never trust the form-provided value.
+            var jwtUserId = req.HttpContext.User?.FindFirst("sub")?.Value
+                         ?? req.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(jwtUserId))
+                return Results.Json(new { error = "Não autenticado" }, statusCode: 401);
+
             if (!req.HasFormContentType)
                 return Results.Json(new { error = "Content-Type deve ser multipart/form-data." }, statusCode: 400);
 
             var form = await req.ReadFormAsync(ct);
             var file = form.Files.GetFile("file");
             var conversationId = (form["conversationId"].FirstOrDefault() ?? string.Empty).Trim();
-            var senderId = (form["senderId"].FirstOrDefault() ?? string.Empty).Trim();
+            var senderId = jwtUserId;
             var messageText = (form["text"].FirstOrDefault() ?? string.Empty).Trim();
             var attachmentType = (form["attachmentType"].FirstOrDefault() ?? "file").Trim();
 
@@ -1215,14 +1222,24 @@ public static class ApiEndpoints
                 return Results.Json(new { error = "Arquivo não enviado." }, statusCode: 400);
             if (string.IsNullOrWhiteSpace(conversationId))
                 return Results.Json(new { error = "conversationId é obrigatório." }, statusCode: 400);
-            if (string.IsNullOrWhiteSpace(senderId))
-                return Results.Json(new { error = "senderId é obrigatório." }, statusCode: 400);
             if (file.Length > maxSizeBytes)
                 return Results.Json(new { error = "Arquivo excede 20MB." }, statusCode: 400);
 
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
             if (!allowedTypes.Contains(contentType))
                 return Results.Json(new { error = "Tipo de arquivo não permitido." }, statusCode: 400);
+
+            if (!await userRepo.UserExistsAsync(senderId, ct))
+                return Results.Json(new { error = "Remetente inválido: usuário não encontrado" }, statusCode: 422);
+
+            // Verify sender is a participant of the conversation before persisting/uploading
+            var conv = await convRepo.GetConversationForReadAsync(conversationId, ct);
+            if (conv is null)
+                return Results.Json(new { error = "Conversa não encontrada" }, statusCode: 404);
+
+            var convDict = ToObjectDictionary(conv);
+            if (convDict["clientId"]?.ToString() != senderId && convDict["professionalId"]?.ToString() != senderId)
+                return Results.Json(new { error = "Acesso negado" }, statusCode: 403);
 
             // Create the message first (with type = "action" and empty text fallback)
             var text = string.IsNullOrWhiteSpace(messageText) ? $"[Arquivo: {file.FileName}]" : messageText;
