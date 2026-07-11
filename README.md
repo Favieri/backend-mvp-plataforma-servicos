@@ -260,7 +260,6 @@ Para o workflow de deploy funcionar, configure estes secrets no repositório:
 | `SMTP_HOST` | Host SMTP para emails | `''` (emails desabilitados) |
 | `SMTP_USER` | Usuário SMTP | `''` |
 | `SMTP_PASS` | Senha SMTP | `''` |
-| `ADMIN_BOOTSTRAP_SECRET` | Segredo para criar o primeiro admin via `POST /internal/admin/bootstrap` (header `X-Admin-Bootstrap-Secret`) | `''` (endpoint desabilitado). O endpoint também se autodesliga assim que já existir um admin no banco — a partir daí, novos admins são criados via `POST /users` autenticado como admin. |
 
 > **Fallbacks aceitos:** `DATABASE_URL` é aceito como alternativa a `DB_CONNECTION`;
 > `MERCADOPAGO_ACCESS_TOKEN` como alternativa a `MP_ACCESS_TOKEN`.
