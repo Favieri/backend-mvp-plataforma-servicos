@@ -14,6 +14,7 @@ using Serilog.Formatting.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
 using System.IO.Compression;
+using System.Text;
 
 // Required for Npgsql timestamp compatibility: maps timestamptz columns to DateTime (not DateTimeOffset)
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -31,6 +32,15 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["CORS_ALLOWED_ORIGINS"]))
 if (missingVars.Count > 0)
     throw new InvalidOperationException(
         $"Required environment variables are missing: {string.Join(", ", missingVars)}");
+
+// Fail-fast: HS256 exige uma chave de no mínimo 256 bits (32 bytes). Uma chave
+// mais curta só falha em runtime, na primeira assinatura/validação de token
+// (IDX10720), deixando o serviço subir aparentemente saudável e quebrar de
+// forma confusa na primeira requisição autenticada.
+var jwtSecret = builder.Configuration["JWT_SECRET"];
+if (Encoding.UTF8.GetByteCount(jwtSecret!) < 32)
+    throw new InvalidOperationException(
+        "JWT_SECRET deve ter no mínimo 32 bytes (256 bits) para uso com HS256.");
 
 // Fail-fast: nunca permitir que o ambiente de produção suba com a validação de
 // assinatura do webhook do Mercado Pago desligada — isso deixaria o endpoint de
