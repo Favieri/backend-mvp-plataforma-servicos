@@ -142,7 +142,7 @@ public sealed class MessageAttachmentAuthorizationTests : IClassFixture<MessageA
 
         public string CreateToken(string userId, string role)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(IntegrationTestDefaults.JwtSecret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var claims = new[]
             {
