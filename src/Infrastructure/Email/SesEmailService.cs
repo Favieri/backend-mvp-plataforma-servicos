@@ -1,5 +1,5 @@
-using System.Net;
-using System.Net.Mail;
+using Amazon.SimpleEmailV2;
+using Amazon.SimpleEmailV2.Model;
 using Application.Abstractions;
 using Infrastructure.Data;
 using Microsoft.Extensions.Logging;
@@ -7,19 +7,21 @@ using Microsoft.Extensions.Logging;
 namespace Infrastructure.Email;
 
 /// <summary>
-/// TODO: CREDENTIALS - configure SMTP credentials via env vars:
-///   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM
-/// If SMTP_HOST is not configured, emails are logged but not sent (dry-run mode).
+/// Envia e-mails via Amazon SES. Autenticação exclusivamente via IAM role do Lambda
+/// (cadeia de credenciais padrão do SDK) — nenhuma chave de acesso é configurada aqui,
+/// mesmo padrão já usado para o cliente S3 em AvatarStorageRepository/AttachmentStorageRepository.
 /// </summary>
-public sealed class SmtpEmailService(IConnectionFactory factory, ILogger<SmtpEmailService> logger) : IEmailService
+public sealed class SesEmailService(
+    IAmazonSimpleEmailServiceV2 sesClient,
+    IConnectionFactory factory,
+    ILogger<SesEmailService> logger) : IEmailService
 {
-    private static readonly string DefaultFrom =
+    // Propriedades (não campos estáticos) para que testes possam alternar as env vars
+    // entre casos sem depender de ordem de inicialização do tipo.
+    private static string DefaultFrom =>
         Environment.GetEnvironmentVariable("EMAIL_FROM") ?? "Jobeasy <naoresponda@jobeasy.com.br>";
 
-    private static readonly string AppBaseUrl =
-        Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
-
-    private static readonly bool EmailEnabled =
+    private static bool EmailEnabled =>
         Environment.GetEnvironmentVariable("EMAIL_ENABLED") is null or "true";
 
     public async Task SendAsync(string to, string subject, string html, string? text = null, string? dedupeKey = null, CancellationToken ct = default)
@@ -41,7 +43,7 @@ public sealed class SmtpEmailService(IConnectionFactory factory, ILogger<SmtpEma
             }
         }
 
-        await DeliverAsync(to, subject, html, ct);
+        await DeliverAsync(to, subject, html, text, ct);
     }
 
     public async Task SendNewLeadAsync(string to, string professionalName, string clientName, string serviceName, string leadUrl, string? city = null, CancellationToken ct = default)
@@ -89,35 +91,36 @@ public sealed class SmtpEmailService(IConnectionFactory factory, ILogger<SmtpEma
         await SendAsync(to, subject, html, ct: ct);
     }
 
-    private async Task DeliverAsync(string to, string subject, string html, CancellationToken ct)
+    private async Task DeliverAsync(string to, string subject, string html, string? text, CancellationToken ct)
     {
-        var host = Environment.GetEnvironmentVariable("SMTP_HOST");
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS to enable email delivery
-            logger.LogInformation("[EMAIL:DRYRUN] No SMTP_HOST configured. To={To} Subject={Subject}", to, subject);
-            return;
-        }
-
         try
         {
-            var port = int.TryParse(Environment.GetEnvironmentVariable("SMTP_PORT"), out var p) ? p : 587;
-            var user = Environment.GetEnvironmentVariable("SMTP_USER") ?? "";
-            var pass = Environment.GetEnvironmentVariable("SMTP_PASS") ?? "";
-
-            using var client = new SmtpClient(host, port)
+            var request = new SendEmailRequest
             {
-                EnableSsl = port is 587 or 465,
-                Credentials = new NetworkCredential(user, pass)
+                FromEmailAddress = DefaultFrom,
+                Destination = new Destination { ToAddresses = [to] },
+                Content = new EmailContent
+                {
+                    Simple = new Message
+                    {
+                        Subject = new Content { Data = subject, Charset = "UTF-8" },
+                        Body = new Body
+                        {
+                            Html = new Content { Data = html, Charset = "UTF-8" },
+                            Text = text is not null ? new Content { Data = text, Charset = "UTF-8" } : null,
+                        },
+                    },
+                },
             };
 
-            using var msg = new MailMessage(DefaultFrom, to, subject, html) { IsBodyHtml = true };
-            await client.SendMailAsync(msg, ct);
-            logger.LogInformation("[EMAIL:SENT] To={To} Subject={Subject}", to, subject);
+            var response = await sesClient.SendEmailAsync(request, ct);
+            logger.LogInformation("[EMAIL:SENT] To={To} Subject={Subject} MessageId={MessageId}", to, subject, response.MessageId);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[EMAIL:ERROR] Failed to send To={To} Subject={Subject}", to, subject);
+            // Nunca deixar uma falha de envio de e-mail quebrar o fluxo que a chamou
+            // (cadastro, recuperação de senha, etc.) — mesmo comportamento do SmtpEmailService.
+            logger.LogError(ex, "[EMAIL:ERROR] Falha ao enviar via SES. To={To} Subject={Subject}", to, subject);
         }
     }
 }

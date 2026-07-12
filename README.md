@@ -257,9 +257,9 @@ Para o workflow de deploy funcionar, configure estes secrets no repositório:
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `''` (login Google desabilitado) |
 | `FACEBOOK_APP_ID` | Facebook App ID | `''` (login Facebook desabilitado) |
 | `CORS_ALLOWED_ORIGINS` | Origens CORS permitidas | `*` |
-| `SMTP_HOST` | Host SMTP para emails | `''` (emails desabilitados) |
-| `SMTP_USER` | Usuário SMTP | `''` |
-| `SMTP_PASS` | Senha SMTP | `''` |
+| `EMAIL_FROM` | Remetente dos emails transacionais (identidade verificada no SES) | `Jobeasy <naoresponda@jobeasy.com.br>` |
+
+> Envio de email usa a API do Amazon SES via IAM role do Lambda — nenhuma credencial SMTP é necessária.
 
 > **Fallbacks aceitos:** `DATABASE_URL` é aceito como alternativa a `DB_CONNECTION`;
 > `MERCADOPAGO_ACCESS_TOKEN` como alternativa a `MP_ACCESS_TOKEN`.

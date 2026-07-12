@@ -107,6 +107,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Aviso (não fail-fast): sem EMAIL_FROM em produção, o SES rejeita o envio por remetente
+// inválido — diferente de JWT_SECRET/CORS acima, isso não impede o resto da API de funcionar.
+if (app.Environment.IsProduction() && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("EMAIL_FROM")))
+{
+    Log.Warning("EMAIL_FROM não configurado em produção — envio de e-mail via SES provavelmente vai falhar (remetente inválido).");
+}
+
 // Compressão deve ser o primeiro middleware, envolvendo toda a pipeline (inclusive respostas
 // geradas por CORS/rotas/erros abaixo). API Gateway HTTP API v2 não faz compressão no gateway
 // (diferente de REST API v1), então precisa ser feita aqui.

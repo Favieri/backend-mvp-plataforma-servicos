@@ -105,10 +105,6 @@ jobs:
           CORS_ALLOWED_ORIGINS:   ${{ secrets.CORS_ALLOWED_ORIGINS }}
           APP_BASE_URL:           ${{ secrets.APP_BASE_URL || 'https://jobeasy.com.br' }}
           EMAIL_FROM:             ${{ secrets.EMAIL_FROM || 'Jobeasy <naoresponda@jobeasy.com.br>' }}
-          SMTP_HOST:              ${{ secrets.SMTP_HOST || '' }}
-          SMTP_PORT:              ${{ secrets.SMTP_PORT || '587' }}
-          SMTP_USER:              ${{ secrets.SMTP_USER || '' }}
-          SMTP_PASS:              ${{ secrets.SMTP_PASS || '' }}
           STORAGE_BUCKET_NAME:    ${{ secrets.STORAGE_BUCKET_NAME || 'jobeasy-bucket-prod' }}
           GOOGLE_CLIENT_ID:       ${{ secrets.GOOGLE_CLIENT_ID || '' }}
           FACEBOOK_APP_ID:        ${{ secrets.FACEBOOK_APP_ID || '' }}
@@ -140,10 +136,6 @@ jobs:
             {"ParameterKey": "CorsAllowedOrigins",     "ParameterValue": secret("CORS_ALLOWED_ORIGINS")},
             {"ParameterKey": "AppBaseUrl",             "ParameterValue": secret("APP_BASE_URL", "https://jobeasy.com.br")},
             {"ParameterKey": "EmailFrom",              "ParameterValue": secret("EMAIL_FROM", "Jobeasy <naoresponda@jobeasy.com.br>")},
-            {"ParameterKey": "SmtpHost",               "ParameterValue": secret("SMTP_HOST")},
-            {"ParameterKey": "SmtpPort",               "ParameterValue": secret("SMTP_PORT", "587")},
-            {"ParameterKey": "SmtpUser",               "ParameterValue": secret("SMTP_USER")},
-            {"ParameterKey": "SmtpPass",               "ParameterValue": secret("SMTP_PASS")},
             {"ParameterKey": "StorageBucketName",      "ParameterValue": secret("STORAGE_BUCKET_NAME", "jobeasy-bucket-prod")},
             {"ParameterKey": "GoogleClientId",         "ParameterValue": secret("GOOGLE_CLIENT_ID")},
             {"ParameterKey": "FacebookAppId",          "ParameterValue": secret("FACEBOOK_APP_ID")},

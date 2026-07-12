@@ -18,10 +18,6 @@ Globals:
         CORS_ALLOWED_ORIGINS:   !Ref CorsAllowedOrigins
         APP_BASE_URL:           !Ref AppBaseUrl
         EMAIL_FROM:             !Ref EmailFrom
-        SMTP_HOST:              !Ref SmtpHost
-        SMTP_PORT:              !Ref SmtpPort
-        SMTP_USER:              !Ref SmtpUser
-        SMTP_PASS:              !Ref SmtpPass
         STORAGE_BUCKET_NAME:    !Ref StorageBucketName
         GOOGLE_CLIENT_ID:       !Ref GoogleClientId
         FACEBOOK_APP_ID:        !Ref FacebookAppId
@@ -59,22 +55,7 @@ Parameters:
   EmailFrom:
     Type: String
     Default: 'Jobeasy <naoresponda@jobeasy.com.br>'
-    Description: "Remetente padrão de emails transacionais"
-  SmtpHost:
-    Type: String
-    Default: ''
-    Description: "Host SMTP (vazio = emails desabilitados)"
-  SmtpPort:
-    Type: String
-    Default: '587'
-  SmtpUser:
-    Type: String
-    Default: ''
-    NoEcho: true
-  SmtpPass:
-    Type: String
-    Default: ''
-    NoEcho: true
+    Description: "Remetente padrão de emails transacionais (deve ser uma identidade verificada no SES)"
 
   # ── Storage S3 ──────────────────────────────────────────────────────────────
   StorageBucketName:
@@ -174,6 +155,12 @@ Resources:
         - AWSLambdaBasicExecutionRole
         - S3CrudPolicy:
             BucketName: !Ref StorageBucketName
+        - Statement:
+            - Sid: AllowSesSendEmail
+              Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource: !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
     Metadata:
       BuildMethod: makefile
 
