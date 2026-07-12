@@ -71,9 +71,7 @@ public sealed class ProfessionalsPaginationEndpointTests : IClassFixture<Profess
 
         public ApiFactory()
         {
-            Environment.SetEnvironmentVariable("JWT_SECRET", "test-jwt-secret-test-jwt-secret");
-            Environment.SetEnvironmentVariable("STORAGE_BUCKET_NAME", "test-bucket");
-            Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "http://localhost");
+            IntegrationTestDefaults.ConfigureTestEnvironment();
             _connection.Open();
         }
 

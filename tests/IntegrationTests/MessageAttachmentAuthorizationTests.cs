@@ -96,14 +96,11 @@ public sealed class MessageAttachmentAuthorizationTests : IClassFixture<MessageA
 
     public sealed class ApiFactory : WebApplicationFactory<Program>
     {
-        private const string JwtSecret = "test-jwt-secret-for-integration-tests-only-32bytes";
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
         public ApiFactory()
         {
-            Environment.SetEnvironmentVariable("JWT_SECRET", JwtSecret);
-            Environment.SetEnvironmentVariable("STORAGE_BUCKET_NAME", "test-bucket");
-            Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "http://localhost");
+            IntegrationTestDefaults.ConfigureTestEnvironment();
             _connection.Open();
         }
 
