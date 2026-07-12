@@ -16,7 +16,7 @@ namespace Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config, IHostEnvironment env)
     {
         services.AddHttpClient();
         services.Configure<DatabaseOptions>(o =>
@@ -36,7 +36,6 @@ public static class ServiceCollectionExtensions
         // number of physical connections to the Supabase pooler.
         services.AddSingleton(sp =>
         {
-            var env = sp.GetRequiredService<IHostEnvironment>();
             var rawCs = config["DB_CONNECTION"] ?? config.GetConnectionString("Default") ?? string.Empty;
             var timeout = int.TryParse(config["DB_TIMEOUT_SECONDS"], out var t) ? t : 15;
             var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
@@ -78,7 +77,6 @@ public static class ServiceCollectionExtensions
             // Reuse the shared NpgsqlDataSource so EF Core and Dapper share one pool.
             var dataSource = sp.GetRequiredService<NpgsqlDataSource>();
             var commandTimeout = int.TryParse(config["DB_COMMAND_TIMEOUT_SECONDS"], out var ct) ? ct : 15;
-            var env = sp.GetRequiredService<IHostEnvironment>();
 
             options.UseNpgsql(dataSource, npgsql =>
             {
@@ -144,11 +142,20 @@ public static class ServiceCollectionExtensions
 
         // Phase 3: dispute + expanded reviews
         services.AddScoped<IDisputeRepository, DisputeRepository>();
-        services.AddHostedService<BackgroundJobs.ProposalExpirationJob>();
+        services.AddSingleton<BackgroundJobs.ProposalExpirationJob>();
 
         // Notificação de chat por e-mail: job periódico com janela de silêncio (2h)
         services.AddSingleton<BackgroundJobs.ChatSilenceNotificationJob>();
-        services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.ChatSilenceNotificationJob>());
+
+        // Os jobs de fundo acima continuam resolvíveis via DI (usado diretamente pelos
+        // testes), mas o timer automático via IHostedService não deve rodar em ambiente
+        // de teste: suas dependências (ex.: IEmailService -> NpgsqlDataSource) não têm
+        // override para a conexão SQLite em memória usada pelos testes de integração.
+        if (!env.IsEnvironment("Testing"))
+        {
+            services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.ProposalExpirationJob>());
+            services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.ChatSilenceNotificationJob>());
+        }
 
         // Phase 4: recurring billing + rebook
         services.AddScoped<IRecurringPlanRepository, RecurringPlanRepository>();
