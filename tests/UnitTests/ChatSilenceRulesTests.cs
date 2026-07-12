@@ -83,7 +83,7 @@ public sealed class ChatSilenceRulesTests
     {
         var candidate = Candidate(
             messageSentAt: Now - TimeSpan.FromHours(3),
-            recipientLastReadAt: Now - TimeSpan.FromHours(1));
+            recipientLastReadAt: Now - TimeSpan.FromHours(4));
 
         Assert.True(ChatSilenceRules.IsEligible(candidate, Now));
     }
