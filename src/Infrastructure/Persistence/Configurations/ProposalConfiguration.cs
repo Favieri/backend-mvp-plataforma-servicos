@@ -14,6 +14,7 @@ public sealed class ProposalConfiguration : IEntityTypeConfiguration<Proposal>
         builder.Property(x => x.Id).HasColumnName("id");
 
         builder.Property(x => x.OrderId).HasColumnName("order_id");
+        builder.Property(x => x.SourceOrderId).HasColumnName("source_order_id");
         builder.Property(x => x.ProfessionalId).HasColumnName("professional_id").IsRequired();
         builder.Property(x => x.ClientId).HasColumnName("client_id").IsRequired();
         builder.Property(x => x.ServiceId).HasColumnName("service_id").IsRequired();
@@ -34,6 +35,7 @@ public sealed class ProposalConfiguration : IEntityTypeConfiguration<Proposal>
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
         builder.HasIndex(x => x.OrderId);
+        builder.HasIndex(x => x.SourceOrderId);
         builder.HasIndex(x => x.ProfessionalId);
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.ConversationId);

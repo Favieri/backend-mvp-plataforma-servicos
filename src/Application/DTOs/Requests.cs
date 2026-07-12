@@ -41,7 +41,7 @@ public sealed record AddressDto(
 public sealed record UpdateDefaultAddressRequest(string UserId, AddressDto Address);
 
 // Auth & Orders (existing)
-public sealed record CreateOrderRequest(string ClientId, string ServiceId, string? Description, string? Location, string? Date);
+public sealed record CreateOrderRequest(string ClientId, string ServiceId, string? Description, string? Location, string? Date, int? MaxProposals = null);
 public sealed record CompleteOrderRequest(string? ProfessionalId, string? ClientId);
 public sealed record LoginRequest(string Email, string Senha);
 
@@ -157,7 +157,8 @@ public sealed record CreateProposalRequest(
     string? PriceByStage,
     string? DurationEstimate,
     string? SuggestedDatetime,
-    int VisitFeeCents);
+    int VisitFeeCents,
+    string? SourceOrderId = null);
 
 public sealed record SendProposalRequest(string ProfessionalId);
 public sealed record AcceptProposalRequest(

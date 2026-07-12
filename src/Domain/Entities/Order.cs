@@ -35,6 +35,10 @@ public class Order
     public string? CancellationReason { get; private set; }
     public DateTime? AutoConfirmAt { get; private set; }
 
+    // ─── Lead flow: limite do cliente ──────────────────────────────────────
+    /// <summary>Quantas propostas o cliente quer receber antes do lead fechar por limite. 1–20, default 5.</summary>
+    public int MaxProposals { get; private set; } = 5;
+
     // ─── Service address snapshot ────────────────────────────────────────────
     public string? SvcAddrZipCode { get; private set; }
     public string? SvcAddrStreet { get; private set; }
@@ -75,7 +79,8 @@ public class Order
         string serviceId,
         string? description,
         string? location,
-        DateTime? date)
+        DateTime? date,
+        int? maxProposals = null)
     {
         return new Order
         {
@@ -85,6 +90,7 @@ public class Order
             Description = description,
             Location = location,
             Date = date,
+            MaxProposals = maxProposals is >= 1 and <= 20 ? maxProposals.Value : 5,
             Status = "aberto",
             CreatedAt = DateTime.UtcNow
         };
@@ -232,6 +238,15 @@ public class Order
     }
 
     public void MarkDisputed() => Status = Enums.OrderStatus.Disputed;
+
+    /// <summary>Atingiu o limite de propostas do cliente — aguarda decisão.</summary>
+    public void MarkPropostasCompletas() => Status = Enums.OrderStatus.PropostasCompletas;
+
+    /// <summary>Cliente aceitou uma proposta — fecha o lead imediatamente, mesmo antes do limite.</summary>
+    public void MarkConvertido() => Status = Enums.OrderStatus.Convertido;
+
+    /// <summary>Cliente rejeitou propostas suficientes para reabrir uma vaga.</summary>
+    public void ReopenAberto() => Status = Enums.OrderStatus.Aberto;
 
     public void MarkRefunded()
     {
