@@ -9,6 +9,10 @@ public static class OrderStatus
     public const string AutoConcluido = "auto_concluido";
     public const string Cancelado = "cancelado";
 
+    // ─── Lead flow: limite do cliente + priorização por reputação ────────────
+    public const string PropostasCompletas = "propostas_completas";
+    public const string Convertido = "convertido";
+
     // ─── Phase 1: full transactional state machine ───────────────────────────
     public const string Draft = "draft";
     public const string ProposalSent = "proposal_sent";
@@ -29,6 +33,7 @@ public static class OrderStatus
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
         Aberto, Confirmado, Concluido, AutoConcluido, Cancelado,
+        PropostasCompletas, Convertido,
         Draft, ProposalSent, AwaitingPayment, Scheduled, InTransit,
         InProgress, AwaitingConfirmation, Completed, Evaluated,
         Disputed, CancelledClient, CancelledProfessional, Refunded, Rebooked,
@@ -38,6 +43,6 @@ public static class OrderStatus
     public static readonly IReadOnlySet<string> Terminal = new HashSet<string>
     {
         Concluido, AutoConcluido, Cancelado, Completed, Evaluated,
-        CancelledClient, CancelledProfessional, Refunded, Rebooked
+        CancelledClient, CancelledProfessional, Refunded, Rebooked, Convertido
     };
 }

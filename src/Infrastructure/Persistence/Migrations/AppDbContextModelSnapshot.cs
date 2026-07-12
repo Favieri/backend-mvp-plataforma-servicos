@@ -100,6 +100,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("CancelledBy").IsRequired(false).HasColumnName("cancelledBy");
             b.Property<string>("CancellationReason").IsRequired(false).HasColumnName("cancellationReason");
             b.Property<DateTime?>("AutoConfirmAt").HasColumnName("autoConfirmAt");
+            b.Property<int>("MaxProposals").IsRequired().HasColumnName("maxProposals").HasDefaultValue(5);
             // Service address snapshot
             b.Property<string>("SvcAddrZipCode").IsRequired(false).HasColumnName("svcAddrZipCode");
             b.Property<string>("SvcAddrStreet").IsRequired(false).HasColumnName("svcAddrStreet");
@@ -137,6 +138,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
         {
             b.Property<string>("Id").HasColumnName("id").HasColumnType("text");
             b.Property<string>("OrderId").IsRequired(false).HasColumnName("order_id");
+            b.Property<string>("SourceOrderId").IsRequired(false).HasColumnName("source_order_id");
             b.Property<string>("ProfessionalId").IsRequired().HasColumnName("professional_id");
             b.Property<string>("ClientId").IsRequired().HasColumnName("client_id");
             b.Property<string>("ServiceId").IsRequired().HasColumnName("service_id");
@@ -157,6 +159,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTime>("UpdatedAt").IsRequired().HasColumnName("updated_at");
             b.HasKey("Id");
             b.HasIndex("OrderId").HasDatabaseName("IX_proposal_order_id");
+            b.HasIndex("SourceOrderId").HasDatabaseName("ix_proposal_source_order_id");
             b.HasIndex("ProfessionalId").HasDatabaseName("IX_proposal_professional_id");
             b.HasIndex("ClientId").HasDatabaseName("IX_proposal_client_id");
             b.HasIndex("ConversationId").HasDatabaseName("IX_proposal_conversation_id");

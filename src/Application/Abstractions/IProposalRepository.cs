@@ -13,4 +13,10 @@ public interface IProposalRepository
     Task<IReadOnlyList<Proposal>> GetByConversationAsync(string conversationId, CancellationToken ct);
     Task<IReadOnlyList<object>> GetMineAsync(string userId, string role, CancellationToken ct);
     Task<int> ExpireOverdueAsync(DateTime before, CancellationToken ct);
+
+    // ─── Lead flow: limite do cliente ─────────────────────────────────────
+    /// <summary>Conta propostas ativas (Sent/Negotiating) vinculadas a um pedido-lead de origem.</summary>
+    Task<int> CountActiveBySourceOrderAsync(string sourceOrderId, CancellationToken ct);
+    /// <summary>Propostas ativas (Sent/Negotiating) do mesmo lead, exceto a informada — usado para auto-rejeitar ao aceitar.</summary>
+    Task<IReadOnlyList<Proposal>> GetActiveBySourceOrderAsync(string sourceOrderId, string excludeId, CancellationToken ct);
 }

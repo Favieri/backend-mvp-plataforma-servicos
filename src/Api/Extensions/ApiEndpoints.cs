@@ -867,7 +867,7 @@ public static class ApiEndpoints
             var val = await validator.ValidateAsync(body, ct);
             if (!val.IsValid) return Results.ValidationProblem(val.ToDictionary());
             var date = DateTime.TryParse(body.Date, out var parsed) ? parsed : (DateTime?)null;
-            var created = await repo.CreateAsync(body.ClientId, body.ServiceId, body.Description, body.Location, date, ct);
+            var created = await repo.CreateAsync(body.ClientId, body.ServiceId, body.Description, body.Location, date, ct, maxProposals: body.MaxProposals);
             return Results.Json(created, statusCode: 201);
         });
 

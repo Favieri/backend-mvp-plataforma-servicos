@@ -43,6 +43,7 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.CancelledBy).HasColumnName("cancelledBy");
         builder.Property(x => x.CancellationReason).HasColumnName("cancellationReason");
         builder.Property(x => x.AutoConfirmAt).HasColumnName("autoConfirmAt");
+        builder.Property(x => x.MaxProposals).HasColumnName("maxProposals").IsRequired().HasDefaultValue(5);
 
         // ─── Service address snapshot ─────────────────────────────────────────
         builder.Property(x => x.SvcAddrZipCode).HasColumnName("svcAddrZipCode");

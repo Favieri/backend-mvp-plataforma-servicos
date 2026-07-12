@@ -37,28 +37,59 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             return new PagedResult<Order>(activeItems, activeTotal);
         }
 
-        query = query.Where(o => o.ProfessionalId == null);
+        query = query.Where(o => o.ProfessionalId == null && o.Status == OrderStatus.Aberto);
 
         if (!string.IsNullOrWhiteSpace(serviceId))
             query = query.Where(o => o.ServiceId == serviceId);
-
-        if (filterZones && !string.IsNullOrWhiteSpace(professionalId))
-        {
-            var professionalZones = ctx.ProfessionalZones
-                .Where(pz => pz.ProfessionalId == professionalId)
-                .Select(pz => pz.ZoneId);
-
-            query = query.Where(o =>
-                ctx.Users
-                    .Where(u => u.Id == o.ClientId && u.ZoneId != null && professionalZones.Contains(u.ZoneId!))
-                    .Any());
-        }
 
         if (!string.IsNullOrWhiteSpace(excludeProfessionalId))
         {
             query = query.Where(o =>
                 !ctx.ProfessionalOrderIgnores
                     .Any(poi => poi.ProfessionalId == excludeProfessionalId && poi.OrderId == o.Id));
+        }
+
+        if (filterZones && !string.IsNullOrWhiteSpace(professionalId))
+        {
+            var professionalZones = await ctx.ProfessionalZones
+                .Where(pz => pz.ProfessionalId == professionalId)
+                .Select(pz => pz.ZoneId)
+                .ToListAsync(ct);
+
+            var candidates = await query
+                .Select(o => new
+                {
+                    Order = o,
+                    ClientZoneId = ctx.Users.Where(u => u.Id == o.ClientId).Select(u => u.ZoneId).FirstOrDefault()
+                })
+                .Where(x => x.ClientZoneId != null && professionalZones.Contains(x.ClientZoneId))
+                .ToListAsync(ct);
+
+            // Janela de visibilidade por reputação: começa pequena (melhor avaliados) e cresce com o
+            // tempo decorrido desde a criação do pedido, até cobrir todos os profissionais compatíveis.
+            var visible = new List<Order>();
+            var zoneRankCache = new Dictionary<string, List<string>>();
+            foreach (var c in candidates)
+            {
+                var zoneId = c.ClientZoneId!;
+                if (!zoneRankCache.TryGetValue(zoneId, out var ranked))
+                {
+                    ranked = await GetRankedProfessionalIdsForZoneAsync(zoneId, ct);
+                    zoneRankCache[zoneId] = ranked;
+                }
+
+                var baseWindow = Math.Max(c.Order.MaxProposals * 3, 5);
+                var elapsedHours = (DateTime.UtcNow - c.Order.CreatedAt).TotalHours;
+                var expansionFactor = 1 + Math.Floor(elapsedHours / 4) * 0.5;
+                var effectiveWindow = Math.Min(ranked.Count, (int)(baseWindow * expansionFactor));
+
+                if (ranked.Take(effectiveWindow).Contains(professionalId))
+                    visible.Add(c.Order);
+            }
+
+            var visibleOrdered = visible.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id).ToList();
+            var pagedVisible = visibleOrdered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return new PagedResult<Order>(pagedVisible, visibleOrdered.Count);
         }
 
         var totalCount = await query.CountAsync(ct);
@@ -72,7 +103,7 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
 
     public async Task<Order> CreateAsync(
         string clientId, string serviceId, string? description, string? location,
-        DateTime? date, CancellationToken ct)
+        DateTime? date, CancellationToken ct, int? maxProposals = null)
     {
         var order = Order.Create(
             id: Guid.NewGuid().ToString(),
@@ -80,7 +111,8 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             serviceId: serviceId,
             description: description,
             location: location,
-            date: date);
+            date: date,
+            maxProposals: maxProposals);
 
         ctx.Orders.Add(order);
         await ctx.SaveChangesAsync(ct);
@@ -288,5 +320,56 @@ public sealed class OrderRepository(AppDbContext ctx) : IOrderRepository
             .Where(o => o.Id == orderId)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Refunded), ct);
         return rows > 0;
+    }
+
+    // ─── Lead flow: limite do cliente + priorização por reputação ────────────
+
+    public async Task<bool> MarkConvertidoAsync(string orderId, CancellationToken ct)
+    {
+        var rows = await ctx.Orders
+            .Where(o => o.Id == orderId)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Convertido), ct);
+        return rows > 0;
+    }
+
+    public async Task<bool> MarkPropostasCompletasAsync(string orderId, CancellationToken ct)
+    {
+        var rows = await ctx.Orders
+            .Where(o => o.Id == orderId && o.Status == OrderStatus.Aberto)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.PropostasCompletas), ct);
+        return rows > 0;
+    }
+
+    public async Task<bool> ReopenAbertoAsync(string orderId, CancellationToken ct)
+    {
+        var rows = await ctx.Orders
+            .Where(o => o.Id == orderId && o.Status == OrderStatus.PropostasCompletas)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Aberto), ct);
+        return rows > 0;
+    }
+
+    /// <summary>
+    /// Ranking de profissionais compatíveis com uma zona, por score de reputação (melhor primeiro).
+    /// Reaproveita os campos já calculados por TrustMetricsService (Rating, CompletionRate, ResponseRate),
+    /// com valores neutros de fallback para quem ainda não tem histórico suficiente.
+    /// </summary>
+    private async Task<List<string>> GetRankedProfessionalIdsForZoneAsync(string zoneId, CancellationToken ct)
+    {
+        var candidates = await ctx.ProfessionalZones
+            .Where(pz => pz.ZoneId == zoneId)
+            .Join(ctx.Professionals, pz => pz.ProfessionalId, p => p.Id, (pz, p) => p)
+            .Where(p => p.Active)
+            .Select(p => new { p.Id, p.Rating, p.CompletionRate, p.ResponseRate })
+            .ToListAsync(ct);
+
+        return candidates
+            .Select(p => new
+            {
+                p.Id,
+                Score = (p.Rating ?? 3.0) * 0.5 + (p.CompletionRate ?? 0.5) * 0.3 + (p.ResponseRate ?? 0.5) * 0.2
+            })
+            .OrderByDescending(x => x.Score)
+            .Select(x => x.Id)
+            .ToList();
     }
 }

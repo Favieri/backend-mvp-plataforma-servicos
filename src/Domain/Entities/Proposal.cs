@@ -4,6 +4,8 @@ public class Proposal
 {
     public string Id { get; private set; } = default!;
     public string? OrderId { get; private set; }
+    /// <summary>Pedido-lead de origem (aberto sem profissional) que deu origem a esta proposta, se houver.</summary>
+    public string? SourceOrderId { get; private set; }
     public string ProfessionalId { get; private set; } = default!;
     public string ClientId { get; private set; } = default!;
     public string ServiceId { get; private set; } = default!;
@@ -40,12 +42,14 @@ public class Proposal
         string? priceByStage = null,
         string? durationEstimate = null,
         DateTime? suggestedDatetime = null,
-        int visitFeeCents = 0)
+        int visitFeeCents = 0,
+        string? sourceOrderId = null)
     {
         var now = DateTime.UtcNow;
         return new Proposal
         {
             Id = id,
+            SourceOrderId = sourceOrderId,
             ProfessionalId = professionalId,
             ClientId = clientId,
             ServiceId = serviceId,

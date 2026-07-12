@@ -3,6 +3,7 @@ namespace Application.DTOs;
 public sealed record ProposalDto(
     string Id,
     string? OrderId,
+    string? SourceOrderId,
     string ProfessionalId,
     string ClientId,
     string ServiceId,

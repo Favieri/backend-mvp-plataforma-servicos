@@ -257,6 +257,16 @@ public static class OrderEndpoints
                 actorRole: ActorRole.Client,
                 metadata: $"{{\"proposalId\":\"{proposalId}\"}}"), ct);
 
+            // ─── Fecha o lead imediatamente, mesmo antes do limite (Seção 6 do PRD) ─
+            if (!string.IsNullOrWhiteSpace(proposal.SourceOrderId))
+            {
+                await orderRepo.MarkConvertidoAsync(proposal.SourceOrderId, ct);
+
+                var outras = await proposalRepo.GetActiveBySourceOrderAsync(proposal.SourceOrderId, excludeId: proposalId, ct);
+                foreach (var outra in outras)
+                    await proposalRepo.RejectAsync(outra.Id, "Pedido já foi atendido por outro profissional.", ct);
+            }
+
             return Results.Json(created, statusCode: 201);
         });
 

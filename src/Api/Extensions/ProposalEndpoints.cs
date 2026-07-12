@@ -14,6 +14,7 @@ public static class ProposalEndpoints
         app.MapPost("/proposals", async (
             CreateProposalRequest body,
             IProposalRepository repo,
+            IOrderRepository orderRepo,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(body.ProfessionalId))
@@ -28,6 +29,17 @@ public static class ProposalEndpoints
                 return Results.Json(new { error = "priceTotalCents deve ser positivo" }, statusCode: 400);
             if (!DateTime.TryParse(body.ValidUntil, out var validUntil) || validUntil <= DateTime.UtcNow)
                 return Results.Json(new { error = "validUntil deve ser uma data futura válida" }, statusCode: 400);
+
+            // ─── Vínculo com o lead de origem (Seção 4/5 do PRD de fluxo de leads) ─
+            Order? sourceOrder = null;
+            if (!string.IsNullOrWhiteSpace(body.SourceOrderId))
+            {
+                sourceOrder = await orderRepo.GetByIdAsync(body.SourceOrderId, ct);
+                if (sourceOrder is null)
+                    return Results.Json(new { error = "Pedido de origem não encontrado" }, statusCode: 404);
+                if (sourceOrder.Status != OrderStatus.Aberto)
+                    return Results.Json(new { error = "Este pedido não está mais aceitando propostas." }, statusCode: 422);
+            }
 
             DateTime? suggestedDatetime = DateTime.TryParse(body.SuggestedDatetime, out var sd) ? sd : null;
 
@@ -46,9 +58,18 @@ public static class ProposalEndpoints
                 priceByStage: body.PriceByStage,
                 durationEstimate: body.DurationEstimate,
                 suggestedDatetime: suggestedDatetime,
-                visitFeeCents: body.VisitFeeCents);
+                visitFeeCents: body.VisitFeeCents,
+                sourceOrderId: body.SourceOrderId);
 
             var created = await repo.CreateAsync(proposal, ct);
+
+            if (sourceOrder is not null)
+            {
+                var activeCount = await repo.CountActiveBySourceOrderAsync(sourceOrder.Id, ct);
+                if (activeCount >= sourceOrder.MaxProposals)
+                    await orderRepo.MarkPropostasCompletasAsync(sourceOrder.Id, ct);
+            }
+
             return Results.Json(ToDto(created), statusCode: 201);
         });
 
@@ -146,6 +167,16 @@ public static class ProposalEndpoints
                 actorRole: ActorRole.Client,
                 metadata: $"{{\"proposalId\":\"{id}\"}}"), ct);
 
+            // ─── Fecha o lead imediatamente, mesmo antes do limite (Seção 6 do PRD) ─
+            if (!string.IsNullOrWhiteSpace(proposal.SourceOrderId))
+            {
+                await orderRepo.MarkConvertidoAsync(proposal.SourceOrderId, ct);
+
+                var outras = await repo.GetActiveBySourceOrderAsync(proposal.SourceOrderId, excludeId: id, ct);
+                foreach (var outra in outras)
+                    await repo.RejectAsync(outra.Id, "Pedido já foi atendido por outro profissional.", ct);
+            }
+
             return Results.Json(new { ok = true, orderId = created.Id, order = created }, statusCode: 201);
         });
 
@@ -154,6 +185,7 @@ public static class ProposalEndpoints
             string id,
             RejectProposalRequest body,
             IProposalRepository repo,
+            IOrderRepository orderRepo,
             CancellationToken ct) =>
         {
             var proposal = await repo.GetByIdAsync(id, ct);
@@ -165,8 +197,22 @@ public static class ProposalEndpoints
                 return Results.Json(new { error = $"Proposta em status '{proposal.Status}' não pode ser rejeitada" }, statusCode: 422);
 
             var ok = await repo.RejectAsync(id, body.Reason, ct);
-            return ok ? Results.Ok(new { ok = true, status = ProposalStatus.Rejected })
-                      : Results.Json(new { error = "Falha ao rejeitar proposta" }, statusCode: 500);
+            if (!ok)
+                return Results.Json(new { error = "Falha ao rejeitar proposta" }, statusCode: 500);
+
+            // Se o pedido de origem estava com o limite atingido e a rejeição abriu uma vaga, reabre.
+            if (!string.IsNullOrWhiteSpace(proposal.SourceOrderId))
+            {
+                var sourceOrder = await orderRepo.GetByIdAsync(proposal.SourceOrderId, ct);
+                if (sourceOrder is not null && sourceOrder.Status == OrderStatus.PropostasCompletas)
+                {
+                    var activeCount = await repo.CountActiveBySourceOrderAsync(proposal.SourceOrderId, ct);
+                    if (activeCount < sourceOrder.MaxProposals)
+                        await orderRepo.ReopenAbertoAsync(proposal.SourceOrderId, ct);
+                }
+            }
+
+            return Results.Ok(new { ok = true, status = ProposalStatus.Rejected });
         });
 
         // ─── POST /proposals/{id}/negotiate — contraproposta ─────────────────
@@ -216,7 +262,7 @@ public static class ProposalEndpoints
     }
 
     private static ProposalDto ToDto(Proposal p) => new(
-        p.Id, p.OrderId, p.ProfessionalId, p.ClientId, p.ServiceId,
+        p.Id, p.OrderId, p.SourceOrderId, p.ProfessionalId, p.ClientId, p.ServiceId,
         p.ProfessionalServiceId, p.ConversationId, p.Scope,
         p.IncludesDescription, p.ExcludesDescription, p.PriceTotalCents,
         p.PriceByStage, p.DurationEstimate, p.SuggestedDatetime,

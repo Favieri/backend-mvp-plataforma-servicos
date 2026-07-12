@@ -107,4 +107,20 @@ public sealed class ProposalRepository(AppDbContext ctx) : IProposalRepository
         await ctx.SaveChangesAsync(ct);
         return expired.Count;
     }
+
+    // "Ativa" = ainda não teve um desfecho (aceita/rejeitada/expirada) — conta contra o limite
+    // do cliente e é candidata a auto-rejeição quando outra proposta do mesmo lead é aceita.
+    private static readonly string[] ActiveStatuses =
+        { Domain.Enums.ProposalStatus.Draft, Domain.Enums.ProposalStatus.Sent, Domain.Enums.ProposalStatus.Negotiating };
+
+    public async Task<int> CountActiveBySourceOrderAsync(string sourceOrderId, CancellationToken ct)
+        => await ctx.Proposals
+            .Where(p => p.SourceOrderId == sourceOrderId && ActiveStatuses.Contains(p.Status))
+            .CountAsync(ct);
+
+    public async Task<IReadOnlyList<Proposal>> GetActiveBySourceOrderAsync(string sourceOrderId, string excludeId, CancellationToken ct)
+        => await ctx.Proposals
+            .AsNoTracking()
+            .Where(p => p.SourceOrderId == sourceOrderId && p.Id != excludeId && ActiveStatuses.Contains(p.Status))
+            .ToListAsync(ct);
 }
