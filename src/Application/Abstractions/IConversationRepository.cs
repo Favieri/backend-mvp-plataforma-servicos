@@ -1,3 +1,4 @@
+using Application.Services;
 using Domain.Entities;
 
 namespace Application.Abstractions;
@@ -27,4 +28,9 @@ public interface IConversationRepository
 
     // Phase 2: get available transactional actions for a conversation
     Task<object> GetConversationActionsAsync(string conversationId, string requestingUserId, CancellationToken ct);
+
+    /// <summary>Candidatos a e-mail de silêncio: conversas cuja última mensagem tem mais de silenceThreshold e ainda pode estar não lida.</summary>
+    Task<IReadOnlyList<ChatSilenceCandidate>> GetChatSilenceCandidatesAsync(TimeSpan silenceThreshold, CancellationToken ct);
+
+    Task UpsertChatNotificationStateAsync(string conversationId, string recipientUserId, string messageId, CancellationToken ct);
 }

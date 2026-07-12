@@ -146,6 +146,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDisputeRepository, DisputeRepository>();
         services.AddHostedService<BackgroundJobs.ProposalExpirationJob>();
 
+        // Notificação de chat por e-mail: job periódico com janela de silêncio (2h)
+        services.AddSingleton<BackgroundJobs.ChatSilenceNotificationJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<BackgroundJobs.ChatSilenceNotificationJob>());
+
         // Phase 4: recurring billing + rebook
         services.AddScoped<IRecurringPlanRepository, RecurringPlanRepository>();
         services.AddSingleton<BackgroundJobs.RecurringBillingJob>();

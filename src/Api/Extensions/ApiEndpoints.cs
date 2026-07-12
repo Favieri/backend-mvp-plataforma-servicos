@@ -1248,7 +1248,6 @@ public static class ApiEndpoints
         app.MapPost("/messages", async (
             HttpRequest req,
             IConversationRepository repo,
-            IEmailService emailSvc,
             IAntiLeakDetectionService antiLeak,
             IProfessionalDetailRepository userRepo,
             CancellationToken ct) =>
@@ -1292,8 +1291,6 @@ public static class ApiEndpoints
                 body.ReplyToId,
                 ct);
 
-            var msgDict = ToObjectDictionary(message);
-
             // Phase 2: anti-leak detection — insert a system warning message if contact patterns detected
             if (messageType == MessageType.Text && antiLeak.HasLeakPattern(body.Text))
             {
@@ -1310,20 +1307,8 @@ public static class ApiEndpoints
                 _ = repo.UpdateConversationStatusAsync(body.ConversationId, ConversationStatus.Flagged, ct).ConfigureAwait(false);
             }
 
-            var isClient = resolvedSenderId == convDict["clientId"]?.ToString();
-            var lastReadAt = isClient ? convDict["professionalLastReadAt"] : convDict["clientLastReadAt"];
-            var recipientEmail = isClient ? convDict["professionalEmail"]?.ToString() : convDict["clientEmail"]?.ToString();
-            var recipientName = isClient ? convDict["professionalName"]?.ToString() ?? "Usuário" : convDict["clientName"]?.ToString() ?? "Usuário";
-            var senderName = msgDict["senderName"]?.ToString() ?? "Usuário";
-
-            var recentlyActive = lastReadAt is DateTime lra && (DateTime.UtcNow - lra).TotalMilliseconds <= 120_000;
-            if (!recentlyActive && !string.IsNullOrWhiteSpace(recipientEmail))
-            {
-                var appBaseUrl = Environment.GetEnvironmentVariable("APP_BASE_URL") ?? "https://jobeasy.com.br";
-                _ = emailSvc.SendChatMessageAsync(recipientEmail, recipientName, senderName,
-                    body.Text.Trim(), $"{appBaseUrl}/chat/{body.ConversationId}",
-                    body.ConversationId, windowMinutes: 10, ct).ConfigureAwait(false);
-            }
+            // Notificação de e-mail de chat: responsabilidade exclusiva de ChatSilenceNotificationJob
+            // (job periódico, dispara só após 2h de silêncio real — ver PRD de notificação de chat).
 
             return Results.Ok(message);
         });
