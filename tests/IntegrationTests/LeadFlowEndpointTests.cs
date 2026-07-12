@@ -148,6 +148,7 @@ public sealed class LeadFlowEndpointTests : IClassFixture<LeadFlowEndpointTests.
         {
             using var scope = Services.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await ctx.Database.EnsureDeletedAsync();
             await ctx.Database.EnsureCreatedAsync();
 
             if (!await ctx.Users.AnyAsync(u => u.Id == clientId))
