@@ -33,6 +33,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RecurringOccurrence> RecurringOccurrences => Set<RecurringOccurrence>();
     // Phase 5: verification + trust metrics
     public DbSet<ProfessionalVerification> ProfessionalVerifications => Set<ProfessionalVerification>();
+    // Chat silence notification job
+    public DbSet<ChatNotificationState> ChatNotificationStates => Set<ChatNotificationState>();
     // MP Integration
     public DbSet<ProfessionalMpAccount> ProfessionalMpAccounts => Set<ProfessionalMpAccount>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();

@@ -1,4 +1,5 @@
 using Application.Abstractions;
+using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Persistence;
@@ -423,5 +424,85 @@ public sealed class ConversationRepository(AppDbContext ctx, IContactMaskingServ
             proposalStatus,
             actions
         };
+    }
+
+    /// <summary>Candidatos a e-mail de silêncio: uma linha por conversa, com a última mensagem e o destinatário (a outra parte).</summary>
+    public async Task<IReadOnlyList<ChatSilenceCandidate>> GetChatSilenceCandidatesAsync(TimeSpan silenceThreshold, CancellationToken ct)
+    {
+        var cutoff = DateTime.UtcNow - silenceThreshold;
+
+        var conversations = await (
+            from c in ctx.Conversations.AsNoTracking()
+            join client in ctx.Users.AsNoTracking() on c.ClientId equals client.Id
+            join pro in ctx.Users.AsNoTracking() on c.ProfessionalId equals pro.Id
+            select new { c, client, pro }
+        ).ToListAsync(ct);
+
+        var conversationIds = conversations.Select(x => x.c.Id).ToArray();
+
+        var lastMessages = await ctx.Messages
+            .AsNoTracking()
+            .Where(m => conversationIds.Contains(m.ConversationId))
+            .GroupBy(m => m.ConversationId)
+            .Select(g => g.OrderByDescending(m => m.SentAt).First())
+            .ToDictionaryAsync(m => m.ConversationId, ct);
+
+        var senderIds = lastMessages.Values.Select(m => m.SenderId).Distinct().ToArray();
+        var senderNames = await ctx.Users
+            .AsNoTracking()
+            .Where(u => senderIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+
+        var states = await ctx.ChatNotificationStates
+            .AsNoTracking()
+            .Where(s => conversationIds.Contains(s.ConversationId))
+            .ToDictionaryAsync(s => (s.ConversationId, s.RecipientUserId), s => s.LastNotifiedMessageId, ct);
+
+        var candidates = new List<ChatSilenceCandidate>();
+        foreach (var x in conversations)
+        {
+            if (!lastMessages.TryGetValue(x.c.Id, out var lastMessage)) continue;
+            if (lastMessage.SentAt > cutoff) continue;
+
+            var isClientSender = lastMessage.SenderId == x.c.ClientId;
+            var recipientUserId = isClientSender ? x.c.ProfessionalId : x.c.ClientId;
+            var recipientLastReadAt = isClientSender ? x.c.ProfessionalLastReadAt : x.c.ClientLastReadAt;
+            var recipientEmail = isClientSender ? x.pro.Email : x.client.Email;
+            var recipientName = isClientSender ? x.pro.Name : x.client.Name;
+            var senderName = senderNames.TryGetValue(lastMessage.SenderId, out var sn) ? sn : "Usuário";
+
+            states.TryGetValue((x.c.Id, recipientUserId), out var lastNotifiedMessageId);
+
+            candidates.Add(new ChatSilenceCandidate(
+                x.c.Id,
+                recipientUserId,
+                recipientEmail,
+                recipientName,
+                senderName,
+                lastMessage.Id,
+                lastMessage.Text,
+                lastMessage.SentAt,
+                recipientLastReadAt,
+                lastNotifiedMessageId));
+        }
+
+        return candidates;
+    }
+
+    public async Task UpsertChatNotificationStateAsync(string conversationId, string recipientUserId, string messageId, CancellationToken ct)
+    {
+        var existing = await ctx.ChatNotificationStates
+            .FirstOrDefaultAsync(s => s.ConversationId == conversationId && s.RecipientUserId == recipientUserId, ct);
+
+        if (existing is null)
+        {
+            ctx.ChatNotificationStates.Add(ChatNotificationState.Create(conversationId, recipientUserId, messageId));
+        }
+        else
+        {
+            existing.MarkNotified(messageId);
+        }
+
+        await ctx.SaveChangesAsync(ct);
     }
 }
