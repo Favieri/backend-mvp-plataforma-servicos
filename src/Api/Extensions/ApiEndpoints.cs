@@ -343,8 +343,131 @@ public static class ApiEndpoints
             });
         }).RequireRateLimiting("auth");
 
+        // ─── Confirmação de conta e recuperação de senha ──────────────────────────
+        app.MapPost("/auth/forgot-password", async (
+            ForgotPasswordRequest body,
+            IUserRepository userRepo,
+            IAccountTokenRepository tokenRepo,
+            IEmailService emailService,
+            IConfiguration config,
+            CancellationToken ct) =>
+        {
+            var generic = Results.Ok(new { message = "Se este e-mail estiver cadastrado, você vai receber um link de recuperação." });
+
+            var email = body.Email?.Trim() ?? "";
+            if (string.IsNullOrEmpty(email))
+                return generic;
+
+            var info = await userRepo.GetAuthInfoByEmailAsync(email, ct);
+            if (info is null)
+                return generic;
+
+            var (userId, name, userEmail, hasPassword, provider) = info.Value;
+
+            if (!hasPassword)
+            {
+                await emailService.SendSocialAccountReminderAsync(userEmail, name, provider ?? "Google/Facebook", ct);
+                return generic;
+            }
+
+            await tokenRepo.InvalidatePendingAsync(userId, Application.Services.AccountTokenService.PasswordResetType, ct);
+            var token = Application.Services.AccountTokenService.GenerateToken();
+            var tokenHash = Application.Services.AccountTokenService.HashToken(token);
+            await tokenRepo.CreateAsync(userId, Application.Services.AccountTokenService.PasswordResetType, tokenHash,
+                DateTime.UtcNow.Add(Application.Services.AccountTokenService.PasswordResetTtl), ct);
+
+            var appBaseUrl = config["APP_BASE_URL"] ?? "https://jobeasy.com.br";
+            var resetUrl = $"{appBaseUrl}/redefinir-senha?token={token}";
+            await emailService.SendPasswordResetAsync(userEmail, name, resetUrl, ct);
+
+            return generic;
+        }).RequireRateLimiting("auth");
+
+        app.MapPost("/auth/reset-password", async (
+            ResetPasswordRequest body,
+            IAccountTokenRepository tokenRepo,
+            IUserRepository userRepo,
+            CancellationToken ct) =>
+        {
+            var token = body.Token?.Trim() ?? "";
+            var newPassword = body.NewPassword ?? "";
+
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(newPassword))
+                return Results.Json(new { error = "token e newPassword são obrigatórios" }, statusCode: 400);
+            if (newPassword.Length < 8)
+                return Results.Json(new { error = "A senha deve ter pelo menos 8 caracteres." }, statusCode: 400);
+
+            var tokenHash = Application.Services.AccountTokenService.HashToken(token);
+            var row = await tokenRepo.FindValidAsync(tokenHash, Application.Services.AccountTokenService.PasswordResetType, ct);
+            if (row is null)
+                return Results.Json(new { error = "Link inválido ou expirado. Solicite um novo." }, statusCode: 422);
+
+            var hashed = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 10);
+            await userRepo.SetPasswordAsync(row.UserId, hashed, ct);
+            await tokenRepo.MarkUsedAsync(row.Id, ct);
+            await tokenRepo.InvalidatePendingAsync(row.UserId, Application.Services.AccountTokenService.PasswordResetType, ct);
+
+            return Results.Ok(new { message = "Senha redefinida com sucesso." });
+        }).RequireRateLimiting("auth");
+
+        app.MapGet("/auth/verify-email", async (
+            string? token,
+            IAccountTokenRepository tokenRepo,
+            IUserRepository userRepo,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return Results.Json(new { error = "token é obrigatório" }, statusCode: 400);
+
+            var tokenHash = Application.Services.AccountTokenService.HashToken(token);
+            var row = await tokenRepo.FindValidAsync(tokenHash, Application.Services.AccountTokenService.EmailVerificationType, ct);
+            if (row is null)
+                return Results.Json(new { error = "Link inválido ou expirado. Solicite um novo." }, statusCode: 422);
+
+            await userRepo.SetEmailVerifiedAsync(row.UserId, ct);
+            await tokenRepo.MarkUsedAsync(row.Id, ct);
+
+            return Results.Ok(new { message = "E-mail verificado com sucesso." });
+        }).RequireRateLimiting("auth");
+
+        app.MapPost("/auth/resend-verification", async (
+            ResendVerificationRequest body,
+            IUserRepository userRepo,
+            IAccountTokenRepository tokenRepo,
+            IEmailService emailService,
+            IConfiguration config,
+            CancellationToken ct) =>
+        {
+            var generic = Results.Ok(new { message = "Se este e-mail estiver cadastrado e pendente de verificação, você vai receber um novo link." });
+
+            var email = body.Email?.Trim() ?? "";
+            if (string.IsNullOrEmpty(email))
+                return generic;
+
+            var info = await userRepo.GetVerificationInfoByEmailAsync(email, ct);
+            if (info is null || info.Value.EmailVerified)
+                return generic;
+
+            var (userId, name, userEmail, _) = info.Value;
+
+            await tokenRepo.InvalidatePendingAsync(userId, Application.Services.AccountTokenService.EmailVerificationType, ct);
+            var token = Application.Services.AccountTokenService.GenerateToken();
+            var tokenHash = Application.Services.AccountTokenService.HashToken(token);
+            await tokenRepo.CreateAsync(userId, Application.Services.AccountTokenService.EmailVerificationType, tokenHash,
+                DateTime.UtcNow.Add(Application.Services.AccountTokenService.EmailVerificationTtl), ct);
+
+            var appBaseUrl = config["APP_BASE_URL"] ?? "https://jobeasy.com.br";
+            var verificationUrl = $"{appBaseUrl}/verificar-email?token={token}";
+            await emailService.SendEmailVerificationAsync(userEmail, name, verificationUrl, ct);
+
+            return generic;
+        }).RequireRateLimiting("auth");
+
         // ─── Users ─────────────────────────────────────────────────────────────
-        app.MapPost("/users", async (CreateUserRequest body, HttpContext context, IUserRepository repo, CancellationToken ct) =>
+        app.MapPost("/users", async (
+            CreateUserRequest body, HttpContext context, IUserRepository repo,
+            IAccountTokenRepository tokenRepo, IEmailService emailService, IConfiguration config,
+            ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var name = body.Name?.Trim() ?? "";
             var email = body.Email?.Trim() ?? "";
@@ -374,6 +497,28 @@ public static class ApiEndpoints
 
             var hashed = BCrypt.Net.BCrypt.HashPassword(senha, workFactor: 10);
             var user = await repo.CreateAsync(name, email, body.Phone?.Trim(), role, hashed, body.ZoneId?.Trim(), ct, body.DefaultAddress);
+
+            // Dispara e-mail de confirmação de conta — falha no envio não deve bloquear o cadastro.
+            try
+            {
+                var userJson = JsonSerializer.Serialize(user);
+                using var userDoc = JsonDocument.Parse(userJson);
+                var newUserId = userDoc.RootElement.GetProperty("id").GetString() ?? "";
+
+                var token = Application.Services.AccountTokenService.GenerateToken();
+                var tokenHash = Application.Services.AccountTokenService.HashToken(token);
+                await tokenRepo.CreateAsync(newUserId, Application.Services.AccountTokenService.EmailVerificationType, tokenHash,
+                    DateTime.UtcNow.Add(Application.Services.AccountTokenService.EmailVerificationTtl), ct);
+
+                var appBaseUrl = config["APP_BASE_URL"] ?? "https://jobeasy.com.br";
+                var verificationUrl = $"{appBaseUrl}/verificar-email?token={token}";
+                await emailService.SendEmailVerificationAsync(email, name, verificationUrl, ct);
+            }
+            catch (Exception ex)
+            {
+                loggerFactory.CreateLogger("Users").LogWarning(ex, "Falha ao enviar e-mail de verificação para o novo usuário {Email}", email);
+            }
+
             return Results.Json(user, statusCode: 201);
         });
 

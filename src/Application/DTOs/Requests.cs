@@ -48,6 +48,11 @@ public sealed record LoginRequest(string Email, string Senha);
 // Social login
 public sealed record GoogleLoginRequest(string IdToken);
 public sealed record FacebookLoginRequest(string AccessToken);
+
+// Confirmação de conta e recuperação de senha
+public sealed record ForgotPasswordRequest(string Email);
+public sealed record ResetPasswordRequest(string Token, string NewPassword);
+public sealed record ResendVerificationRequest(string Email);
 public sealed record UpdateAppointmentStatusRequest(string Status);
 public sealed record CreateAppointmentRequest(string ProfessionalId, string? ClientId, string? ServiceId, DateTime StartsAt, DateTime EndsAt, string? Location, string? Notes);
 

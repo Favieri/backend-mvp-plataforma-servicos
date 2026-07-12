@@ -102,6 +102,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IProfessionalReadRepository, ProfessionalReadRepository>();
+        services.AddScoped<IAccountTokenRepository, AccountTokenRepository>();
 
         // New repositories
         services.AddScoped<IUserRepository, UserRepository>();
