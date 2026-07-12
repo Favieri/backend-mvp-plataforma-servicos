@@ -204,6 +204,49 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         }, true);
     }
 
+    // ─── Confirmação de conta e recuperação de senha ──────────────────────────
+
+    public async Task<(string Id, string Name, string Email, bool HasPassword, string? Provider)?> GetAuthInfoByEmailAsync(string email, CancellationToken ct)
+    {
+        var row = await ctx.Database
+            .SqlQuery<AuthInfoRow>($"""
+                SELECT id AS "Id", name AS "Name", email AS "Email",
+                       (senha IS NOT NULL) AS "HasPassword", provider AS "Provider"
+                FROM "User"
+                WHERE email = {email}
+                LIMIT 1
+            """)
+            .FirstOrDefaultAsync(ct);
+
+        return row is null ? null : (row.Id, row.Name, row.Email, row.HasPassword, row.Provider);
+    }
+
+    public async Task SetPasswordAsync(string userId, string hashedPassword, CancellationToken ct)
+    {
+        await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "User" SET senha = {hashedPassword} WHERE id = {userId}""", ct);
+    }
+
+    public async Task<(string Id, string Name, string Email, bool EmailVerified)?> GetVerificationInfoByEmailAsync(string email, CancellationToken ct)
+    {
+        var row = await ctx.Database
+            .SqlQuery<VerificationInfoRow>($"""
+                SELECT id AS "Id", name AS "Name", email AS "Email", email_verified AS "EmailVerified"
+                FROM "User"
+                WHERE email = {email}
+                LIMIT 1
+            """)
+            .FirstOrDefaultAsync(ct);
+
+        return row is null ? null : (row.Id, row.Name, row.Email, row.EmailVerified);
+    }
+
+    public async Task SetEmailVerifiedAsync(string userId, CancellationToken ct)
+    {
+        await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "User" SET email_verified = true WHERE id = {userId}""", ct);
+    }
+
     // ─── Múltiplos endereços (PRD-18a) ────────────────────────────────────────
 
     public async Task<IReadOnlyList<UserAddressDto>> GetAddressesAsync(string userId, CancellationToken ct)
@@ -338,6 +381,23 @@ public sealed class UserRepository(AppDbContext ctx) : IUserRepository
         public string? Reference { get; init; }
         public bool IsDefault { get; init; }
         public DateTime? LastUsedAt { get; init; }
+    }
+
+    private sealed record AuthInfoRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+        public bool HasPassword { get; init; }
+        public string? Provider { get; init; }
+    }
+
+    private sealed record VerificationInfoRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+        public bool EmailVerified { get; init; }
     }
 
     private sealed record SocialUserRow

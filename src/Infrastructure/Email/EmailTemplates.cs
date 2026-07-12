@@ -104,6 +104,48 @@ internal static class EmailTemplates
         return ("Seu agendamento foi confirmado", html, StripHtml(content));
     }
 
+    public static (string Subject, string Html, string Text) EmailVerification(string name, string verificationUrl)
+    {
+        var content = $"""
+<h1>Confirme seu e-mail</h1>
+<p>Olá, <b>{Escape(name)}</b>!</p>
+<p>Confirme seu e-mail para ativar sua conta na Jobeasy.</p>
+<div class="sp"></div>
+<a class="btn" href="{verificationUrl}">Confirmar e-mail</a>
+<div class="divider"></div>
+<p class="muted">Se você não criou esta conta, ignore este e-mail. Este link expira em 48 horas.</p>
+""";
+        var html = BaseLayout("Confirme seu e-mail", "Confirme seu e-mail para ativar sua conta", content);
+        return ("Confirme seu e-mail na Jobeasy", html, StripHtml(content));
+    }
+
+    public static (string Subject, string Html, string Text) PasswordReset(string name, string resetUrl)
+    {
+        var content = $"""
+<h1>Redefinir senha</h1>
+<p>Olá, <b>{Escape(name)}</b>!</p>
+<p>Recebemos um pedido para redefinir sua senha na Jobeasy.</p>
+<div class="sp"></div>
+<a class="btn" href="{resetUrl}">Redefinir senha</a>
+<div class="divider"></div>
+<p class="muted">Se você não pediu isso, ignore este e-mail. Este link expira em 30 minutos.</p>
+""";
+        var html = BaseLayout("Redefinir sua senha", "Redefina sua senha na Jobeasy", content);
+        return ("Redefinir sua senha na Jobeasy", html, StripHtml(content));
+    }
+
+    public static (string Subject, string Html, string Text) SocialAccountReminder(string name, string provider)
+    {
+        var content = $"""
+<h1>Você entra pelo {Escape(provider)}</h1>
+<p>Olá, <b>{Escape(name)}</b>!</p>
+<p>Sua conta na Jobeasy usa login via <b>{Escape(provider)}</b> e não tem senha cadastrada na plataforma.</p>
+<p class="muted">Para acessar, entre usando o botão "{Escape(provider)}" na tela de login.</p>
+""";
+        var html = BaseLayout("Sua conta usa login social", $"Entre pela sua conta {provider}", content);
+        return ("Sobre o acesso à sua conta Jobeasy", html, StripHtml(content));
+    }
+
     private static string Escape(string s) => s
         .Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")
         .Replace("\"", "&quot;").Replace("'", "&#39;");

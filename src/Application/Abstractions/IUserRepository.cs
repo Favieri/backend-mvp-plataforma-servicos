@@ -14,6 +14,12 @@ public interface IUserRepository
     Task<object?> GetByIdAsync(string userId, CancellationToken ct);
     Task UpdateUserAsync(string userId, string? name, string? phone, string? zoneId, CancellationToken ct);
 
+    // ─── Confirmação de conta e recuperação de senha ──────────────────────────
+    Task<(string Id, string Name, string Email, bool HasPassword, string? Provider)?> GetAuthInfoByEmailAsync(string email, CancellationToken ct);
+    Task SetPasswordAsync(string userId, string hashedPassword, CancellationToken ct);
+    Task<(string Id, string Name, string Email, bool EmailVerified)?> GetVerificationInfoByEmailAsync(string email, CancellationToken ct);
+    Task SetEmailVerifiedAsync(string userId, CancellationToken ct);
+
     // ─── Múltiplos endereços (PRD-18a) ────────────────────────────────────────
     Task<IReadOnlyList<UserAddressDto>> GetAddressesAsync(string userId, CancellationToken ct);
     Task<UserAddressDto> CreateAddressAsync(string userId, CreateUserAddressRequest req, CancellationToken ct);

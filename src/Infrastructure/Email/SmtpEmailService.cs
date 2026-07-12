@@ -72,6 +72,24 @@ public sealed class SmtpEmailService(IConnectionFactory factory, ILogger<SmtpEma
         await SendAsync(to, subject, html, dedupeKey: dedupeKey, ct: ct);
     }
 
+    public async Task SendEmailVerificationAsync(string to, string name, string verificationUrl, CancellationToken ct = default)
+    {
+        var (subject, html, _) = EmailTemplates.EmailVerification(name, verificationUrl);
+        await SendAsync(to, subject, html, ct: ct);
+    }
+
+    public async Task SendPasswordResetAsync(string to, string name, string resetUrl, CancellationToken ct = default)
+    {
+        var (subject, html, _) = EmailTemplates.PasswordReset(name, resetUrl);
+        await SendAsync(to, subject, html, ct: ct);
+    }
+
+    public async Task SendSocialAccountReminderAsync(string to, string name, string provider, CancellationToken ct = default)
+    {
+        var (subject, html, _) = EmailTemplates.SocialAccountReminder(name, provider);
+        await SendAsync(to, subject, html, ct: ct);
+    }
+
     private async Task<bool> TryInsertEmailJobAsync(string to, string subject, string html, string? text, string dedupeKey, CancellationToken ct)
     {
         try
