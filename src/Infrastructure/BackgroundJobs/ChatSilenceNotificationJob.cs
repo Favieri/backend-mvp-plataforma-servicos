@@ -32,7 +32,14 @@ public sealed class ChatSilenceNotificationJob : BackgroundService
 
         using var timer = new PeriodicTimer(Interval);
 
-        await RunOnceAsync(stoppingToken);
+        try
+        {
+            await RunOnceAsync(stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ChatSilenceNotificationJob] Unhandled error during initial run");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -57,11 +64,12 @@ public sealed class ChatSilenceNotificationJob : BackgroundService
     public async Task RunOnceAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
-        var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
         try
         {
+            var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+            var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
             var now = DateTime.UtcNow;
             var candidates = await repo.GetChatSilenceCandidatesAsync(ChatSilenceRules.SilenceThreshold, ct);
 

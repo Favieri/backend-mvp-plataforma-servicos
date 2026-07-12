@@ -31,7 +31,14 @@ public sealed class ProposalExpirationJob : BackgroundService
         using var timer = new PeriodicTimer(Interval);
 
         // Run once immediately on startup, then on each tick
-        await RunAsync(stoppingToken);
+        try
+        {
+            await RunAsync(stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ProposalExpirationJob] Unhandled error during initial run");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -56,10 +63,11 @@ public sealed class ProposalExpirationJob : BackgroundService
     private async Task RunAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         try
         {
+            var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
             var now = DateTime.UtcNow;
 
             var expired = await ctx.Proposals
