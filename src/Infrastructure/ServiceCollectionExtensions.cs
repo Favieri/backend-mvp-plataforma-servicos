@@ -1,4 +1,5 @@
 using Amazon.S3;
+using Amazon.SimpleEmailV2;
 using Application.Abstractions;
 using Application.Services;
 using Infrastructure.Data;
@@ -175,9 +176,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRefundService, Infrastructure.Services.RefundService>();
         services.AddHostedService<BackgroundJobs.RefundRetryJob>();
 
-        // Email / notifications
-        // TODO: CREDENTIALS - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM env vars
-        services.AddScoped<IEmailService, SmtpEmailService>();
+        // Email / notifications — via Amazon SES. Autenticação exclusivamente pela IAM role
+        // do Lambda (cadeia de credenciais padrão do SDK), mesmo padrão do cliente S3 acima.
+        services.AddSingleton<IAmazonSimpleEmailServiceV2>(_ =>
+        {
+            var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+            return new AmazonSimpleEmailServiceV2Client(Amazon.RegionEndpoint.GetBySystemName(region));
+        });
+        services.AddScoped<IEmailService, SesEmailService>();
 
         return services;
     }

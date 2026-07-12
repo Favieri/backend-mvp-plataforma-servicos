@@ -20,5 +20,11 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="AWSSDK.S3" Version="3.*" />
+    <PackageReference Include="AWSSDK.SimpleEmailV2" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UnitTests" />
+    <InternalsVisibleTo Include="IntegrationTests" />
   </ItemGroup>
 </Project>
